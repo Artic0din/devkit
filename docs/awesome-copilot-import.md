@@ -6,10 +6,20 @@ read_when:
 
 # Awesome Copilot imports
 
-These files were already installed locally and are now tracked without changing their contents or invocation settings.
+These files were already installed locally and are now tracked with invocation settings preserved.
 Source: [GitHub Awesome Copilot](https://github.com/github/awesome-copilot/tree/1f5644080a525d26a2e24f61a7609fb9b261c21a).
 Pinned revision: `1f5644080a525d26a2e24f61a7609fb9b261c21a`.
-All 202 imported files match the Git blob at their corresponding source path.
+All 202 imported files were verified against the Git blob at their corresponding source path before the compatibility corrections below.
+
+## Local compatibility corrections
+
+- `agent-skill-stack/scripts/inventory_skills.py` recognizes YAML block scalars with chomping indicators such as `>-`, as used by the imported `doc-and-modernize` description.
+  It also discovers directory-linked skills, deduplicates aliases, and stops cycles, matching the managed skill links used here.
+  Focused regression checks cover both paths.
+- `webapp-testing/assets/package.json` marks the existing helper as CommonJS within this repository's ES module package.
+  The helper itself remains unchanged, and a regression check exercises imports and its three exports.
+
+Run `python3 skills/agent-skill-stack/scripts/test_inventory_skills.py` and `node skills/webapp-testing/assets/test-helper.test.cjs` after updating these assets.
 
 ## Scope and licenses
 
@@ -85,4 +95,5 @@ Publishing these source files does not prove every external integration or produ
 Use each skill's prerequisites and current tool authorization when invoking it.
 
 Before an update, compare the selected files against a new pinned upstream revision and review the complete diff.
+Keep the compatibility checks passing and record any source deviations here.
 Do not silently rewrite imported instructions or change automatic invocation while updating provenance.
