@@ -26,7 +26,7 @@ def main() -> int:
     try:
         payload = json.load(sys.stdin)
         response = payload["tool_response"]
-        stdout, stderr = response.get("stdout", ""), response.get("stderr", "")
+        stdout, stderr = response["stdout"], response["stderr"]
         if not isinstance(stdout, str) or not isinstance(stderr, str):
             raise ValueError("Bash output fields must be strings")
         clean_stdout, clean_stderr = scrub(stdout), scrub(stderr)

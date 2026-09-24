@@ -17,6 +17,13 @@ def run_hook(stdout: str, stderr: str = "") -> str:
 
 
 if __name__ == "__main__":
+    for response in ({}, {"stdout": ""}, {"stderr": ""}):
+        result = subprocess.run(
+            ["bash", str(Path(__file__).with_name("bash-output-scrub.sh"))],
+            input=json.dumps({"tool_response": response}), text=True,
+            capture_output=True, timeout=3,
+        )
+        assert result.returncode == 2 and result.stdout == "", result
     assert run_hook("ordinary output") == ""
     assert run_hook("eyJ" * 100000) == ""
     for prefix in ("sk-", "pk-"):
