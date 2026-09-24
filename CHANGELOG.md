@@ -7,6 +7,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 ## Unreleased
 
 - Preserved 53 existing Awesome Copilot skills, 19 agents, and four instructions in the repository with pinned provenance and upstream licenses.
+- Fixed imported skill indexing for folded YAML descriptions and linked directories, and made the bundled web testing helper load correctly in this repository.
 - Preserved build planning and session organisation workflows with approved previews, current evidence checks, and consistent GitHub publication safeguards.
 - Added Google Chrome's `modern-web-guidance` and `chrome-extensions` skills: agents can look up current HTML, CSS and browser JavaScript practices and build Manifest V3 Chrome extensions, and the guidance lookups no longer send usage data to Google.
 - Added `scripts/list-skills`: one page that shows every skill and installed Claude plugin skill with where it came from, its repository, its version and what it does, and recorded in `skills.lock.json` where 138 skills that live outside DevKit came from, plus the upstream repository of 34 DevKit skills that started as copies.
