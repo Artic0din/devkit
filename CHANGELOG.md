@@ -6,6 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Published the Codex post-tool output filter with redacted blocking feedback and checks for both output channels.
 - Updated fleet maintenance for the current fleet: it now covers the iMac, lists the Intel Mac mini and Windows PC as joining, and explains how to run it from a Mac other than the Air.
 - Removed the `gstack-retro` weekly review and its setup notes, because Gstack is no longer installed.
 - Removed the agent host `pre-commit-secrets.sh` hooks and their Claude, Codex, Copilot, Cursor and Antigravity registrations; the opt-in Git `pre-commit` hook still runs the staged-secret scan.
