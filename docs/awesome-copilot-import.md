@@ -9,7 +9,8 @@ read_when:
 These files were already installed locally and are now tracked with invocation settings preserved.
 Source: [GitHub Awesome Copilot](https://github.com/github/awesome-copilot/tree/1f5644080a525d26a2e24f61a7609fb9b261c21a).
 Pinned revision: `1f5644080a525d26a2e24f61a7609fb9b261c21a`.
-All 202 imported files were verified against the Git blob at their corresponding source path before the compatibility corrections below.
+All 202 candidate source files were verified against the Git blob at their corresponding source path before review.
+This import includes 187 of them, with the compatibility corrections below; the 15 React 19 and Swift MCP files described under exclusions remain local only.
 
 ## Local compatibility corrections
 
@@ -18,18 +19,40 @@ All 202 imported files were verified against the Git blob at their corresponding
   Focused regression checks cover both paths.
 - `webapp-testing/assets/package.json` marks the existing helper as CommonJS within this repository's ES module package.
   The helper itself remains unchanged, and a regression check exercises imports and its three exports.
+- `ui-screenshots/SKILL.md` captures a missed before-state in a separate detached worktree instead of overwriting staged and unstaged work with path checkout commands.
+- The frontend performance investigator enables its documented Chrome DevTools server tool set using the [VS Code MCP tool-list syntax](https://code.visualstudio.com/docs/agent-customization/custom-agents#custom-agent-file-structure).
+  The server still needs to be configured and available; no server is installed by this import.
+- `generate-custom-instructions-from-codebase` writes migration rules under `.github/instructions/` with an `applyTo` header so Copilot discovers the generated file.
 
 Run `python3 skills/agent-skill-stack/scripts/test_inventory_skills.py` and `node skills/webapp-testing/assets/test-helper.test.cjs` after updating these assets.
 
 ## Scope and licenses
 
-- 53 skill directories under `skills/`, containing 179 files, retain their upstream paths.
-- 19 upstream `agents/` files live under `.github/agents/`.
-- Four upstream `instructions/` files live under `.github/instructions/`: `devcontainers`, `html-css-style-color-guide`, `mvvm-toolkit`, and `swift-mcp-server`.
+- 49 skill directories under `skills/`, containing 171 source files, retain their upstream paths.
+- 13 upstream `agents/` files live under `.github/agents/`.
+- Three upstream `instructions/` files live under `.github/instructions/`: `devcontainers`, `html-css-style-color-guide`, and `mvvm-toolkit`.
 - The upstream [MIT license, GitHub Inc](licenses/awesome-copilot-MIT.txt) is included.
   The separately supplied [anti-ui-slop Apache license](../skills/anti-ui-slop/LICENSE) is preserved verbatim, along with its upstream metadata.
 - Twelve local plugin manifests are excluded because all 29 assets they reference are absent from that local plugin tree.
   No incomplete plugin is advertised as installable by this import.
+
+The existing [Repository Label Governance context](../CONTEXT.md) is local project vocabulary, not part of Awesome Copilot or its upstream attribution.
+
+## Excluded React 19 migration suite
+
+Five agents and three skill directories, totaling 12 files, are excluded and remain untouched in the original local checkout.
+The excluded agents are `react19-auditor`, `react19-commander`, `react19-dep-surgeon`, `react19-migrator`, and `react19-test-guardian`.
+The excluded skills are `react19-concurrent-patterns` (four files), `react19-source-patterns` (two files), and `react19-test-patterns` (one file).
+Review confirmed that migration guidance changes argumentless refs from `undefined` to `null`, falsely claims React 19 no longer replays effects in development StrictMode, and recommends matching assertions to observed counts without establishing intended behavior.
+The migration pipeline also skips TypeScript files and applies inconsistent test-file exclusions in its completion gate.
+These require a dedicated migration-content review before publication; this import does not attempt that rewrite.
+
+## Excluded Swift MCP lifecycle templates
+
+The `swift-mcp-expert` agent, `swift-mcp-server-generator` skill, and `swift-mcp-server` instruction file remain local only.
+All three define a `shutdown()` method that the ServiceLifecycle `Service` protocol does not invoke.
+The expert example also returns from `run()` immediately after `Server.start()`, which starts its receive loop in a separate task; the other two use a long sleep instead of the server's completion lifecycle.
+These three templates require a dedicated SDK lifecycle correction and compile/runtime validation before publication.
 
 ## Imported skills
 
@@ -72,14 +95,10 @@ Run `python3 skills/agent-skill-stack/scripts/test_inventory_skills.py` and `nod
 - [pr-dashboard](../skills/pr-dashboard/SKILL.md)
 - [pr-screenshots](../skills/pr-screenshots/SKILL.md)
 - [premium-frontend-ui](../skills/premium-frontend-ui/SKILL.md)
-- [react19-concurrent-patterns](../skills/react19-concurrent-patterns/SKILL.md)
-- [react19-source-patterns](../skills/react19-source-patterns/SKILL.md)
-- [react19-test-patterns](../skills/react19-test-patterns/SKILL.md)
 - [repo-standardizer](../skills/repo-standardizer/SKILL.md)
 - [suggest-awesome-github-copilot-agents](../skills/suggest-awesome-github-copilot-agents/SKILL.md)
 - [suggest-awesome-github-copilot-instructions](../skills/suggest-awesome-github-copilot-instructions/SKILL.md)
 - [suggest-awesome-github-copilot-skills](../skills/suggest-awesome-github-copilot-skills/SKILL.md)
-- [swift-mcp-server-generator](../skills/swift-mcp-server-generator/SKILL.md)
 - [technology-stack-blueprint-generator](../skills/technology-stack-blueprint-generator/SKILL.md)
 - [ui-screenshots](../skills/ui-screenshots/SKILL.md)
 - [update-specification](../skills/update-specification/SKILL.md)
