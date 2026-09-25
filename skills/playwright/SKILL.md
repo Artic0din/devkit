@@ -15,7 +15,7 @@ The wrapper uses a locked CLI installation inside this trusted skill directory, 
 Check Node.js and npm before setup:
 
 ```bash
-node --version
+node -e 'if (Number(process.versions.node.split(".")[0]) < 20) { console.error("Node.js 20 or newer is required"); process.exit(1); }'
 npm --version
 ```
 
@@ -26,11 +26,16 @@ If unavailable, install through the host's supported Node.js setup before contin
 ```bash
 export PWCLI="${CODEX_HOME:-$HOME/.codex}/skills/agent-scripts/playwright/scripts/playwright_cli.sh"
 (cd "$(dirname "$PWCLI")/runtime" && npm ci --ignore-scripts --no-audit --no-fund)
+node "$(dirname "$PWCLI")/runtime/node_modules/playwright/cli.js" install chromium
 ```
 
 This path matches the repository's Codex mirror.
 For another host, resolve `scripts/playwright_cli.sh` relative to this loaded `SKILL.md` instead.
 Run setup from the trusted skill's runtime directory; the lockfile pins versions and package integrity, and installation scripts are disabled.
+The browser install uses that pinned Playwright version.
+On Linux, install missing operating-system browser dependencies through the host's supported package manager before opening a browser.
+The wrapper requires Node.js 20 or newer and forces its bundled trusted browser configuration.
+It ignores project-local configuration and rejects `--config` overrides; review any necessary settings in the trusted configuration before use.
 
 ## Quick start
 

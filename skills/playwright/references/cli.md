@@ -10,10 +10,10 @@ export PWCLI="${CODEX_HOME:-$HOME/.codex}/skills/agent-scripts/playwright/script
 This is the repository's Codex mirror path.
 For other hosts, resolve the wrapper relative to the loaded skill directory and follow `SKILL.md` for locked runtime setup.
 
-Optional convenience alias:
+Define this shell function before using the reference commands, including in non-interactive shells:
 
 ```bash
-alias pwcli="$PWCLI"
+pwcli() { "$PWCLI" "$@"; }
 ```
 
 ## Core

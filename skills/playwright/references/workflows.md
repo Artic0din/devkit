@@ -1,7 +1,7 @@
 # Playwright CLI Workflows
 
 Use the wrapper script and snapshot often.
-Assume `PWCLI` is set and `pwcli` is an alias for `"$PWCLI"`.
+Set `PWCLI` as described in `SKILL.md`, then define `pwcli() { "$PWCLI" "$@"; }` in each shell running these examples.
 In this repo, run commands from `output/playwright/<label>/` to keep artifacts contained.
 
 ## Standard interaction loop
@@ -71,9 +71,11 @@ pwcli open https://example.com/checkout
 
 ## Configuration file
 
-By default, the CLI reads `playwright-cli.json` from the current directory. Use `--config` to point at a specific file.
+The wrapper always selects its trusted `scripts/runtime/config.json`, so project-local `.playwright/cli.config.json` cannot select an executable or inject launch settings.
+Project configuration overrides are rejected.
+If customization is authorized, review and edit the trusted configuration; never copy an unreviewed repository configuration into it.
 
-Minimal example:
+Example settings to review within that trusted file:
 
 ```json
 {

@@ -25,6 +25,8 @@ Read each skill's setup instructions before use and follow the current host's to
 Playwright uses the canonical mirror path, ignored capture output, and an absolute CLI path installed with `npm ci` from its trusted runtime directory.
 The runtime manifest and lockfile pin the already-required CLI and its integrity hashes; install scripts are disabled.
 A regression check places a fake executable in a project and verifies it is not selected.
+The wrapper also forces a trusted browser configuration, rejects project configuration overrides, and requires Node.js 20 or newer.
+Setup installs Chromium through the pinned runtime; CI exercises package/configuration isolation and literal session-like command data in a real headless browser.
 Find Skills requires source and license review at a pinned commit and imports through the canonical repository instead of writing directly to a global store.
 Both skills are registered in the catalogue.
 
