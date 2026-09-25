@@ -6,6 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Preserved local build and session-triage workflows while removing retired workspace and project references and aligning publication safeguards.
 - Added Google Chrome's `modern-web-guidance` and `chrome-extensions` skills: agents can look up current HTML, CSS and browser JavaScript practices and build Manifest V3 Chrome extensions, and the guidance lookups no longer send usage data to Google.
 - Added `scripts/list-skills`: one page that shows every skill and installed Claude plugin skill with where it came from, its repository, its version and what it does, and recorded in `skills.lock.json` where 138 skills that live outside DevKit came from, plus the upstream repository of 34 DevKit skills that started as copies.
 - Fixed `scripts/agent-sweep` failing to remove a repository's remaining worktrees after deleting the worktree it found the repository through.
