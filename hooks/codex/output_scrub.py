@@ -1,14 +1,14 @@
 """Return bounded, redacted feedback using the Codex PostToolUse contract."""
 
+import base64
 import json
 import re
 import sys
 
 
 PREVIEW_CHARACTERS = 6000
+JWT_PATTERN = re.compile(r"(?<![A-Za-z0-9_-])(?=(([A-Za-z0-9_-]+)\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+))")
 PATTERNS = (
-    # A token boundary prevents rescanning overlapping eyJ prefixes without dots.
-    (r"(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+", "JWT"),
     (r"(?<![A-Za-z0-9_-])(?:sk[-_]|pk[-_]|ptr_|psk_)[A-Za-z0-9_-]{20,}", "KEY"),
     (r"(?:gh[psour]_|github_pat_)[A-Za-z0-9_]{30,}", "GH_TOKEN"),
     (r"(?:AKIA|ASIA)[0-9A-Z]{16}", "AWS_KEY"),
@@ -16,7 +16,24 @@ PATTERNS = (
 )
 
 
+def is_jwt_header(header: str) -> bool:
+    # JSON whitespace changes the encoded prefix; recognize the decoded JOSE header.
+    try:
+        decoded = json.loads(base64.urlsafe_b64decode(header + "=" * (-len(header) % 4)))
+    except (ValueError, UnicodeDecodeError):
+        return False
+    return isinstance(decoded, dict) and isinstance(decoded.get("alg"), str)
+
+
 def scrub(text: str) -> str:
+    parts: list[str] = []
+    end = 0
+    # Overlapping candidates keep an invalid dotted prefix from hiding a real JWT.
+    for candidate in JWT_PATTERN.finditer(text):
+        if candidate.start() >= end and is_jwt_header(candidate.group(2)):
+            parts.extend((text[end:candidate.start()], "[REDACTED_JWT]"))
+            end = candidate.start() + len(candidate.group(1))
+    text = "".join(parts) + text[end:]
     for pattern, label in PATTERNS:
         text = re.sub(pattern, f"[REDACTED_{label}]", text)
     return text
@@ -41,7 +58,7 @@ def main() -> int:
             )
             print(json.dumps({"decision": "block", "reason": reason}))
         return 0
-    except (AttributeError, KeyError, TypeError, ValueError, OSError):
+    except (AttributeError, KeyError, TypeError, ValueError, OSError, RecursionError):
         print("Tool output withheld: output filter could not process the result.", file=sys.stderr)
         return 2
 
