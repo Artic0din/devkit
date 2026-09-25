@@ -73,8 +73,9 @@ rules are the standing contract and must not drift.
   `gitleaks git --redact --log-opts='<remote-base>..HEAD'` over the exact outgoing
   range before every push. Scanner findings block publication.
   No secrets in git, memory files, or logs. .env.example with names only.
-- No scope creep. Where the spec leaves a decision open, pick the lowest-risk option, record it
-  and the reasoning in [DECISIONS_DOC], and keep going.
+- No scope creep. Ask about unresolved user intent or consequential product and architecture choices.
+  Choose autonomously only among explicitly delegated, reversible implementation details;
+  record the choice and reasoning in [DECISIONS_DOC].
 - Open source is license-gated: no GPL/AGPL copy-paste; prefer pinned maintained libs; attribute
   in docs/third-party.md.
 - AI review: use the canonical autoreview skill and repository-required reviews. Self-fix loop on any failing gate:

@@ -84,6 +84,15 @@ def _validate_task(
 
     if status == "new":
         repository = task.get("repo")
+        body = task.get("body")
+        _require(_has_text(body), f"{path}.body is required", errors)
+        if isinstance(body, str):
+            for heading in ("Context", "Goal", "Acceptance criteria", "Technical notes"):
+                _require(
+                    bool(re.search(rf"(?m)^## {heading}\s*$", body)),
+                    f"{path}.body requires a {heading} section", errors,
+                )
+            _require(isinstance(marker, str) and marker in body, f"{path}.body must include its marker", errors)
         _require(
             mapping_status == "mapped",
             f"{path} cannot be new for an unmapped project",
@@ -236,6 +245,7 @@ def validate_preview(preview: Any) -> list[str]:
             )
 
     seen_ids: set[str] = set()
+    seen_markers: set[str] = set()
     audited_count = 0
     unreadable_count = 0
     archive_count = 0
@@ -400,6 +410,10 @@ def validate_preview(preview: Any) -> list[str]:
                 )
                 if isinstance(task, dict) and task.get("status") == "new":
                     new_task_count += 1
+                    marker = task.get("marker")
+                    if isinstance(marker, str):
+                        _require(marker not in seen_markers, f"duplicate task marker: {marker}", errors)
+                        seen_markers.add(marker)
                     _require(not unreadable, f"{path} unreadable thread cannot propose new tasks", errors)
 
         if isinstance(knowledge, list):
