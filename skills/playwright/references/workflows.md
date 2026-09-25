@@ -1,5 +1,7 @@
 # Playwright CLI Workflows
 
+> Modified by Artic0din/agent-scripts for non-interactive shell invocation and trusted browser configuration.
+
 Use the wrapper script and snapshot often.
 Set `PWCLI` as described in `SKILL.md`, then define `pwcli() { "$PWCLI" "$@"; }` in each shell running these examples.
 In this repo, run commands from `output/playwright/<label>/` to keep artifacts contained.

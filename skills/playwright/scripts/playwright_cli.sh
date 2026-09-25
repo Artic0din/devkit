@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Modified by Artic0din/agent-scripts for a pinned runtime, trusted browser
+# configuration, Node.js prerequisites, and separator-aware session handling.
 set -euo pipefail
 
 node -e 'if (Number(process.versions.node.split(".")[0]) < 20) { console.error("Playwright requires Node.js 20 or newer"); process.exit(1); }'

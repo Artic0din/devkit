@@ -6,6 +6,8 @@ description: "Use when the task requires automating a real browser from the term
 
 # Playwright CLI Skill
 
+> Modified by Artic0din/agent-scripts for canonical skill paths, pinned runtime and browser setup, trusted configuration, and artifact handling.
+
 Drive a real browser from the terminal using `playwright-cli`. Prefer the bundled wrapper script so the CLI works even when it is not globally installed.
 Treat this skill as CLI-first automation. Do not pivot to `@playwright/test` unless the user explicitly asks for test files.
 

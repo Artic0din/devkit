@@ -1,5 +1,7 @@
 # Playwright CLI Reference
 
+> Modified by Artic0din/agent-scripts for canonical wrapper discovery and non-interactive shell invocation.
+
 Use the wrapper script unless the CLI is already installed globally:
 
 ```bash
