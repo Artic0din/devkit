@@ -6,6 +6,8 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Bounded abandoned iOS session renewal and serialized tunnel recovery in the preserved Gstack patch.
+
 - Preserved the local Gstack iOS daemon reconnect changes as a reproducible patch against a pinned upstream revision.
 - Fixed skill sync and its audit to preserve existing canonical aliases and variants and allow the retired manager root to be absent.
 - Recorded the existing Metisary skill and worktree paths, Cursor and Copilot instruction links, and Antigravity registration files.

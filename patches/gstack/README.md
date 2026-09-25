@@ -9,6 +9,10 @@ They also preserve the local regression coverage for reconnects and tunnel reuse
 Review found that rejected requests could replace or clear the active session heartbeat.
 The preserved patch corrects that behavior and adds two regression cases: session tracking changes only after successful acquisition or a successful release of the tracked session.
 An older heartbeat response also cannot clear a newer session.
+Session renewal stops after five minutes without a successful request from the owning client, allowing the device lease to expire after abandonment.
+Successful activity from the same still-valid session resumes renewal.
+Concurrent recovery requests share the complete soft-reuse and hard-bootstrap operation so recovery cannot relaunch the app while reuse is still in progress.
+If a reused tunnel still fails on the requested endpoint, requests share a hard-bootstrap fallback.
 The installed runtime was left unchanged.
 
 ## Apply to a separate Gstack checkout
@@ -35,6 +39,8 @@ The patch applied cleanly to a fresh checkout at the pinned revision.
 The initial six-file delta was byte-identical to the installed local files.
 The final patch retains four of those files unchanged and adds the reviewed session correction in `src/index.ts` and its tests in `test/daemon-integration.test.ts`.
 Both new regression cases failed against the original local changes and passed with the correction.
-The two suites passed with Bun 1.4.2: 53 tests and 149 assertions.
+Concurrent recovery and client inactivity regressions also failed against the earlier patch and passed after correction.
+Release tests count heartbeat request starts, avoiding a race with an already in-flight request arriving after release.
+The two suites passed with Bun 1.4.2: 55 tests and 159 assertions.
 They use local test doubles; a physical iPhone and Xcode device integration were not exercised.
 Generated aliases, compiled outputs, installation markers, and the remaining upstream runtime are excluded.
