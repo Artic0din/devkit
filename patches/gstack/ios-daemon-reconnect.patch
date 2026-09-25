@@ -1,0 +1,659 @@
+diff --git a/ios-qa/daemon/src/devicectl.ts b/ios-qa/daemon/src/devicectl.ts
+index c17aec7..4355d20 100644
+--- a/ios-qa/daemon/src/devicectl.ts
++++ b/ios-qa/daemon/src/devicectl.ts
+@@ -4,7 +4,7 @@
+ // Production code uses the defaults: spawnSync('xcrun', [...]) and
+ // dns.lookup('<host>.coredevice.local'). Tests inject stubs.
+ 
+-import { spawnSync, type SpawnSyncReturns } from 'child_process';
++import { spawn, spawnSync, type SpawnSyncReturns } from 'child_process';
+ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+ import { tmpdir } from 'os';
+ import { join } from 'path';
+@@ -145,11 +145,17 @@ export function getDeviceTunnelIPv6FromDevicectl(
+  * something poking it, the tunnel IPv6 becomes unroutable within seconds —
+  * `curl` to the address times out even though the address looks valid.
+  *
+- * Implementation note: we chose `device info details` (cheap, ~10ms of CPU
+- * per tick, no persistent child process) over `device console` (which would
+- * keep the tunnel up continuously but spams stdout, can wedge on backpressure,
+- * and is harder to kill cleanly). The 5-second interval is comfortably under
+- * the empirically-observed tunnel teardown timeout (~10-15s of idle).
++ * Implementation note: we chose `device info details` (no persistent child)
++ * over `device console` (which would keep the tunnel up continuously but
++ * spams stdout, can wedge on backpressure, and is harder to kill cleanly).
++ * Each poke is ~0.5–0.7s of wall time on Xcode 26, so production uses
++ * async `spawn` and skips a tick that is still in flight. A synchronous
++ * poke would stall the HTTP proxy for the whole duration — long enough
++ * for `/elements` or `/screenshot` to look like a dead tunnel, which then
++ * relaunches the app and wipes the in-memory session lock.
++ *
++ * The 5-second interval is comfortably under the empirically-observed
++ * tunnel teardown timeout (~10-15s of idle).
+  *
+  * Returns a `stop()` function that cancels the timer. Safe to call multiple
+  * times.
+@@ -159,17 +165,37 @@ export function startTunnelKeepalive(
+   opts: { intervalMs?: number; spawn?: SpawnImpl } = {},
+ ): { stop: () => void } {
+   const intervalMs = opts.intervalMs ?? 5_000;
+-  const spawn = opts.spawn ?? defaultSpawn;
+   let stopped = false;
++  let inFlight = false;
++
++  const pokeArgs = (tmp: string) =>
++    ['devicectl', 'device', 'info', 'details', '--device', udid, '--json-output', tmp];
++
+   const tick = () => {
+     if (stopped) return;
+-    // Fire-and-forget: ignore result, the side-effect of the spawn is what
+-    // keeps the tunnel up. We deliberately do not use the JSON output here.
+-    try {
+-      const tmp = join(tmpdir(), `devicectl-keepalive-${process.pid}-${Date.now()}.json`);
+-      spawn('xcrun', ['devicectl', 'device', 'info', 'details', '--device', udid, '--json-output', tmp]);
++    const tmp = join(tmpdir(), `devicectl-keepalive-${process.pid}-${Date.now()}.json`);
++    // Tests inject a sync spawnImpl so they can assert the argv without a
++    // real devicectl. Production must not block the event loop.
++    if (opts.spawn) {
++      try {
++        opts.spawn('xcrun', pokeArgs(tmp));
++      } catch { /* ignore — next tick will retry */ }
+       try { rmSync(tmp, { force: true }); } catch { /* ignore */ }
+-    } catch { /* ignore — next tick will retry */ }
++      return;
++    }
++    if (inFlight) return;
++    inFlight = true;
++    try {
++      const child = spawn('xcrun', pokeArgs(tmp), { stdio: 'ignore' });
++      const done = () => {
++        inFlight = false;
++        try { rmSync(tmp, { force: true }); } catch { /* ignore */ }
++      };
++      child.once('exit', done);
++      child.once('error', done);
++    } catch {
++      inFlight = false;
++    }
+   };
+   const handle = setInterval(tick, intervalMs);
+   // Don't keep the event loop alive just for this — daemon owns the lifecycle.
+diff --git a/ios-qa/daemon/src/index.ts b/ios-qa/daemon/src/index.ts
+index 9ae177c..9230917 100644
+--- a/ios-qa/daemon/src/index.ts
++++ b/ios-qa/daemon/src/index.ts
+@@ -20,7 +20,7 @@ import { SessionTokenStore } from './session-tokens';
+ import { mintForCaller } from './auth-mint';
+ import { classifyRoute, proxyToDevice, type DeviceTunnel } from './proxy';
+ import { writeAudit, writeAttempt, sanitizeReplacer, saltedHash } from './audit';
+-import { bootstrapTunnel } from './tunnel-bootstrap';
++import { bootstrapTunnel, reuseRotatedTunnel } from './tunnel-bootstrap';
+ import { startTunnelKeepalive } from './devicectl';
+ import type { Capability } from './types';
+ 
+@@ -40,6 +40,13 @@ interface DaemonOptions {
+   tunnelProvider?: () => Promise<DeviceTunnel | null>;
+   whoIsImpl?: (addr: string) => Promise<{ identity: string; raw: unknown }>;
+   probeImpl?: () => Promise<{ ok: boolean; reason?: string; ownIdentity?: string }>;
++  // Prefer re-resolving the CoreDevice IPv6 and reusing the rotated bearer
++  // over a full bootstrap (which relaunches the app when the boot token is
++  // already gone). CLI enables the real USB probe; tests inject a stub.
++  softReconnect?: (failed: DeviceTunnel) => Promise<DeviceTunnel | null>;
++  // Slide the on-device session lock while the daemon is alive. Reads do
++  // not slide that lock, so a screenshot-only walk otherwise expires at 300s.
++  sessionKeepaliveMs?: number;
+ }
+ 
+ export interface RunningDaemon {
+@@ -63,6 +70,7 @@ export async function startDaemon(opts: DaemonOptions): Promise<RunningDaemon |
+   const tokenStore = new SessionTokenStore();
+   let tunnel: DeviceTunnel | null = null;
+   let tunnelInFlight: Promise<DeviceTunnel | null> | null = null;
++  let lastDeviceSessionId: string | null = null;
+ 
+   const getTunnel = async (): Promise<DeviceTunnel | null> => {
+     // A successful bootstrap consumes and deletes the app's one-shot boot
+@@ -94,6 +102,49 @@ export async function startDaemon(opts: DaemonOptions): Promise<RunningDaemon |
+     if (tunnel === failedTunnel) tunnel = null;
+   };
+ 
++  const adoptTunnel = (next: DeviceTunnel): void => {
++    tunnel = next;
++  };
++
++  const noteDeviceSession = (path: string, requestId: string | null, upstream?: DeviceProxyResponse) => {
++    if (!upstream || upstream.status < 200 || upstream.status >= 300) return;
++    if (path === '/session/release') {
++      if (requestId === lastDeviceSessionId) lastDeviceSessionId = null;
++      return;
++    }
++    if (path === '/session/acquire') {
++      try {
++        const body = JSON.parse(upstream.body.toString('utf-8')) as { session_id?: string };
++        if (typeof body.session_id === 'string' && body.session_id) lastDeviceSessionId = body.session_id;
++      } catch { /* ignore malformed acquire bodies */ }
++    }
++  };
++
++  const beatDeviceSession = async () => {
++    const current = tunnel;
++    const sid = lastDeviceSessionId;
++    if (!current || !sid) return;
++    const isIPv6 = (current.ipv6Addr.match(/:/g)?.length ?? 0) >= 2;
++    const host = isIPv6 ? `[${current.ipv6Addr}]` : current.ipv6Addr;
++    try {
++      const r = await fetch(`http://${host}:${current.port}/session/heartbeat`, {
++        method: 'POST',
++        headers: {
++          authorization: `Bearer ${current.bootTokenRotated}`,
++          'x-session-id': sid,
++        },
++        signal: AbortSignal.timeout(5_000),
++      });
++      if (r.status === 409 && lastDeviceSessionId === sid) lastDeviceSessionId = null;
++    } catch { /* next tick retries */ }
++  };
++
++  let sessionKeepalive: ReturnType<typeof setInterval> | null = null;
++  if (opts.sessionKeepaliveMs && opts.sessionKeepaliveMs > 0) {
++    sessionKeepalive = setInterval(() => { void beatDeviceSession(); }, opts.sessionKeepaliveMs);
++    if (typeof sessionKeepalive.unref === 'function') sessionKeepalive.unref();
++  };
++
+   // 2. Tailnet probe (fail-closed).
+   const probe = opts.tailnetEnabled
+     ? (opts.probeImpl ? await opts.probeImpl() : await probeTailscale(opts.tailnetSocketPath))
+@@ -106,7 +157,10 @@ export async function startDaemon(opts: DaemonOptions): Promise<RunningDaemon |
+ 
+   // 3. Loopback listener (full surface).
+   const loopbackServer = createServer(async (req, res) => {
+-    await handleLoopback({ req, res, tokenStore, getTunnel, invalidateTunnel });
++    await handleLoopback({
++      req, res, tokenStore, getTunnel, invalidateTunnel, adoptTunnel,
++      softReconnect: opts.softReconnect, noteDeviceSession,
++    });
+   });
+   // Use port 0 for OS-assigned port when test/random port collisions are a risk.
+   const requestedPort = opts.loopbackPort;
+@@ -117,7 +171,10 @@ export async function startDaemon(opts: DaemonOptions): Promise<RunningDaemon |
+   // mode this can collide; we try the actualPort first and skip ipv6 if it
+   // fails (tests don't exercise ::1 explicitly).
+   const loopbackServerV6 = createServer(async (req, res) => {
+-    await handleLoopback({ req, res, tokenStore, getTunnel, invalidateTunnel });
++    await handleLoopback({
++      req, res, tokenStore, getTunnel, invalidateTunnel, adoptTunnel,
++      softReconnect: opts.softReconnect, noteDeviceSession,
++    });
+   });
+   let v6Bound = false;
+   try {
+@@ -139,6 +196,9 @@ export async function startDaemon(opts: DaemonOptions): Promise<RunningDaemon |
+         tokenStore,
+         getTunnel,
+         invalidateTunnel,
++        adoptTunnel,
++        softReconnect: opts.softReconnect,
++        noteDeviceSession,
+         auditPath: opts.auditPath,
+         attemptsPath: opts.attemptsPath,
+         allowlistPath: opts.allowlistPath,
+@@ -169,6 +229,10 @@ export async function startDaemon(opts: DaemonOptions): Promise<RunningDaemon |
+         (s as unknown as { closeIdleConnections?: () => void }).closeIdleConnections?.();
+         return new Promise<void>((resolve) => s.close(() => resolve()));
+       };
++      if (sessionKeepalive) {
++        clearInterval(sessionKeepalive);
++        sessionKeepalive = null;
++      }
+       await Promise.all([
+         closeAll(loopbackServer),
+         v6Bound ? closeAll(loopbackServerV6) : Promise.resolve(),
+@@ -197,19 +261,22 @@ function listenAsync(server: ReturnType<typeof createServer>, port: number, host
+ 
+ // ───────── Handlers ─────────
+ 
++type DeviceProxyResponse = Awaited<ReturnType<typeof proxyToDevice>>;
++
+ interface HandlerCtx {
+   req: IncomingMessage;
+   res: ServerResponse;
+   tokenStore: SessionTokenStore;
+   getTunnel: () => Promise<DeviceTunnel | null>;
+   invalidateTunnel: (failedTunnel: DeviceTunnel) => void;
++  adoptTunnel: (next: DeviceTunnel) => void;
++  softReconnect?: (failed: DeviceTunnel) => Promise<DeviceTunnel | null>;
++  noteDeviceSession: (path: string, requestId: string | null, upstream?: DeviceProxyResponse) => void;
+   // Explicit security-log + allowlist paths (default to env-derived when undefined).
+   auditPath?: string;
+   attemptsPath?: string;
+   allowlistPath?: string;
+ }
+-
+-type DeviceProxyResponse = Awaited<ReturnType<typeof proxyToDevice>>;
+ const RECOVERABLE_SOCKET_ERRORS = new Set([
+   'ECONNABORTED',
+   'ECONNREFUSED',
+@@ -275,6 +342,8 @@ async function proxyWithTunnelRecovery(opts: {
+   agentIdentity?: string;
+   getTunnel: HandlerCtx['getTunnel'];
+   invalidateTunnel: HandlerCtx['invalidateTunnel'];
++  adoptTunnel: HandlerCtx['adoptTunnel'];
++  softReconnect?: HandlerCtx['softReconnect'];
+ }): Promise<{ tunnel: DeviceTunnel; upstream: DeviceProxyResponse } | null> {
+   let tunnel = await opts.getTunnel();
+   if (!tunnel) return null;
+@@ -292,6 +361,21 @@ async function proxyWithTunnelRecovery(opts: {
+ 
+   const failedTunnel = tunnel;
+   const replaySafe = canReplayAfterRefresh(opts.inbound, upstream);
++
++  // USB flaps and hung element dumps drop the route without killing the app.
++  // Reuse the rotated bearer against a freshly resolved IPv6 before the hard
++  // bootstrap, which would relaunch Pulse and wipe the session lock.
++  if (opts.softReconnect) {
++    const reused = await opts.softReconnect(failedTunnel);
++    if (reused) {
++      opts.adoptTunnel(reused);
++      if (!replaySafe) return { tunnel: failedTunnel, upstream };
++      tunnel = reused;
++      upstream = await makeAttempt(tunnel);
++      if (!shouldRefreshTunnel(upstream)) return { tunnel, upstream };
++    }
++  }
++
+   opts.invalidateTunnel(tunnel);
+   const refreshed = await opts.getTunnel();
+   if (!refreshed) return replaySafe ? null : { tunnel: failedTunnel, upstream };
+@@ -350,7 +434,7 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
+  * loopback bind itself is the boundary).
+  */
+ async function handleLoopback(ctx: HandlerCtx): Promise<void> {
+-  const { req, res, tokenStore, getTunnel, invalidateTunnel } = ctx;
++  const { req, res, tokenStore, getTunnel, invalidateTunnel, adoptTunnel, softReconnect, noteDeviceSession } = ctx;
+   const url = parseUrl(req.url ?? '/');
+   const path = url.pathname ?? '/';
+   const method = req.method ?? 'GET';
+@@ -413,12 +497,15 @@ async function handleLoopback(ctx: HandlerCtx): Promise<void> {
+       agentIdentity,
+       getTunnel,
+       invalidateTunnel,
++      adoptTunnel,
++      softReconnect,
+     });
+     if (!proxied) {
+       sendJson(res, 503, { error: 'device_not_connected' });
+       return;
+     }
+     const { upstream } = proxied;
++    noteDeviceSession(path, sessionId, upstream);
+     res.writeHead(upstream.status, upstream.headers);
+     res.end(upstream.body);
+   } catch (err) {
+@@ -434,7 +521,7 @@ interface TailnetCtx extends HandlerCtx {
+  * Tailnet handler — locked allowlist + capability tiers.
+  */
+ async function handleTailnet(ctx: TailnetCtx): Promise<void> {
+-  const { req, res, tokenStore, getTunnel, invalidateTunnel, whoIsImpl, auditPath, attemptsPath, allowlistPath } = ctx;
++  const { req, res, tokenStore, getTunnel, invalidateTunnel, adoptTunnel, softReconnect, noteDeviceSession, whoIsImpl, auditPath, attemptsPath, allowlistPath } = ctx;
+   const url = parseUrl(req.url ?? '/');
+   const path = url.pathname ?? '/';
+   const method = req.method ?? 'GET';
+@@ -530,12 +617,15 @@ async function handleTailnet(ctx: TailnetCtx): Promise<void> {
+       agentIdentity: session.identity,
+       getTunnel,
+       invalidateTunnel,
++      adoptTunnel,
++      softReconnect,
+     });
+     if (!proxied) {
+       sendJson(res, 503, { error: 'device_not_connected' });
+       return;
+     }
+     const { tunnel, upstream } = proxied;
++    noteDeviceSession(path, sessionId, upstream);
+ 
+     // Audit the action (mutating endpoints only).
+     if (requiredCapability !== 'observe') {
+@@ -599,6 +689,8 @@ if (import.meta.main) {
+     loopbackPort: port,
+     tailnetEnabled: tailnet,
+     tunnelProvider: realTunnelProvider,
++    softReconnect: (failed) => reuseRotatedTunnel({ failed }),
++    sessionKeepaliveMs: 60_000,
+   }).then((d) => {
+     if ('error' in d) {
+       process.stderr.write(`daemon error: ${d.error}\n`);
+diff --git a/ios-qa/daemon/src/proxy.ts b/ios-qa/daemon/src/proxy.ts
+index 1431886..15650d3 100644
+--- a/ios-qa/daemon/src/proxy.ts
++++ b/ios-qa/daemon/src/proxy.ts
+@@ -54,11 +54,16 @@ export async function proxyToDevice(opts: {
+   const isIPv6 = (tunnel.ipv6Addr.match(/:/g)?.length ?? 0) >= 2;
+   const hostPart = isIPv6 ? `[${tunnel.ipv6Addr}]` : tunnel.ipv6Addr;
+   const url = `http://${hostPart}:${tunnel.port}${inbound.url ?? '/'}`;
++  const path = (inbound.url ?? '/').split('?')[0] ?? '/';
++  const heavyRead = (inbound.method === 'GET' || inbound.method === 'HEAD')
++    && (path === '/screenshot' || path === '/elements');
+   return new Promise((resolve, reject) => {
+     const req = httpRequest(url, {
+       method: inbound.method,
+       headers,
+-      timeout: 30_000,
++      // Library grids can take well over 30s to dump. Timing those out used
++      // to look like a dead USB tunnel and triggered a full app relaunch.
++      timeout: heavyRead ? 120_000 : 30_000,
+     }, (res) => {
+       const chunks: Buffer[] = [];
+       res.on('data', (c) => chunks.push(c));
+diff --git a/ios-qa/daemon/src/tunnel-bootstrap.ts b/ios-qa/daemon/src/tunnel-bootstrap.ts
+index f1be1ca..469899b 100644
+--- a/ios-qa/daemon/src/tunnel-bootstrap.ts
++++ b/ios-qa/daemon/src/tunnel-bootstrap.ts
+@@ -21,6 +21,7 @@ import type { DeviceTunnel } from './proxy';
+ import {
+   listDevices,
+   resolveTunnelIPv6,
++  getDeviceTunnelIPv6FromDevicectl,
+   isAppRunning,
+   launchApp,
+   copyFileFromAppContainer,
+@@ -336,3 +337,48 @@ export async function bootstrapTunnel(opts: BootstrapOptions): Promise<Bootstrap
+     },
+   };
+ }
++
++function formatTunnelHost(addr: string): string {
++  const isIPv6 = (addr.match(/:/g)?.length ?? 0) >= 2;
++  return isIPv6 ? `[${addr}]` : addr;
++}
++
++/**
++ * Re-resolve the CoreDevice IPv6 and reuse the already-rotated bearer.
++ *
++ * A USB flap or a hung `/elements` dump often drops the route without
++ * killing Pulse. Full `bootstrapTunnel` then sees a running app with no
++ * on-disk boot token and relaunches it, which wipes the in-memory session
++ * lock (`session_invalid_or_expired` on the next tap). Prefer this reuse
++ * path whenever `/healthz` plus an authenticated `/state/snapshot` still
++ * succeed with the cached token.
++ */
++export async function reuseRotatedTunnel(opts: {
++  failed: DeviceTunnel;
++  spawn?: SpawnImpl;
++  fetchImpl?: typeof fetch;
++}): Promise<DeviceTunnel | null> {
++  const ipv6 = getDeviceTunnelIPv6FromDevicectl(opts.failed.udid, opts.spawn);
++  if (!ipv6) return null;
++
++  const fetchFn = opts.fetchImpl ?? fetch;
++  const base = `http://${formatTunnelHost(ipv6)}:${opts.failed.port}`;
++  try {
++    const health = await fetchFn(`${base}/healthz`, {
++      signal: AbortSignal.timeout(2_000),
++    });
++    if (!health.ok) return null;
++
++    const snap = await fetchFn(`${base}/state/snapshot`, {
++      headers: { Authorization: `Bearer ${opts.failed.bootTokenRotated}` },
++      signal: AbortSignal.timeout(3_000),
++    });
++    // 401 means the process was replaced and the rotated token died — caller
++    // must take the hard bootstrap / relaunch path.
++    if (!snap.ok) return null;
++
++    return { ...opts.failed, ipv6Addr: ipv6 };
++  } catch {
++    return null;
++  }
++}
+diff --git a/ios-qa/daemon/test/daemon-integration.test.ts b/ios-qa/daemon/test/daemon-integration.test.ts
+index 9073b18..bbd3ff9 100644
+--- a/ios-qa/daemon/test/daemon-integration.test.ts
++++ b/ios-qa/daemon/test/daemon-integration.test.ts
+@@ -52,6 +52,26 @@ function startStubStateServer(): Promise<{ server: Server; port: number; receive
+           res.end(JSON.stringify({ png_base64: 'abc=' }));
+           return;
+         }
++        if (req.url === '/session/acquire') {
++          res.writeHead(200, { 'content-type': 'application/json' });
++          res.end(JSON.stringify({ session_id: 'stub-session-1', ttl_seconds: 300 }));
++          return;
++        }
++        if (req.url === '/session/heartbeat') {
++          res.writeHead(200, { 'content-type': 'application/json' });
++          res.end(JSON.stringify({ ok: true, ttl_seconds: 300 }));
++          return;
++        }
++        if (req.headers['x-session-id'] === 'stale-session') {
++          res.writeHead(409, { 'content-type': 'application/json' });
++          res.end(JSON.stringify({ error: 'session_mismatch' }));
++          return;
++        }
++        if (req.url === '/session/release') {
++          res.writeHead(200, { 'content-type': 'application/json' });
++          res.end(JSON.stringify({ ok: true }));
++          return;
++        }
+         if (req.url === '/tap') {
+           res.writeHead(200, { 'content-type': 'application/json' });
+           res.end(JSON.stringify({ ok: true, op: 'tap' }));
+@@ -404,6 +424,124 @@ describe('daemon — loopback listener', () => {
+     }
+   });
+ 
++  test('soft reconnect reuses the rotated token without a second bootstrap', async () => {
++    const deadPort = await new Promise<number>((resolve, reject) => {
++      const reservation = createServer();
++      reservation.once('error', reject);
++      reservation.listen(0, '127.0.0.1', () => {
++        const address = reservation.address();
++        const port = typeof address === 'object' && address ? address.port : 0;
++        reservation.close((err) => err ? reject(err) : resolve(port));
++      });
++    });
++    let bootstraps = 0;
++    let softCalls = 0;
++    const d = await startDaemon({
++      loopbackPort: 0,
++      tailnetEnabled: false,
++      pidfilePath: join(workDir, 'daemon-soft-reconnect.pid'),
++      tunnelProvider: async () => {
++        bootstraps++;
++        if (bootstraps > 1) throw new Error('hard bootstrap should not run after soft reconnect');
++        return {
++          udid: 'STUB-UDID',
++          ipv6Addr: '127.0.0.1',
++          port: deadPort,
++          bootTokenRotated: 'stale-route-token',
++        };
++      },
++      softReconnect: async (failed) => {
++        softCalls++;
++        return {
++          ...failed,
++          ipv6Addr: '127.0.0.1',
++          port: stub.port,
++          bootTokenRotated: STATE_SERVER_TOKEN,
++        };
++      },
++    });
++    if ('error' in d) throw new Error(d.error);
++
++    try {
++      const recovered = await fetchWith('GET', `http://127.0.0.1:${d.loopbackPort}/screenshot`);
++      expect(recovered.status).toBe(200);
++      expect(JSON.parse(recovered.bodyText)).toEqual({ png_base64: 'abc=' });
++      expect(bootstraps).toBe(1);
++      expect(softCalls).toBe(1);
++
++      const reused = await fetchWith('GET', `http://127.0.0.1:${d.loopbackPort}/screenshot`);
++      expect(reused.status).toBe(200);
++      expect(bootstraps).toBe(1);
++      expect(softCalls).toBe(1);
++    } finally {
++      await d.close();
++    }
++  });
++
++  test('session keepalive heartbeats the on-device lock', async () => {
++    const d = await startDaemon({
++      loopbackPort: 0,
++      tailnetEnabled: false,
++      pidfilePath: join(workDir, 'daemon-session-keepalive.pid'),
++      tunnelProvider: async () => ({
++        udid: 'STUB-UDID',
++        ipv6Addr: '127.0.0.1',
++        port: stub.port,
++        bootTokenRotated: STATE_SERVER_TOKEN,
++      }),
++      sessionKeepaliveMs: 40,
++    });
++    if ('error' in d) throw new Error(d.error);
++
++    const heartbeatsBefore = stub.receivedRequests.filter((request) => request.path === '/session/heartbeat').length;
++    try {
++      const acquired = await fetchWith('POST', `http://127.0.0.1:${d.loopbackPort}/session/acquire`);
++      expect(acquired.status).toBe(200);
++      expect(JSON.parse(acquired.bodyText).session_id).toBe('stub-session-1');
++
++      await new Promise((resolve) => setTimeout(resolve, 120));
++      const heartbeats = stub.receivedRequests.filter((request) => request.path === '/session/heartbeat');
++      expect(heartbeats.length).toBeGreaterThan(heartbeatsBefore);
++      expect(heartbeats.at(-1)?.headers['x-session-id']).toBe('stub-session-1');
++    } finally {
++      await d.close();
++    }
++  });
++
++  test.each(['/tap', '/session/release'])('rejected %s preserves the active heartbeat session', async (path) => {
++    const d = await startDaemon({
++      loopbackPort: 0,
++      tailnetEnabled: false,
++      pidfilePath: join(workDir, 'daemon-rejected-session.pid'),
++      tunnelProvider: async () => ({
++        udid: 'STUB-UDID', ipv6Addr: '127.0.0.1', port: stub.port,
++        bootTokenRotated: STATE_SERVER_TOKEN,
++      }),
++      sessionKeepaliveMs: 40,
++    });
++    if ('error' in d) throw new Error(d.error);
++    try {
++      const base = `http://127.0.0.1:${d.loopbackPort}`;
++      expect((await fetchWith('POST', `${base}/session/acquire`)).status).toBe(200);
++      expect((await fetchWith('POST', `${base}${path}`, {
++        headers: { 'x-session-id': 'stale-session' },
++      })).status).toBe(409);
++      const before = stub.receivedRequests.length;
++      await new Promise((resolve) => setTimeout(resolve, 120));
++      const beats = stub.receivedRequests.slice(before).filter((r) => r.path === '/session/heartbeat');
++      expect(beats.length).toBeGreaterThan(0);
++      expect(beats.every((r) => r.headers['x-session-id'] === 'stub-session-1')).toBe(true);
++      expect((await fetchWith('POST', `${base}/session/release`, {
++        headers: { 'x-session-id': 'stub-session-1' },
++      })).status).toBe(200);
++      const released = stub.receivedRequests.length;
++      await new Promise((resolve) => setTimeout(resolve, 120));
++      expect(stub.receivedRequests.slice(released).filter((r) => r.path === '/session/heartbeat')).toHaveLength(0);
++    } finally {
++      await d.close();
++    }
++  });
++
+   test('connection failure refreshes but never replays an ambiguous tap', async () => {
+     const deadPort = await new Promise<number>((resolve, reject) => {
+       const reservation = createServer();
+diff --git a/ios-qa/daemon/test/tunnel-bootstrap.test.ts b/ios-qa/daemon/test/tunnel-bootstrap.test.ts
+index 37af481..450722b 100644
+--- a/ios-qa/daemon/test/tunnel-bootstrap.test.ts
++++ b/ios-qa/daemon/test/tunnel-bootstrap.test.ts
+@@ -3,7 +3,7 @@
+ // rotate_failed, success) without needing a real iPhone connected.
+ 
+ import { describe, test, expect } from 'bun:test';
+-import { bootstrapTunnel } from '../src/tunnel-bootstrap';
++import { bootstrapTunnel, reuseRotatedTunnel } from '../src/tunnel-bootstrap';
+ import {
+   getDeviceTunnelIPv6FromDevicectl,
+   resolveTunnelIPv6,
+@@ -711,6 +711,80 @@ describe('getDeviceTunnelIPv6FromDevicectl', () => {
+   });
+ });
+ 
++describe('reuseRotatedTunnel', () => {
++  test('reuses the rotated bearer against a freshly resolved IPv6', async () => {
++    const spawn = makeSpawn([
++      {
++        argsMatch: /devicectl device info details --device STALE/,
++        jsonOutput: { result: { connectionProperties: { tunnelIPAddress: 'fd00::new' } } },
++      },
++    ]);
++    const urls: string[] = [];
++    const reused = await reuseRotatedTunnel({
++      failed: {
++        udid: 'STALE',
++        ipv6Addr: 'fd00::old',
++        port: 9999,
++        bootTokenRotated: 'still-live',
++      },
++      spawn,
++      fetchImpl: (async (input: RequestInfo | URL) => {
++        urls.push(String(input));
++        return new Response('{"ok":true}', { status: 200 });
++      }) as typeof fetch,
++    });
++    expect(reused).toEqual({
++      udid: 'STALE',
++      ipv6Addr: 'fd00::new',
++      port: 9999,
++      bootTokenRotated: 'still-live',
++    });
++    expect(urls[0]).toBe('http://[fd00::new]:9999/healthz');
++    expect(urls[1]).toBe('http://[fd00::new]:9999/state/snapshot');
++  });
++
++  test('returns null when the rotated token is rejected', async () => {
++    const spawn = makeSpawn([
++      {
++        argsMatch: /devicectl device info details/,
++        jsonOutput: { result: { connectionProperties: { tunnelIPAddress: 'fd00::1' } } },
++      },
++    ]);
++    const reused = await reuseRotatedTunnel({
++      failed: {
++        udid: 'DEAD',
++        ipv6Addr: 'fd00::old',
++        port: 9999,
++        bootTokenRotated: 'expired',
++      },
++      spawn,
++      fetchImpl: (async (input: RequestInfo | URL) => {
++        const url = String(input);
++        if (url.endsWith('/healthz')) return new Response('{"ok":true}', { status: 200 });
++        return new Response('{"error":"unauthorized"}', { status: 401 });
++      }) as typeof fetch,
++    });
++    expect(reused).toBeNull();
++  });
++
++  test('returns null when the tunnel address cannot be resolved', async () => {
++    const spawn = makeSpawn([
++      { argsMatch: /devicectl device info details/, exitCode: 1 },
++    ]);
++    const reused = await reuseRotatedTunnel({
++      failed: {
++        udid: 'MISSING',
++        ipv6Addr: 'fd00::old',
++        port: 9999,
++        bootTokenRotated: 'still-live',
++      },
++      spawn,
++      fetchImpl: (async () => new Response('nope')) as typeof fetch,
++    });
++    expect(reused).toBeNull();
++  });
++});
++
+ describe('resolveTunnelIPv6 fallback chain', () => {
+   test('prefers devicectl-based resolution', async () => {
+     const spawn = makeSpawn([
