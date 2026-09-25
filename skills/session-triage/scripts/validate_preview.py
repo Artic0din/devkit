@@ -42,6 +42,7 @@ def _validate_task(
     task: Any,
     thread_id: str,
     mapping_status: str,
+    project_repository: str | None,
     path: str,
     errors: list[str],
 ) -> None:
@@ -92,6 +93,12 @@ def _validate_task(
             isinstance(repository, str)
             and bool(REPOSITORY_PATTERN.fullmatch(repository)),
             f"{path}.repo is invalid",
+            errors,
+        )
+        _require(
+            isinstance(repository, str) and isinstance(project_repository, str)
+            and repository.casefold() == project_repository.casefold(),
+            f"{path}.repo must match the mapped project",
             errors,
         )
         _require(
@@ -243,6 +250,7 @@ def validate_preview(preview: Any) -> list[str]:
 
         thread_id = thread.get("id")
         _require(_has_text(thread_id), f"{path}.id is required", errors)
+        _require(_has_text(thread.get("host_id")), f"{path}.host_id is required", errors)
         if isinstance(thread_id, str):
             _require(
                 thread_id not in seen_ids,
@@ -330,6 +338,18 @@ def validate_preview(preview: Any) -> list[str]:
                     f"{path}.project.repo is invalid",
                     errors,
                 )
+            elif mapping_status == "unmapped":
+                for field in ("name", "cwd", "repo"):
+                    value = project.get(field)
+                    valid_value = value is None or (
+                        _has_text(value)
+                        and (field != "repo" or bool(REPOSITORY_PATTERN.fullmatch(value)))
+                    )
+                    _require(
+                        field in project and valid_value,
+                        f"{path}.project.{field} must be present and null or valid text",
+                        errors,
+                    )
 
         _require(type(thread.get("unreadable")) is bool, f"{path}.unreadable must be a boolean", errors)
         _require(type(thread.get("archive_candidate")) is bool, f"{path}.archive_candidate must be a boolean", errors)
@@ -374,11 +394,13 @@ def validate_preview(preview: Any) -> list[str]:
                     task,
                     str(thread_id),
                     mapping_status,
+                    project.get("repo") if isinstance(project, dict) else None,
                     f"{path}.task_candidates[{task_index}]",
                     errors,
                 )
                 if isinstance(task, dict) and task.get("status") == "new":
                     new_task_count += 1
+                    _require(not unreadable, f"{path} unreadable thread cannot propose new tasks", errors)
 
         if isinstance(knowledge, list):
             for candidate_index, candidate in enumerate(knowledge):
@@ -392,6 +414,7 @@ def validate_preview(preview: Any) -> list[str]:
                     and candidate.get("status") == "verified"
                 ):
                     verified_knowledge_count += 1
+                    _require(not unreadable, f"{path} unreadable thread cannot propose verified knowledge", errors)
 
         if thread.get("archive_candidate") is True:
             archive_count += 1
@@ -450,7 +473,7 @@ def main() -> int:
     args = parser.parse_args()
     try:
         preview = json.loads(args.preview.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         print(f"INVALID: {exc}", file=sys.stderr)
         return 1
 

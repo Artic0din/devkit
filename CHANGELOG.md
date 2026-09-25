@@ -6,6 +6,10 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Rejected incomplete host and project metadata in session previews and reported invalid text encoding without a traceback.
+- Prevented session previews from targeting the wrong repository or creating tasks and knowledge from unreadable sessions, and rechecked issue markers before creation.
+- Registered the build and session workflows and clarified issue approval, review status, and direct-fix pull request guidance.
+
 - Preserved local build and session-triage workflows while removing retired workspace and project references and aligning publication safeguards.
 - Fixed skill sync and its audit to preserve existing canonical aliases and variants and allow the retired manager root to be absent.
 - Recorded the existing Metisary skill and worktree paths, Cursor and Copilot instruction links, and Antigravity registration files.

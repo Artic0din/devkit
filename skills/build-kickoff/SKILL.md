@@ -16,7 +16,7 @@ skill assembles that brief from the canonical templates below so it is identical
 and never hand-retyped or partially remembered.
 
 This is a template/standards skill: it produces a kickoff brief, it does not itself run the
-build. After emitting the brief, hand off to the normal execution path (`worker`/`architect`,
+build. After emitting the brief and completing the issue-breakdown approval below, hand off to the normal execution path (`worker`/`architect`,
 `superpowers:executing-plans`, or `loop` for autonomous runs).
 
 ## When to use
@@ -60,6 +60,9 @@ rules are the standing contract and must not drift.
 
 ```
 - Read ~/Metisary/Enviroment/config/docs/engineering-constitution.md FIRST and treat it as binding.
+- Before a multi-phase build begins, use github-workflow to create or refine the fewest independently
+  deliverable GitHub Issues and present the phase-to-issue breakdown for explicit approval.
+  Proceed only within an already approved breakdown; execution mode does not waive this gate.
 - Phases, each its own branch + PR: [PHASES]. Phase 0 = spine (repo, CI/CD, backend skeleton,
   frontend shell, settings store, health-check framework), then one slice end-to-end at a time
   in priority order.
@@ -98,14 +101,16 @@ Phased build. Standard human-in-the-loop applies: the human presses merge on eve
 
 ## User review gate
 - At the end of each phase/PR, STOP at a <HARD-GATE> and summarize: what shipped, gate status
-  (CI/tests/lint/secret-scan/@codex review), and what is next. Do not start the next phase or
+  (CI/tests/lint/secret-scan/autoreview), and what is next. Do not start the next phase or
   merge until the human approves.
 ```
 
 ## Step 4 - Hand off
 
-State the chosen mode and the filled phase list back to the user, then proceed via the normal
-execution path. For autonomous runs, `loop` can drive the phase sequence; for gated runs, stop
+State the chosen mode and the filled phase list back to the user.
+For a multi-phase build, invoke github-workflow to create or refine its issues and obtain explicit approval of the breakdown before handing off.
+Reuse an existing approval only when it covers that same scope.
+Then proceed via the normal execution path. For autonomous runs, `loop` can drive the approved phase sequence; for gated runs, stop
 after each phase as specified.
 
 ## Notes

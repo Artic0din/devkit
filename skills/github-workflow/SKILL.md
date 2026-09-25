@@ -12,7 +12,7 @@ The user-level `Development` Project is closed and must not be used.
 
 - Small fix completed in one focused pull request: work directly without creating an issue.
 - Planned, multi-session, backlog, or independently deliverable work: create or refine an issue.
-- Multi-phase initiative: create the fewest independently deliverable issues and present the breakdown before implementation.
+- Multi-phase initiative: create the fewest independently deliverable issues, present the breakdown, and wait for explicit approval before implementation.
 - Existing issue or URL: start or continue that issue.
 
 ## Create or refine an issue
@@ -49,7 +49,8 @@ The user-level `Development` Project is closed and must not be used.
 
 1. Complete required validation and the staged-secret scan.
 2. Open or update one focused pull request with a conventional title.
-3. Include `Fixes #123`, what changed, why, the test plan, and the required release note in the pull request body.
+3. Include what changed, why, the test plan, and the required release note in the pull request body.
+   Add `Fixes #123` only for an actual linked issue; direct-fix pull requests do not need an issue footer.
 4. Keep issue state aligned with the pull request; pull request review state is authoritative.
 
 ## Complete work
