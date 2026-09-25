@@ -10,3 +10,4 @@ bin/*
 !bin/rm
 skills/.system/
 skills/.external/
+output/playwright/

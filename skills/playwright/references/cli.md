@@ -3,12 +3,12 @@
 Use the wrapper script unless the CLI is already installed globally:
 
 ```bash
-export CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
-export PWCLI="$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh"
+export PWCLI="${CODEX_HOME:-$HOME/.codex}/skills/agent-scripts/playwright/scripts/playwright_cli.sh"
 "$PWCLI" --help
 ```
 
-User-scoped skills install under `$CODEX_HOME/skills` (default: `~/.codex/skills`).
+This is the repository's Codex mirror path.
+For other hosts, resolve the wrapper relative to the loaded skill directory and follow `SKILL.md` for locked runtime setup.
 
 Optional convenience alias:
 

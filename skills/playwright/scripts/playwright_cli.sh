@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if ! command -v npx >/dev/null 2>&1; then
-  echo "Error: npx is required but not found on PATH." >&2
+runtime="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/runtime" && pwd -P)"
+cli="$runtime/node_modules/@playwright/cli/playwright-cli.js"
+if [[ ! -f "$cli" ]]; then
+  echo "Error: install the pinned CLI with: (cd '$runtime' && npm ci --ignore-scripts --no-audit --no-fund)" >&2
   exit 1
 fi
 
@@ -16,7 +18,7 @@ for arg in "$@"; do
   esac
 done
 
-cmd=(npx --yes --package @playwright/cli playwright-cli)
+cmd=(node "$cli")
 if [[ "${has_session_flag}" != "true" && -n "${PLAYWRIGHT_CLI_SESSION:-}" ]]; then
   cmd+=(--session "${PLAYWRIGHT_CLI_SESSION}")
 fi

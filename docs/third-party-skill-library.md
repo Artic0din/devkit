@@ -1,15 +1,15 @@
 # Installed third-party skill library
 
 These two skill directories were installed locally but absent from this repository.
-This import preserves their existing source files without activating additional integrations.
-Every imported source file was compared by Git blob hash against the pinned upstream tree below.
+The initial import matched the pinned upstream trees below by Git blob hash.
+Review adaptations described below make the source work with this repository's activation and validation rules without activating integrations.
 
 | Local skill | Source revision | Imported source files | License |
 | --- | --- | ---: | --- |
 | `playwright` | [openai/skills](https://github.com/openai/skills/tree/49f948faa9258a0c61caceaf225e179651397431/skills/.curated/playwright) | 9 | Apache 2.0, license and notice included |
 | `find-skills` | [vercel-labs/skills](https://github.com/vercel-labs/skills/tree/7407f3893ad4dceab546ac002c3ef806e4000c73/skills/find-skills) | 1 | MIT, upstream notice added |
 
-The import contains 10 existing source files and one additional upstream license notice.
+The initial import contained 10 existing source files and one additional upstream license notice.
 Each directory retains its own license; the repository's license does not replace the upstream terms.
 
 ## Runtime requirements
@@ -17,7 +17,16 @@ Each directory retains its own license; the repository's license does not replac
 These are source snapshots, not bundled runtimes.
 Read each skill's setup instructions before use and follow the current host's tool availability and authorization rules.
 
-- `playwright` requires Node.js, the Playwright CLI, and browser installation; `find-skills` requires the Skills CLI through `npx`.
+- `playwright` requires Node.js, its locked CLI installation, and browser installation.
+- `find-skills` uses website and source search; it does not execute a discovery CLI.
+
+## Review adaptations
+
+Playwright uses the canonical mirror path, ignored capture output, and an absolute CLI path installed with `npm ci` from its trusted runtime directory.
+The runtime manifest and lockfile pin the already-required CLI and its integrity hashes; install scripts are disabled.
+A regression check places a fake executable in a project and verifies it is not selected.
+Find Skills requires source and license review at a pinned commit and imports through the canonical repository instead of writing directly to a global store.
+Both skills are registered in the catalogue.
 
 Keep future updates tied to an upstream revision and recheck the imported files and license notices together.
 
