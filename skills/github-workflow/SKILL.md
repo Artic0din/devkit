@@ -1,6 +1,6 @@
 ---
 name: github-workflow
-description: Manage Ryan's solo-development lifecycle through GitHub Issues, branches, pull requests, reviews, and CI. Use when creating or refining planned work, starting or continuing a GitHub issue, planning a multi-phase build, reviewing the backlog, reporting progress, opening a pull request for tracked work, or completing an issue-backed coding task.
+description: Manage repository work through GitHub Issues, feature branches, pull requests, reviews, and CI.
 ---
 
 # GitHub Workflow
@@ -38,12 +38,13 @@ The user-level `Development` Project is closed and must not be used.
 
 4. Add only labels that improve retrieval; do not invent milestones, dates, estimates, or custom fields.
 
-## Implement tracked work
+## Implement work
 
-1. Confirm the issue belongs to the repository and does not conflict with current code or repository instructions.
-2. Create or reuse one feature branch containing the issue number, such as `fix/123-short-description` or `cursor/123-short-description`.
-3. Implement and validate the acceptance criteria under repository rules.
-4. Update issue checkboxes only after the corresponding work is verified; never treat them as a merge gate.
+1. For both direct fixes and issue-backed work, create or reuse a feature branch before editing; never commit directly to main.
+   Include the issue number only when linked to an actual issue, such as `fix/123-short-description`; otherwise use a conventional direct-fix name such as `fix/short-description`.
+2. For issue-backed work, confirm the issue belongs to the repository and agrees with current code and instructions.
+3. Implement and validate the approved outcome or issue acceptance criteria under repository rules.
+4. When an issue exists, update its checkboxes only after verification; never treat them as a merge gate.
 
 ## Send work to review
 

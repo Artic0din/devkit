@@ -44,6 +44,9 @@ jobs:
       - name: Test autoreview CLI options (offline, synthetic)
         run: python3 skills/autoreview/scripts/test-autoreview.py
 
+      - name: Test session preview validation (offline, synthetic)
+        run: python3 skills/session-triage/scripts/test_validate_preview.py
+
       - name: Test issue triage (offline, synthetic)
         run: python3 scripts/test-issue-triage.py
 

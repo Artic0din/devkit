@@ -1,6 +1,6 @@
 ---
 name: session-triage
-description: Audit and clean up recent Codex sessions with a preview-first workflow. Use whenever the user asks to review, organise, rename, group, archive, or recover outstanding work from Codex chats; asks what work was left unfinished in recent sessions; or wants verified session knowledge promoted to Basic Memory. Audits the last seven days by default, extracts unresolved work into repository GitHub Issues, and never mutates sessions, GitHub, or memory before a validated preview and explicit approval.
+description: Review, organise, or recover unfinished work from recent Codex sessions through an approved preview.
 ---
 
 # Session Triage
@@ -143,12 +143,15 @@ Apply in this order:
 
 1. Immediately before each approved issue creation, search its verified repository for the exact stable marker again, including open and closed issues.
    Treat an existing match as already applied and record its URL in the ledger; create the issue only when no match exists.
+   Repeat the default-branch, issue, pull-request, relevant runtime, and semantic-duplicate checks from task extraction immediately before creating it.
+   Skip newly completed or duplicate work and record the evidence instead of creating an issue.
    Publish the exact approved title and body; do not invent content during apply.
 2. Re-read each knowledge candidate's named primary sources immediately before writing.
    Skip changed or unverifiable evidence and return that candidate to preview; otherwise apply the exact approved note edit.
 3. Rename approved sessions.
 4. Move sessions only when a supported thread tool exists.
-5. Archive approved sessions last.
+5. Archive approved sessions last, refreshing live status immediately before each archive.
+   Require the session to still be `idle`; skip active, unknown, or unreadable status even when its timestamp is unchanged.
 
 Archive only sessions still proven verified_complete.
 Return an apply ledger listing every success, skipped stale target, unsupported action, and exact blocker.

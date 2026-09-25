@@ -6,6 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Preserved build planning and session organisation workflows with approved previews, current evidence checks, and consistent GitHub publication safeguards.
 - Bound session actions to the exact approved preview, required complete issue payloads with unique markers, and revalidated knowledge evidence before applying edits.
 
 - Rejected incomplete host and project metadata in session previews and reported invalid text encoding without a traceback.

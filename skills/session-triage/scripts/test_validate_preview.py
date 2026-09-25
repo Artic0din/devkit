@@ -150,6 +150,9 @@ if __name__ == "__main__":
     test_task_publication_payload()
     valid = preview()
     assert not validate_preview(valid)
+    invalid = deepcopy(valid)
+    invalid["generated_at"] = "0001-01-01T00:00:00+14:00"
+    assert validate_preview(invalid), "Timezone overflow must be a validation error"
     custom = deepcopy(valid)
     custom["window_days"] = 14
     custom["cutoff"] = "2026-09-12T00:00:00+10:00"

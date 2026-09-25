@@ -1,6 +1,6 @@
 ---
 name: build-kickoff
-description: Emit a standardized greenfield/multi-phase build kickoff brief for Ryan's projects. Use when starting a new build that should run phase-by-phase with branch-per-PR, conventional commits, tests-in-PR, and a chosen execution mode. Triggers - "start an autonomous build", "kick off the build", "run this spec end to end", "build X phase by phase", pasting a build/autonomy preamble, or any new-project kickoff that needs the standing gates and rules wired up.
+description: Prepare a kickoff brief for a new or phased build, with execution mode and approval gates.
 metadata:
   short-description: Standardized greenfield build kickoff brief (autonomous or human-gated)
 ---
