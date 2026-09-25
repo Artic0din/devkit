@@ -25,6 +25,7 @@ if __name__ == "__main__":
         )
         assert result.returncode == 2 and result.stdout == "", result
     assert run_hook("ordinary output") == ""
+    assert run_hook("task-abcdefghijklmnopqrstuvwxyz") == ""
     assert run_hook("eyJ" * 100000) == ""
     for prefix in ("sk-", "pk-"):
         token = prefix + "A" * 40
@@ -34,6 +35,10 @@ if __name__ == "__main__":
     output = run_hook("x" * 1000000 + "ghp_" + "A" * 36)
     assert json.loads(output)["decision"] == "block"
     for channel in ("stdout", "stderr"):
+        for credential in ("ASIA" + "Z" * 16, "eyJhbGciOiJIUzI1NiJ9.e30." + "Z" * 43):
+            output = run_hook(**{channel: credential, **({"stdout": ""} if channel == "stderr" else {})})
+            assert json.loads(output)["decision"] == "block"
+            assert credential not in output
         for prefix in ("ghp_", "ghs_", "gho_", "ghu_", "ghr_", "github_pat_"):
             fake_token = prefix + "Z" * 36
             output = run_hook(**{channel: fake_token, **({"stdout": ""} if channel == "stderr" else {})})

@@ -8,10 +8,10 @@ import sys
 PREVIEW_CHARACTERS = 6000
 PATTERNS = (
     # A token boundary prevents rescanning overlapping eyJ prefixes without dots.
-    (r"(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}", "JWT"),
-    (r"(?:sk[-_]|pk[-_]|ptr_|psk_)[A-Za-z0-9_-]{20,}", "KEY"),
+    (r"(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+", "JWT"),
+    (r"(?<![A-Za-z0-9_-])(?:sk[-_]|pk[-_]|ptr_|psk_)[A-Za-z0-9_-]{20,}", "KEY"),
     (r"(?:gh[psour]_|github_pat_)[A-Za-z0-9_]{30,}", "GH_TOKEN"),
-    (r"AKIA[0-9A-Z]{16}", "AWS_KEY"),
+    (r"(?:AKIA|ASIA)[0-9A-Z]{16}", "AWS_KEY"),
     (r"[a-fA-F0-9]{32,}", "HEX"),
 )
 

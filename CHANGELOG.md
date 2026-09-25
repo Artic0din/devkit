@@ -6,6 +6,8 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Covered temporary AWS identifiers and compact JWTs while preserving ordinary identifiers containing key-like substrings.
+
 - Published the Codex post-tool output filter with redacted blocking feedback and automatic checks for both output channels, GitHub token families and mixed-case hexadecimal values.
 - Published the Codex post-tool output filter with redacted blocking feedback and checks for both output channels.
 - Updated fleet maintenance for the current fleet: it now covers the iMac, lists the Intel Mac mini and Windows PC as joining, and explains how to run it from a Mac other than the Air.
