@@ -53,6 +53,27 @@ if __name__ == "__main__":
         assert token not in output
     output = run_hook("x" * 1000000 + "ghp_" + "A" * 36)
     assert json.loads(output)["decision"] == "block"
+    assert run_hook("token" * 200000) == ""
+    assert run_hook("\x1b[32mok\x1b[0m") == ""
+    siblings = ("Zsecret/Access+Key0", "ZsessionToken+/=")
+    assert json.loads(run_hook("password=hunter2"))["decision"] == "block"
+    sts = json.dumps({"Credentials": {"AccessKeyId": "ASIA" + "Z" * 16, "SecretAccessKey": siblings[0], "SessionToken": siblings[1]}})
+    for source in ("const token = getToken();", "if secret_ref == other:", "a=" * 20000 + "(", "k=v&" * 10000 + "[", "token=f();" * 100000):
+        assert run_hook(source) == "", source
+    nested = json.dumps({"SecretString": json.dumps({"password": siblings[0]})})
+    for credential_output in (sts, nested, '{"password": "x\\"' + siblings[0] + '"}', f"AWS_SECRET_ACCESS_KEY={siblings[0]}\npassword: '{siblings[1]}'", f"password={siblings[0]},{siblings[1]}", *(f"a=x,password=ab{c}{siblings[0]}" for c in ":=&<(;")):
+        output = run_hook(credential_output)
+        assert json.loads(output)["decision"] == "block"
+        assert not any(sibling in output for sibling in siblings), output
+    for credential in ("sk-" + "Z" * 40, "ghp_" + "Z" * 36, "ASIA" + "Z" * 16, "a" * 40, "eyJhbGciOiJIUzI1NiJ9.e30." + "Z" * 43):
+        for styled in ("\x1b[1;31m" + credential[:3] + "\x1b[0m" + credential[3:], credential[:3] + "\x1b(B\x1b[m" + credential[3:]):
+            output = run_hook(styled)
+            assert json.loads(output)["decision"] == "block"
+            assert credential[3:] not in output, output
+        for hidden in ("\x1b]0;x\n" + credential, "\x1b" + credential, "\x1b[" + credential, "\x1bPq\n" + credential[:3] + "\x1b[1m" + credential[3:]):
+            output = run_hook(hidden)
+            assert json.loads(output)["decision"] == "block", repr(hidden)
+            assert credential[4:] not in output, output
     for channel in ("stdout", "stderr"):
         token = base64.urlsafe_b64encode(b'{"alg":"HS256"}').decode().rstrip("=") + ".e30." + "Z" * 43
         output = run_hook(**{channel: "prefix." + token, **({"stdout": ""} if channel == "stderr" else {})})

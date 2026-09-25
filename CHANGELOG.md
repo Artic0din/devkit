@@ -6,6 +6,8 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Redacted credentials split by terminal colour codes and values of secret-named fields such as an STS `SecretAccessKey` and `SessionToken`.
+
 - Isolated output filtering from inherited Python modules and recognized JWT headers containing JSON whitespace.
 
 - Covered temporary AWS identifiers and compact JWTs while preserving ordinary identifiers containing key-like substrings.

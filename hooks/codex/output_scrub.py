@@ -7,6 +7,9 @@ import sys
 
 
 PREVIEW_CHARACTERS = 6000
+TERMINAL_CONTROL_PATTERN = re.compile(
+    r"\x1b(?:\[[0-?]*[ -/]*[@-~]|[\]PX^_][^\x07\x1b\n]*(?:\x07|\x1b\\)?|[ -/]*[0-~])|[\x00-\x08\x0b-\x1f\x7f]"
+)
 JWT_PATTERN = re.compile(r"(?<![A-Za-z0-9_-])(?=(([A-Za-z0-9_-]+)\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+))")
 PATTERNS = (
     (r"(?<![A-Za-z0-9_-])(?:sk[-_]|pk[-_]|ptr_|psk_)[A-Za-z0-9_-]{20,}", "KEY"),
@@ -14,6 +17,25 @@ PATTERNS = (
     (r"(?:AKIA|ASIA)[0-9A-Z]{16}", "AWS_KEY"),
     (r"[a-fA-F0-9]{32,}", "HEX"),
 )
+# Credentials without a recognizable shape, such as an STS SecretAccessKey, are found by their field name.
+SECRET_NAME_PATTERN = re.compile(r"secret|token|passw(?:or)?d|credential|api[_-]?key|private[_-]?key", re.IGNORECASE)
+FIELD_PATTERN = re.compile(r"""(?<![A-Za-z0-9_-])([A-Za-z0-9_-]+)["']?\s*[:=](?!=)\s*""")
+VALUE_PATTERN = re.compile(r""""(?:[^"\\\n]|\\.)+"?|'(?:[^'\\\n]|\\.)+'?|[^\s"']+""")
+CALL_PATTERN = re.compile(r"[A-Za-z_][\w.]*\([^\s()]*\)")
+
+
+def redact_assignments(text: str) -> str:
+    parts: list[str] = []
+    end = 0
+    for field in FIELD_PATTERN.finditer(text):
+        # Code such as `token = getToken()` names a call, not a credential.
+        if field.start() < end or not SECRET_NAME_PATTERN.search(field.group(1)) or CALL_PATTERN.match(text, field.end()):
+            continue
+        value = VALUE_PATTERN.match(text, field.end())
+        if value:
+            parts.extend((text[end:field.end()], "[REDACTED_VALUE]"))
+            end = value.end()
+    return "".join(parts) + text[end:]
 
 
 def is_jwt_header(header: str) -> bool:
@@ -26,6 +48,7 @@ def is_jwt_header(header: str) -> bool:
 
 
 def scrub(text: str) -> str:
+    text = redact_assignments(text)
     parts: list[str] = []
     end = 0
     # Overlapping candidates keep an invalid dotted prefix from hiding a real JWT.
@@ -39,6 +62,14 @@ def scrub(text: str) -> str:
     return text
 
 
+def redact(text: str) -> tuple[str, bool]:
+    # Colour codes can split a credential, and removing them can hide one the model still sees; scan both forms.
+    raw_clean = scrub(text)
+    displayed = TERMINAL_CONTROL_PATTERN.sub("", raw_clean)
+    clean = scrub(displayed)
+    return clean, raw_clean != text or clean != displayed
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
@@ -46,8 +77,8 @@ def main() -> int:
         stdout, stderr = response["stdout"], response["stderr"]
         if not isinstance(stdout, str) or not isinstance(stderr, str):
             raise ValueError("Bash output fields must be strings")
-        clean_stdout, clean_stderr = scrub(stdout), scrub(stderr)
-        if (clean_stdout, clean_stderr) != (stdout, stderr):
+        (clean_stdout, stdout_changed), (clean_stderr, stderr_changed) = redact(stdout), redact(stderr)
+        if stdout_changed or stderr_changed:
             reason = (
                 "Original tool output withheld because it contains secret-shaped text. "
                 "The command already ran; do not repeat it merely because its output was blocked. "
