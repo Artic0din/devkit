@@ -6,10 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
-- Preserved 49 existing Awesome Copilot skills, 13 agents, three instructions, and local label-governance context in the repository with pinned provenance and upstream licenses.
-- Fixed imported skill indexing for folded YAML descriptions and linked directories, and made the bundled web testing helper load correctly in this repository.
-- Preserved staged and unstaged edits when obtaining a missing before-state screenshot from an older revision.
-- Made generated migration instructions discoverable and exposed the required Chrome DevTools tools; excluded unsafe React 19 migration and Swift MCP lifecycle guidance.
+- Preserved 32 reviewed Awesome Copilot skills, ten agents, two instructions, and local label-governance context with pinned provenance, compatible helpers, and upstream licenses.
 - Fixed skill sync and its audit to preserve existing canonical aliases and variants and allow the retired manager root to be absent.
 - Recorded the existing Metisary skill and worktree paths, Cursor and Copilot instruction links, and Antigravity registration files.
 - Added Theo Browne's tstack PR-workflow skills (`full-send`, `full-stop`, `council`, `sol-loop`, `file-pr`, `takeover`, `babysit-pr`, `modernize`, `leaving-pr-comments`), so agents can file, review, babysit, and land pull requests end to end.
