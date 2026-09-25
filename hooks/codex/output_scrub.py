@@ -10,9 +10,9 @@ PATTERNS = (
     # A token boundary prevents rescanning overlapping eyJ prefixes without dots.
     (r"(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}", "JWT"),
     (r"(?:sk[-_]|pk[-_]|ptr_|psk_)[A-Za-z0-9_-]{20,}", "KEY"),
-    (r"gh[ps]_[A-Za-z0-9]{30,}", "GH_TOKEN"),
+    (r"(?:gh[psour]_|github_pat_)[A-Za-z0-9_]{30,}", "GH_TOKEN"),
     (r"AKIA[0-9A-Z]{16}", "AWS_KEY"),
-    (r"[a-f0-9]{32,}", "HEX"),
+    (r"[a-fA-F0-9]{32,}", "HEX"),
 )
 
 

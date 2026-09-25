@@ -34,12 +34,16 @@ if __name__ == "__main__":
     output = run_hook("x" * 1000000 + "ghp_" + "A" * 36)
     assert json.loads(output)["decision"] == "block"
     for channel in ("stdout", "stderr"):
-        fake_token = "ghp_" + "A" * 36
-        output = run_hook(**{channel: fake_token, **({"stdout": ""} if channel == "stderr" else {})})
-        result = json.loads(output)
-        assert result["decision"] == "block", result
-        assert set(result) == {"decision", "reason"}, result
-        assert fake_token not in output
-        assert "[REDACTED_GH_TOKEN]" in result["reason"]
-    assert "[REDACTED_HEX]" in json.loads(run_hook("a" * 40))["reason"]
+        for prefix in ("ghp_", "ghs_", "gho_", "ghu_", "ghr_", "github_pat_"):
+            fake_token = prefix + "Z" * 36
+            output = run_hook(**{channel: fake_token, **({"stdout": ""} if channel == "stderr" else {})})
+            result = json.loads(output)
+            assert result["decision"] == "block", result
+            assert set(result) == {"decision", "reason"}, result
+            assert fake_token not in output
+            assert "[REDACTED_GH_TOKEN]" in result["reason"]
+        for hexadecimal in ("a" * 40, "ABCDEF1234" * 4, "AbCdEf1234" * 4):
+            output = run_hook(**{channel: hexadecimal, **({"stdout": ""} if channel == "stderr" else {})})
+            assert hexadecimal not in output
+            assert "[REDACTED_HEX]" in json.loads(output)["reason"]
     print("PASS: ordinary output, stdout/stderr redaction, Codex block contract")
