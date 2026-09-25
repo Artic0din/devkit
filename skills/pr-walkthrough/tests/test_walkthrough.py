@@ -73,8 +73,55 @@ def test_broken_third_step_fails_browser_validation(tmp_path):
         step = deepcopy(data["steps"][0])
         step["id"] += suffix
         data["steps"].append(step)
+    rendered = walkthrough.html_template(data)
     data["steps"][2]["explanation"] = None
     path = tmp_path / "index.html"
-    path.write_text(walkthrough.html_template(data))
+    path.write_text(rendered.replace(json.dumps(walkthrough.extract_data(rendered)), json.dumps(data)))
     passed, message = walkthrough.browser_validate(path)
     assert not passed, message
+
+
+@pytest.mark.parametrize("field", ["diffs", "explanation", "reviewChecks", "productionExamples"])
+@pytest.mark.parametrize("value", [None, "invalid", {"invalid": True}])
+def test_step_collections_reject_non_arrays(field, value):
+    data = example()
+    data["steps"][0][field] = value
+    assert walkthrough.validate_data(data)
+
+
+@pytest.mark.parametrize("field", ["diffs", "productionExamples"])
+def test_step_collections_reject_non_objects(field):
+    data = example()
+    data["steps"][0][field] = [None]
+    assert walkthrough.validate_data(data)
+
+
+def test_diff_lines_reject_non_objects():
+    data = example()
+    data["steps"][0]["diffs"][0]["lines"] = [None]
+    assert walkthrough.validate_data(data)
+
+
+def test_missing_browser_page_returns_failure(tmp_path):
+    pytest.importorskip("playwright")
+    passed, message = walkthrough.browser_validate(tmp_path / "missing.html")
+    assert not passed
+    assert "ERR_FILE_NOT_FOUND" in message
+
+
+def test_required_review_content():
+    data = example()
+    del data["interfaces"]
+    assert walkthrough.validate_data(data)
+    data = example()
+    for line in data["steps"][0]["diffs"][0]["lines"]:
+        line["type"] = "context"
+    assert walkthrough.validate_data(data)
+    data = example()
+    data["steps"][0]["productionExamples"] = [{}]
+    assert walkthrough.validate_data(data)
+
+
+@pytest.mark.parametrize("value", [None, [], "invalid", 1])
+def test_json_root_must_be_object(value):
+    assert walkthrough.validate_data(value) == ["Walkthrough data must be an object"]

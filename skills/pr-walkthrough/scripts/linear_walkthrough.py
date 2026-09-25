@@ -58,13 +58,15 @@ def is_web_url(value: object) -> bool:
 
 
 def validate_data(data: dict) -> list[str]:
+    if not isinstance(data, dict):
+        return ["Walkthrough data must be an object"]
     errors: list[str] = []
     meta = data.get("meta")
     if not isinstance(meta, dict):
         errors.append("Missing meta object")
     else:
         for field in ("title", "summary", "baseRef", "headRef", "prUrl"):
-            if not meta.get(field):
+            if not isinstance(meta.get(field), str) or not meta[field]:
                 errors.append(f"Missing meta.{field}")
         if not is_web_url(meta.get("prUrl")):
             errors.append("meta.prUrl must be an HTTP(S) URL")
@@ -93,12 +95,14 @@ def validate_data(data: dict) -> list[str]:
             for field in required_finding_fields:
                 if field in finding and not finding.get(field):
                     errors.append(f"Finding {index} has empty {field}")
-            if finding.get("severity") not in {"critical", "major"}:
+            if finding.get("severity") not in ("critical", "major"):
                 errors.append(
                     f"Finding {index} severity must be critical or major"
                 )
 
     interfaces = data.get("interfaces")
+    if interfaces is None:
+        errors.append("Missing interfaces array")
     if interfaces is not None:
         if not isinstance(interfaces, list):
             errors.append("interfaces must be an array")
@@ -117,10 +121,13 @@ def validate_data(data: dict) -> list[str]:
                     errors.append(
                         f"Interface {index} missing fields: {', '.join(sorted(missing))}"
                     )
-                if iface.get("category") not in valid_categories:
+                if not isinstance(iface.get("category"), str) or iface["category"] not in valid_categories:
                     errors.append(
                         f"Interface {index} category must be one of: {', '.join(sorted(valid_categories))}"
                     )
+                for field in ("addedLines", "removedLines"):
+                    if not isinstance(iface.get(field, []), list):
+                        errors.append(f"Interface {index} {field} must be an array")
 
     steps = data.get("steps")
     if not isinstance(steps, list) or not steps:
@@ -135,18 +142,40 @@ def validate_data(data: dict) -> list[str]:
         if missing:
             errors.append(f"Step {index} missing fields: {', '.join(sorted(missing))}")
         step_id = step.get("id")
-        if step_id in seen_ids:
+        if not isinstance(step_id, str) or not step_id:
+            errors.append(f"Step {index} id must be a nonempty string")
+        elif step_id in seen_ids:
             errors.append(f"Duplicate step id: {step_id}")
         if isinstance(step_id, str):
             seen_ids.add(step_id)
-        if not step.get("diffs"):
+        for field in ("diffs", "explanation", "reviewChecks", "productionExamples"):
+            if not isinstance(step.get(field, []), list):
+                errors.append(f"Step {index} {field} must be an array")
+        diffs = step.get("diffs")
+        if not diffs:
             errors.append(f"Step {index} has no code diff")
-        for diff_index, diff in enumerate(step.get("diffs", []), start=1):
+        for diff_index, diff in enumerate(diffs if isinstance(diffs, list) else [], start=1):
+            if not isinstance(diff, dict):
+                errors.append(f"Step {index} diff {diff_index} must be an object")
+                continue
             if not diff.get("file") or not diff.get("lines"):
                 errors.append(f"Step {index} diff {diff_index} needs file and lines")
+            lines = diff.get("lines")
+            if not isinstance(lines, list) or any(not isinstance(line, dict) for line in lines):
+                errors.append(f"Step {index} diff {diff_index} lines must be an array of objects")
+            elif not any(line.get("type") in ("add", "remove") for line in lines):
+                errors.append(f"Step {index} diff {diff_index} needs at least one changed line")
             if diff.get("url") and not is_web_url(diff["url"]):
                 errors.append(f"Step {index} diff {diff_index} URL must be HTTP(S)")
-        if step.get("kind") in {"interface", "data-model"} and not step.get(
+        examples = step.get("productionExamples", [])
+        if isinstance(examples, list) and any(not isinstance(example, dict) for example in examples):
+            errors.append(f"Step {index} productionExamples must contain objects")
+        elif isinstance(examples, list):
+            for example in examples:
+                for field in ("title", "note", "content"):
+                    if not isinstance(example.get(field), str) or not example[field].strip():
+                        errors.append(f"Step {index} production example needs nonempty {field}")
+        if step.get("kind") in ("interface", "data-model") and not step.get(
             "productionExamples"
         ):
             errors.append(
@@ -412,13 +441,13 @@ def runtime() -> str:
   };
 
   const CATEGORY_META = {
-    'firestore':  { icon: '🔥', label: 'Firestore' },
-    'grpc':       { icon: '⚡', label: 'gRPC' },
-    'http-api':   { icon: '🌐', label: 'HTTP API' },
-    'database':   { icon: '🗄️', label: 'Database' },
-    'storage':    { icon: '📦', label: 'Storage' },
-    'messaging':  { icon: '📨', label: 'Messaging' },
-    'config':     { icon: '⚙️', label: 'Config' },
+    'firestore': 'Firestore',
+    'grpc': 'gRPC',
+    'http-api': 'HTTP API',
+    'database': 'Database',
+    'storage': 'Storage',
+    'messaging': 'Messaging',
+    'config': 'Config',
   };
 
   const renderInterfaces = () => {
@@ -454,10 +483,8 @@ def runtime() -> str:
 
     const list = element('div', 'interfaces-list');
     order.forEach(cat => {
-      const meta = CATEGORY_META[cat] || { icon: '📄', label: cat };
       const label = element('div', 'iface-group-label');
-      label.appendChild(element('span', 'iface-group-icon', meta.icon));
-      label.appendChild(document.createTextNode(`${meta.label} (${groups[cat].length})`));
+      label.appendChild(document.createTextNode(`${CATEGORY_META[cat] || cat} (${groups[cat].length})`));
       list.appendChild(label);
 
       groups[cat].forEach(iface => {
@@ -687,8 +714,8 @@ def static_validate(html_text: str) -> tuple[dict, list[str]]:
 
 def browser_validate(html_path: Path) -> tuple[bool, str]:
     try:
-        from playwright.sync_api import sync_playwright
-    except Exception as exc:
+        from playwright.sync_api import Error as PlaywrightError, sync_playwright
+    except ImportError as exc:
         return False, f"Playwright is unavailable: {exc}"
     with sync_playwright() as playwright:
         browser = None
@@ -701,7 +728,7 @@ def browser_validate(html_path: Path) -> tuple[bool, str]:
             try:
                 browser = playwright.chromium.launch(**options)
                 break
-            except Exception as exc:
+            except PlaywrightError as exc:
                 errors.append(f"{label}: {exc}")
         if browser is None:
             return False, "Unable to launch browser: " + " | ".join(errors)
@@ -733,6 +760,8 @@ def browser_validate(html_path: Path) -> tuple[bool, str]:
             interfaces_panel_count = page.locator(".interfaces-panel").count()
             tab_count = page.locator('.tab-button[role="tab"]').count()
             navigation_works = page.locator('[data-action="next"]').is_disabled()
+        except (PlaywrightError, OSError, ValueError) as exc:
+            return False, f"Browser validation failed: {exc}"
         finally:
             browser.close()
     if count < 1 or not navigation_works:

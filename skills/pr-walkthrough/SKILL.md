@@ -236,10 +236,13 @@ Other useful kinds are `entry-point`, `domain-logic`, `persistence`, `side-effec
 
 ## Generate and validate
 
+Resolve `scripts/linear_walkthrough.py` relative to the directory containing this loaded `SKILL.md`.
+Set `WALKTHROUGH_RENDERER` to that verified absolute path before running either command; do not assume a particular host's skill mirror.
+
 Generate:
 
 ```bash
-python3 ~/.agents/skills/pr-walkthrough/scripts/linear_walkthrough.py \
+python3 "$WALKTHROUGH_RENDERER" \
   --template --data .warp/pr-walkthrough/context.json \
   > .warp/pr-walkthrough/index.html
 ```
@@ -247,7 +250,7 @@ python3 ~/.agents/skills/pr-walkthrough/scripts/linear_walkthrough.py \
 Validate:
 
 ```bash
-python3 ~/.agents/skills/pr-walkthrough/scripts/linear_walkthrough.py \
+python3 "$WALKTHROUGH_RENDERER" \
   --validate --html .warp/pr-walkthrough/index.html --require-browser
 ```
 
