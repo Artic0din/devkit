@@ -205,14 +205,14 @@ def validate_preview(preview: Any) -> list[str]:
         and _valid_timestamp(preview.get("cutoff"))
     ):
         timezone = ZoneInfo("Australia/Melbourne")
-        generated = datetime.fromisoformat(preview["generated_at"].replace("Z", "+00:00")).astimezone(timezone)
-        cutoff = datetime.fromisoformat(preview["cutoff"].replace("Z", "+00:00"))
         try:
+            generated = datetime.fromisoformat(preview["generated_at"].replace("Z", "+00:00")).astimezone(timezone)
+            cutoff = datetime.fromisoformat(preview["cutoff"].replace("Z", "+00:00"))
             first_date = generated.date() - timedelta(days=preview["window_days"] - 1)
             expected_cutoff = datetime.combine(first_date, time.min, tzinfo=timezone)
             _require(cutoff == expected_cutoff, "cutoff must match the declared Melbourne calendar-day window", errors)
         except OverflowError:
-            errors.append("window_days is outside the supported date range")
+            errors.append("preview timestamps or window_days are outside the supported date range")
 
     coverage = preview.get("coverage")
     validation = preview.get("validation")
