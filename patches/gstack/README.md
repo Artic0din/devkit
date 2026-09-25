@@ -13,6 +13,7 @@ Session renewal stops after five minutes without a successful request from the o
 Successful activity from the same still-valid session resumes renewal.
 Concurrent recovery requests share the complete soft-reuse and hard-bootstrap operation so recovery cannot relaunch the app while reuse is still in progress.
 If a reused tunnel still fails on the requested endpoint, requests share a hard-bootstrap fallback.
+Hard-only callers joining pending soft recovery escalate after it settles, preserving the requested hard fallback.
 The installed runtime was left unchanged.
 
 ## Apply to a separate Gstack checkout
@@ -41,6 +42,6 @@ The final patch retains four of those files unchanged and adds the reviewed sess
 Both new regression cases failed against the original local changes and passed with the correction.
 Concurrent recovery and client inactivity regressions also failed against the earlier patch and passed after correction.
 Release tests count heartbeat request starts, avoiding a race with an already in-flight request arriving after release.
-The two suites passed with Bun 1.4.2: 55 tests and 159 assertions.
+The two suites passed with Bun 1.4.2: 56 tests and 162 assertions.
 They use local test doubles; a physical iPhone and Xcode device integration were not exercised.
 Generated aliases, compiled outputs, installation markers, and the remaining upstream runtime are excluded.

@@ -80,7 +80,7 @@ index c17aec7..4355d20 100644
    const handle = setInterval(tick, intervalMs);
    // Don't keep the event loop alive just for this — daemon owns the lifecycle.
 diff --git a/ios-qa/daemon/src/index.ts b/ios-qa/daemon/src/index.ts
-index 9ae177c..c91b99d 100644
+index 9ae177c..72bce3b 100644
 --- a/ios-qa/daemon/src/index.ts
 +++ b/ios-qa/daemon/src/index.ts
 @@ -20,7 +20,7 @@ import { SessionTokenStore } from './session-tokens';
@@ -115,7 +115,7 @@ index 9ae177c..c91b99d 100644
  export async function startDaemon(opts: DaemonOptions): Promise<RunningDaemon | { error: string; reason?: string }> {
    // 1. Single-instance enforcement.
    const claim = await tryClaim({ port: opts.loopbackPort, path: opts.pidfilePath });
-@@ -62,23 +71,34 @@ export async function startDaemon(opts: DaemonOptions): Promise<RunningDaemon |
+@@ -62,29 +71,49 @@ export async function startDaemon(opts: DaemonOptions): Promise<RunningDaemon |
  
    const tokenStore = new SessionTokenStore();
    let tunnel: DeviceTunnel | null = null;
@@ -132,7 +132,10 @@ index 9ae177c..c91b99d 100644
      // trying to bootstrap it again on a timer. Failed attempts are not cached.
 -    if (tunnel) return tunnel;
 -    if (!opts.tunnelProvider) return null;
-+    if (tunnel && tunnel !== failed) return { tunnel, reused: tunnelWasReused };
++    if (tunnel && tunnel !== failed) {
++      if (!hardOnly || !tunnelWasReused) return { tunnel, reused: tunnelWasReused };
++      failed = tunnel;
++    }
 +    if (failed && tunnel === failed) tunnel = null;
 +    if (!opts.tunnelProvider) return { tunnel: null, reused: false };
  
@@ -158,7 +161,20 @@ index 9ae177c..c91b99d 100644
          })
          .finally(() => {
            tunnelInFlight = null;
-@@ -94,6 +114,55 @@ export async function startDaemon(opts: DaemonOptions): Promise<RunningDaemon |
+         });
+     }
+-    return tunnelInFlight;
++    const recovered = await tunnelInFlight;
++    // A hard-only caller may have joined soft recovery already in progress.
++    // Chain its escalation after that recovery settles instead of accepting reuse.
++    if (hardOnly && recovered.reused && recovered.tunnel) {
++      return getTunnel(recovered.tunnel, true);
++    }
++    return recovered;
+   };
+ 
+   const invalidateTunnel = (failedTunnel: DeviceTunnel): void => {
+@@ -94,6 +123,55 @@ export async function startDaemon(opts: DaemonOptions): Promise<RunningDaemon |
      if (tunnel === failedTunnel) tunnel = null;
    };
  
@@ -214,7 +230,7 @@ index 9ae177c..c91b99d 100644
    // 2. Tailnet probe (fail-closed).
    const probe = opts.tailnetEnabled
      ? (opts.probeImpl ? await opts.probeImpl() : await probeTailscale(opts.tailnetSocketPath))
-@@ -106,7 +175,9 @@ export async function startDaemon(opts: DaemonOptions): Promise<RunningDaemon |
+@@ -106,7 +184,9 @@ export async function startDaemon(opts: DaemonOptions): Promise<RunningDaemon |
  
    // 3. Loopback listener (full surface).
    const loopbackServer = createServer(async (req, res) => {
@@ -225,7 +241,7 @@ index 9ae177c..c91b99d 100644
    });
    // Use port 0 for OS-assigned port when test/random port collisions are a risk.
    const requestedPort = opts.loopbackPort;
-@@ -117,7 +188,9 @@ export async function startDaemon(opts: DaemonOptions): Promise<RunningDaemon |
+@@ -117,7 +197,9 @@ export async function startDaemon(opts: DaemonOptions): Promise<RunningDaemon |
    // mode this can collide; we try the actualPort first and skip ipv6 if it
    // fails (tests don't exercise ::1 explicitly).
    const loopbackServerV6 = createServer(async (req, res) => {
@@ -236,7 +252,7 @@ index 9ae177c..c91b99d 100644
    });
    let v6Bound = false;
    try {
-@@ -139,6 +212,7 @@ export async function startDaemon(opts: DaemonOptions): Promise<RunningDaemon |
+@@ -139,6 +221,7 @@ export async function startDaemon(opts: DaemonOptions): Promise<RunningDaemon |
          tokenStore,
          getTunnel,
          invalidateTunnel,
@@ -244,7 +260,7 @@ index 9ae177c..c91b99d 100644
          auditPath: opts.auditPath,
          attemptsPath: opts.attemptsPath,
          allowlistPath: opts.allowlistPath,
-@@ -169,6 +243,10 @@ export async function startDaemon(opts: DaemonOptions): Promise<RunningDaemon |
+@@ -169,6 +252,10 @@ export async function startDaemon(opts: DaemonOptions): Promise<RunningDaemon |
          (s as unknown as { closeIdleConnections?: () => void }).closeIdleConnections?.();
          return new Promise<void>((resolve) => s.close(() => resolve()));
        };
@@ -255,7 +271,7 @@ index 9ae177c..c91b99d 100644
        await Promise.all([
          closeAll(loopbackServer),
          v6Bound ? closeAll(loopbackServerV6) : Promise.resolve(),
-@@ -197,19 +275,20 @@ function listenAsync(server: ReturnType<typeof createServer>, port: number, host
+@@ -197,19 +284,20 @@ function listenAsync(server: ReturnType<typeof createServer>, port: number, host
  
  // ───────── Handlers ─────────
  
@@ -279,7 +295,7 @@ index 9ae177c..c91b99d 100644
  const RECOVERABLE_SOCKET_ERRORS = new Set([
    'ECONNABORTED',
    'ECONNREFUSED',
-@@ -276,7 +355,7 @@ async function proxyWithTunnelRecovery(opts: {
+@@ -276,7 +364,7 @@ async function proxyWithTunnelRecovery(opts: {
    getTunnel: HandlerCtx['getTunnel'];
    invalidateTunnel: HandlerCtx['invalidateTunnel'];
  }): Promise<{ tunnel: DeviceTunnel; upstream: DeviceProxyResponse } | null> {
@@ -288,7 +304,7 @@ index 9ae177c..c91b99d 100644
    if (!tunnel) return null;
  
    const makeAttempt = (candidate: DeviceTunnel) => proxyAttempt({
-@@ -292,8 +371,8 @@ async function proxyWithTunnelRecovery(opts: {
+@@ -292,8 +380,8 @@ async function proxyWithTunnelRecovery(opts: {
  
    const failedTunnel = tunnel;
    const replaySafe = canReplayAfterRefresh(opts.inbound, upstream);
@@ -299,7 +315,7 @@ index 9ae177c..c91b99d 100644
    if (!refreshed) return replaySafe ? null : { tunnel: failedTunnel, upstream };
  
    // The replacement is now cached for the next request, but never replay an
-@@ -303,6 +382,14 @@ async function proxyWithTunnelRecovery(opts: {
+@@ -303,6 +391,14 @@ async function proxyWithTunnelRecovery(opts: {
  
    tunnel = refreshed;
    upstream = await makeAttempt(tunnel);
@@ -314,7 +330,7 @@ index 9ae177c..c91b99d 100644
    // Do not loop forever if the replacement app is itself unavailable. Leave
    // the cache empty so the next independent request can bootstrap again.
    if (shouldRefreshTunnel(upstream)) opts.invalidateTunnel(tunnel);
-@@ -350,7 +437,7 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
+@@ -350,7 +446,7 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
   * loopback bind itself is the boundary).
   */
  async function handleLoopback(ctx: HandlerCtx): Promise<void> {
@@ -323,7 +339,7 @@ index 9ae177c..c91b99d 100644
    const url = parseUrl(req.url ?? '/');
    const path = url.pathname ?? '/';
    const method = req.method ?? 'GET';
-@@ -419,6 +506,7 @@ async function handleLoopback(ctx: HandlerCtx): Promise<void> {
+@@ -419,6 +515,7 @@ async function handleLoopback(ctx: HandlerCtx): Promise<void> {
        return;
      }
      const { upstream } = proxied;
@@ -331,7 +347,7 @@ index 9ae177c..c91b99d 100644
      res.writeHead(upstream.status, upstream.headers);
      res.end(upstream.body);
    } catch (err) {
-@@ -434,7 +522,7 @@ interface TailnetCtx extends HandlerCtx {
+@@ -434,7 +531,7 @@ interface TailnetCtx extends HandlerCtx {
   * Tailnet handler — locked allowlist + capability tiers.
   */
  async function handleTailnet(ctx: TailnetCtx): Promise<void> {
@@ -340,7 +356,7 @@ index 9ae177c..c91b99d 100644
    const url = parseUrl(req.url ?? '/');
    const path = url.pathname ?? '/';
    const method = req.method ?? 'GET';
-@@ -536,6 +624,7 @@ async function handleTailnet(ctx: TailnetCtx): Promise<void> {
+@@ -536,6 +633,7 @@ async function handleTailnet(ctx: TailnetCtx): Promise<void> {
        return;
      }
      const { tunnel, upstream } = proxied;
@@ -348,7 +364,7 @@ index 9ae177c..c91b99d 100644
  
      // Audit the action (mutating endpoints only).
      if (requiredCapability !== 'observe') {
-@@ -599,6 +688,8 @@ if (import.meta.main) {
+@@ -599,6 +697,8 @@ if (import.meta.main) {
      loopbackPort: port,
      tailnetEnabled: tailnet,
      tunnelProvider: realTunnelProvider,
@@ -441,7 +457,7 @@ index f1be1ca..469899b 100644
 +  }
 +}
 diff --git a/ios-qa/daemon/test/daemon-integration.test.ts b/ios-qa/daemon/test/daemon-integration.test.ts
-index 9073b18..b63a194 100644
+index 9073b18..21b2f1a 100644
 --- a/ios-qa/daemon/test/daemon-integration.test.ts
 +++ b/ios-qa/daemon/test/daemon-integration.test.ts
 @@ -9,7 +9,7 @@
@@ -480,7 +496,7 @@ index 9073b18..b63a194 100644
          if (req.url === '/tap') {
            res.writeHead(200, { 'content-type': 'application/json' });
            res.end(JSON.stringify({ ok: true, op: 'tap' }));
-@@ -404,6 +424,208 @@ describe('daemon — loopback listener', () => {
+@@ -404,6 +424,257 @@ describe('daemon — loopback listener', () => {
      }
    });
  
@@ -577,6 +593,55 @@ index 9073b18..b63a194 100644
 +      expect(softCalls).toBe(1);
 +    } finally {
 +      await d.close();
++    }
++  });
++
++  test('hard fallback escalates after joining an in-flight soft recovery', async () => {
++    const retrySeen = Promise.withResolvers<void>();
++    let releaseFirstRetry = () => {};
++    const endpoint = createServer((req, res) => {
++      const fail = () => { res.writeHead(401); res.end('{}'); };
++      if (req.headers.authorization === 'Bearer soft-1' && req.headers['x-session-id'] === 'first') {
++        releaseFirstRetry = fail;
++        retrySeen.resolve();
++      } else if (req.headers.authorization === `Bearer ${STATE_SERVER_TOKEN}`) {
++        res.writeHead(200); res.end('{}');
++      } else fail();
++    });
++    await new Promise<void>((resolve) => endpoint.listen(0, '127.0.0.1', resolve));
++    const port = (endpoint.address() as { port: number }).port;
++    const candidate = (token: string) => ({
++      udid: 'STUB-UDID', ipv6Addr: '127.0.0.1', port, bootTokenRotated: token,
++    });
++    let bootstraps = 0;
++    let softCalls = 0;
++    const d = await startDaemon({
++      loopbackPort: 0, tailnetEnabled: false,
++      pidfilePath: join(workDir, 'daemon-hard-escalation.pid'),
++      tunnelProvider: async () => candidate(++bootstraps === 1 ? 'original' : STATE_SERVER_TOKEN),
++      softReconnect: async () => {
++        softCalls++;
++        if (softCalls === 2) {
++          releaseFirstRetry();
++          await Bun.sleep(50);
++        }
++        return candidate(`soft-${softCalls}`);
++      },
++    });
++    if ('error' in d) throw new Error(d.error);
++    try {
++      const url = `http://127.0.0.1:${d.loopbackPort}/screenshot`;
++      const first = fetchWith('GET', url, { headers: { 'x-session-id': 'first' } });
++      await retrySeen.promise;
++      const second = fetchWith('GET', url, { headers: { 'x-session-id': 'second' } });
++      const responses = await Promise.all([first, second]);
++      expect(responses.map((r) => r.status)).toEqual([200, 200]);
++      expect(bootstraps).toBe(2);
++      expect(softCalls).toBe(2);
++    } finally {
++      await d.close();
++      endpoint.closeAllConnections();
++      await new Promise<void>((resolve) => endpoint.close(() => resolve()));
 +    }
 +  });
 +
