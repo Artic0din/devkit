@@ -1,6 +1,10 @@
 """Run directly to check preview scope and archive safeguards with synthetic data."""
 
 from copy import deepcopy
+from pathlib import Path
+import subprocess
+import sys
+from tempfile import TemporaryDirectory
 
 from validate_preview import validate_preview
 
@@ -20,19 +24,113 @@ def preview() -> dict:
             "dedupe_checks_complete": True, "primary_source_checks_complete": True,
         },
         "threads": [{
-            "id": "synthetic", "kind": "codex", "status": "idle",
+            "id": "synthetic", "host_id": "local", "kind": "codex", "status": "idle",
             "updated_at": "2026-09-24T10:00:00+10:00",
             "observed_updated_at": "2026-09-24T10:00:00+10:00",
             "current_title": "Example", "proposed_title": "Example done",
             "outcome": "verified_complete", "evidence": ["Synthetic check passed"],
-            "project": {"mapping_status": "unmapped", "apply_support": "unsupported"},
+            "project": {
+                "name": None, "cwd": None, "repo": None,
+                "mapping_status": "unmapped", "apply_support": "unsupported",
+            },
             "unreadable": False, "blocker": None, "archive_candidate": True,
             "unresolved_outcomes": [], "task_candidates": [], "knowledge_candidates": [],
         }],
     }
 
 
+def test_host_identity() -> None:
+    for value in (None, "", " ", 1, [], {}):
+        invalid = preview()
+        invalid["threads"][0]["host_id"] = value
+        assert "threads[0].host_id is required" in validate_preview(invalid), value
+    invalid = preview()
+    del invalid["threads"][0]["host_id"]
+    assert "threads[0].host_id is required" in validate_preview(invalid)
+
+
+def test_project_metadata() -> None:
+    for mapping in ("mapped", "unmapped"):
+        valid = preview()
+        valid["threads"][0]["project"].update(
+            mapping_status=mapping, name="Example", cwd="/tmp/example", repo="owner/example",
+        )
+        assert not validate_preview(valid), validate_preview(valid)
+        for field in ("name", "cwd", "repo"):
+            invalid = deepcopy(valid)
+            del invalid["threads"][0]["project"][field]
+            assert any(f"project.{field}" in error for error in validate_preview(invalid)), (mapping, field)
+            for value in (None, "", " ", 1, [], {}):
+                invalid = deepcopy(valid)
+                invalid["threads"][0]["project"][field] = value
+                errors = validate_preview(invalid)
+                if mapping == "unmapped" and value is None:
+                    assert not errors, errors
+                else:
+                    assert any(f"project.{field}" in error for error in errors), (mapping, field, value)
+        invalid = deepcopy(valid)
+        invalid["threads"][0]["project"]["repo"] = "not-a-repository"
+        assert any("project.repo" in error for error in validate_preview(invalid)), mapping
+
+
+def test_invalid_utf8_cli() -> None:
+    with TemporaryDirectory() as directory:
+        source = Path(directory) / "preview.json"
+        source.write_bytes(b'\xff')
+        result = subprocess.run(
+            [sys.executable, str(Path(__file__).with_name("validate_preview.py")), str(source)],
+            capture_output=True, text=True, check=False,
+        )
+    assert result.returncode == 1, result
+    assert result.stderr.startswith("INVALID:"), result.stderr
+    assert "Traceback" not in result.stderr, result.stderr
+
+
+def task_preview() -> dict:
+    value = preview()
+    thread = value["threads"][0]
+    thread["archive_candidate"] = False
+    thread["project"].update(mapping_status="mapped", name="Example", cwd="/tmp/example", repo="owner/project")
+    thread["task_candidates"] = [{
+        "status": "new", "title": "Example", "repo": "owner/project",
+        "evidence": ["Synthetic evidence"], "marker": "<!-- session-triage:synthetic:example -->",
+        "dedupe": {"checked": True, "existing_url": None, "reason": "No matching issue"},
+    }]
+    value["coverage"].update(archive_candidates=0, new_task_candidates=1)
+    return value
+
+
+def test_task_repository() -> None:
+    value = task_preview()
+    assert not validate_preview(value), validate_preview(value)
+    value["threads"][0]["task_candidates"][0]["repo"] = "OWNER/Project"
+    assert not validate_preview(value), validate_preview(value)
+    value["threads"][0]["task_candidates"][0]["repo"] = "other/project"
+    assert any("must match the mapped project" in error for error in validate_preview(value))
+
+
+def test_unreadable_mutations() -> None:
+    for candidate_type in ("task", "knowledge"):
+        value = task_preview()
+        thread = value["threads"][0]
+        thread.update(unreadable=True, blocker="Cannot read source", outcome="blocked")
+        value["coverage"].update(audited_threads=0, unreadable_threads=1)
+        if candidate_type == "knowledge":
+            thread["task_candidates"] = []
+            thread["knowledge_candidates"] = [{
+                "status": "verified", "target_note": "Example", "proposed_content": "Example fact",
+                "primary_sources": ["Synthetic source"], "reason": "Verified fixture",
+            }]
+            value["coverage"].update(new_task_candidates=0, verified_knowledge_candidates=1)
+        assert any("unreadable" in error for error in validate_preview(value)), candidate_type
+
+
 if __name__ == "__main__":
+    test_host_identity()
+    test_project_metadata()
+    test_invalid_utf8_cli()
+    test_task_repository()
+    test_unreadable_mutations()
     valid = preview()
     assert not validate_preview(valid)
     custom = deepcopy(valid)
@@ -89,4 +187,4 @@ if __name__ == "__main__":
         invalid["threads"][0].update(unreadable=unreadable, archive_candidate=False)
         invalid["coverage"]["archive_candidates"] = 0
         assert validate_preview(invalid), unreadable
-    print("PASS: default/custom window and known-idle archive safeguards")
+    print("PASS: window, archive, metadata, and invalid UTF-8 safeguards")

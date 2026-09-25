@@ -7,6 +7,7 @@
       "description": "Skills for agent instructions, skill hygiene, and reusable workflow design.",
       "skills": [
         "autoreview",
+        "build-kickoff",
         "chrome-extensions",
         "codex-config",
         "codex-first",
@@ -22,6 +23,7 @@
         "playwright",
         "project-structure",
         "retro",
+        "session-triage",
         "skill-cleaner"
       ]
     },
@@ -38,6 +40,7 @@
         "github-author-context",
         "github-deep-review",
         "github-project-triage",
+        "github-workflow",
         "leaving-pr-comments",
         "modernize",
         "pr-walkthrough",

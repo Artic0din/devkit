@@ -137,7 +137,8 @@ Remove changed sessions from the apply set and return them to preview.
 
 Apply in this order:
 
-1. Create approved, non-duplicate GitHub Issues in their verified repositories.
+1. Immediately before each approved issue creation, search its verified repository for the exact stable marker again, including open and closed issues.
+   Treat an existing match as already applied and record its URL in the ledger; create the issue only when no match exists.
 2. Apply approved Basic Memory note edits.
 3. Rename approved sessions.
 4. Move sessions only when a supported thread tool exists.

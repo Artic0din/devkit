@@ -47,6 +47,10 @@ Each thread contains:
 
 Project mapping_status is mapped or unmapped.
 Project apply_support is supported or unsupported.
+Every thread's host_id is a non-empty string identifying the source host, including `local` for the local host.
+Project name, cwd, and repo must always be present.
+For a mapped project, name and cwd are non-empty strings and repo uses `owner/repository` form.
+For an unmapped project, unknown values are explicitly null; known name and cwd values are non-empty strings, and a known repo still uses `owner/repository` form.
 Thread status is the non-empty status returned by the app.
 Only a confirmed `idle` status permits an archive candidate; active, missing, or unfamiliar statuses do not establish inactivity.
 
@@ -55,6 +59,8 @@ Every task includes title, repo, evidence, dedupe, and marker.
 Dedupe contains checked, existing_url, and reason.
 Duplicate and completed tasks include an existing URL.
 New tasks require a mapped owner/repository and a marker containing the source thread ID.
+The task repository must match the mapped project's repository, ignoring letter case.
+Unreadable threads cannot contain new task candidates or verified knowledge candidates.
 
 Knowledge status is verified or rejected.
 Verified candidates include target_note, proposed_content, non-empty primary_sources, and reason.
