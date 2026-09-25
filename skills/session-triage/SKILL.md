@@ -109,7 +109,7 @@ Internal validation requires:
 - every eligible thread appears exactly once;
 - every unreadable thread has a precise blocker;
 - archive candidates are inactive, verified complete, and have no unresolved outcomes or new tasks;
-- every proposed issue has a mapped repository, evidence, deduplication result, and stable marker;
+- every proposed issue has a mapped repository, exact proposed body, evidence, deduplication result, and unique stable marker;
 - every verified knowledge candidate names current primary sources and a target note;
 - summary counts match the roster.
 
@@ -127,11 +127,15 @@ Present a compact preview grouped by project:
 5. verified knowledge updates and rejected candidates.
 
 Include the validated preview path and coverage counts.
+Compute the preview file's SHA-256 digest and include it in the presented approval request.
+Present the exact issue titles and bodies and knowledge edits, or link their full content in that immutable preview.
 Stop and wait for explicit approval.
 
 ## 7. Apply an approved preview
 
-Before any mutation, re-read the preview and recheck each target session's updatedAt.
+Before any mutation, recompute the preview's SHA-256 digest and compare it to the digest presented for approval.
+If it differs, stop and present the changed preview for fresh approval.
+Re-read the matching preview and recheck each target session's updatedAt.
 Normalize the live value to the same instant representation as `observed_updated_at` before comparing.
 Remove changed sessions from the apply set and return them to preview.
 
@@ -139,7 +143,9 @@ Apply in this order:
 
 1. Immediately before each approved issue creation, search its verified repository for the exact stable marker again, including open and closed issues.
    Treat an existing match as already applied and record its URL in the ledger; create the issue only when no match exists.
-2. Apply approved Basic Memory note edits.
+   Publish the exact approved title and body; do not invent content during apply.
+2. Re-read each knowledge candidate's named primary sources immediately before writing.
+   Skip changed or unverifiable evidence and return that candidate to preview; otherwise apply the exact approved note edit.
 3. Rename approved sessions.
 4. Move sessions only when a supported thread tool exists.
 5. Archive approved sessions last.

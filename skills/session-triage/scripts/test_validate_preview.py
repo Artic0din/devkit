@@ -93,6 +93,7 @@ def task_preview() -> dict:
     thread["project"].update(mapping_status="mapped", name="Example", cwd="/tmp/example", repo="owner/project")
     thread["task_candidates"] = [{
         "status": "new", "title": "Example", "repo": "owner/project",
+        "body": "## Context\nEvidence\n## Goal\nOutcome\n## Acceptance criteria\n- [ ] Verified\n## Technical notes\nConstraints\n<!-- session-triage:synthetic:example -->",
         "evidence": ["Synthetic evidence"], "marker": "<!-- session-triage:synthetic:example -->",
         "dedupe": {"checked": True, "existing_url": None, "reason": "No matching issue"},
     }]
@@ -125,12 +126,28 @@ def test_unreadable_mutations() -> None:
         assert any("unreadable" in error for error in validate_preview(value)), candidate_type
 
 
+def test_task_publication_payload() -> None:
+    for body in (None, "", "Unstructured issue"):
+        value = task_preview()
+        value["threads"][0]["task_candidates"][0]["body"] = body
+        assert any("body" in error for error in validate_preview(value)), body
+    value = task_preview()
+    candidate = value["threads"][0]["task_candidates"][0]
+    value["threads"][0]["task_candidates"].append(deepcopy(candidate))
+    value["coverage"]["new_task_candidates"] = 2
+    assert any("duplicate task marker" in error for error in validate_preview(value))
+    value["threads"][0]["task_candidates"][1]["marker"] = "<!-- session-triage:synthetic:second -->"
+    value["threads"][0]["task_candidates"][1]["body"] = candidate["body"].replace(":example -->", ":second -->")
+    assert not validate_preview(value), validate_preview(value)
+
+
 if __name__ == "__main__":
     test_host_identity()
     test_project_metadata()
     test_invalid_utf8_cli()
     test_task_repository()
     test_unreadable_mutations()
+    test_task_publication_payload()
     valid = preview()
     assert not validate_preview(valid)
     custom = deepcopy(valid)

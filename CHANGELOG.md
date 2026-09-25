@@ -6,6 +6,8 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Bound session actions to the exact approved preview, required complete issue payloads with unique markers, and revalidated knowledge evidence before applying edits.
+
 - Rejected incomplete host and project metadata in session previews and reported invalid text encoding without a traceback.
 - Prevented session previews from targeting the wrong repository or creating tasks and knowledge from unreadable sessions, and rechecked issue markers before creation.
 - Registered the build and session workflows and clarified issue approval, review status, and direct-fix pull request guidance.
