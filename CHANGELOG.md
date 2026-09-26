@@ -6,6 +6,8 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Blocked output whenever the output filter fails, restored Python 3.8 support, and redacted private-key PEM blocks and concatenated or multiline quoted secret values.
+
 - Redacted credentials split by terminal colour codes and values of secret-named fields such as an STS `SecretAccessKey` and `SessionToken`.
 
 - Isolated output filtering from inherited Python modules and recognized JWT headers containing JSON whitespace.

@@ -27,6 +27,16 @@ if __name__ == "__main__":
             capture_output=True, timeout=3,
         )
         assert result.returncode == 2 and result.stdout == "", result
+    with tempfile.TemporaryDirectory() as directory:
+        Path(directory, "python3").write_text("#!/bin/sh\nexit 1\n")
+        Path(directory, "python3").chmod(0o755)
+        result = subprocess.run(
+            ["bash", str(Path(__file__).with_name("bash-output-scrub.sh"))],
+            input=json.dumps({"tool_response": {"stdout": "", "stderr": ""}}),
+            env={**os.environ, "PATH": directory + os.pathsep + os.environ["PATH"]},
+            text=True, capture_output=True, timeout=3,
+        )
+        assert result.returncode == 2 and result.stdout == "", result
     assert run_hook("ordinary output") == ""
     assert run_hook("version abc.def.ghi") == ""
     assert run_hook("task-abcdefghijklmnopqrstuvwxyz") == ""
@@ -56,9 +66,23 @@ if __name__ == "__main__":
     assert run_hook("token" * 200000) == ""
     assert run_hook("\x1b[32mok\x1b[0m") == ""
     siblings = ("Zsecret/Access+Key0", "ZsessionToken+/=")
-    assert json.loads(run_hook("password=hunter2"))["decision"] == "block"
+    for short in ("password=hunter2", "password=getToken()hunter2", 'password=getToken()"hunter2"', "PASSWORD='x'\"hunter2\"", "password=hunter2(2)",
+                  "\x1b[01;31m\x1b[Kpassword\x1b[m\x1b[K=" + "a" * 32 + "hunter2"):
+        output = run_hook(short)
+        assert json.loads(output)["decision"] == "block" and "hunter2" not in output, output
+    pem_body = ("MIIEvQIBADANBgkqhkiG9w0BAQEFAASC", "Zq9LeakPemLine+/==")
+    pem = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(pem_body) + "\n-----END PRIVATE KEY-----"
+    for pem_output in (f"PRIVATE_KEY='{pem}'", f"PRIVATE_KEY={pem}", "private_key: |\n  " + pem.replace("\n", "\n  "), pem):
+        output = run_hook(pem_output + "\nnext")
+        assert json.loads(output)["decision"] == "block"
+        assert not any(line in output for line in pem_body) and "next" in output, output
+    output = run_hook('Missing token: "abc\nrow 1\nrow 2')
+    assert "row 2" in json.loads(output)["reason"], output
+    for minified in ('{"token":"abc","user":"bob"}', '{"token":abc,"user":"bob"}', "{'token':abc,'user':'bob'}"):
+        output = run_hook(minified)
+        assert "abc" not in output and "user" in output and "bob" in output, output
     sts = json.dumps({"Credentials": {"AccessKeyId": "ASIA" + "Z" * 16, "SecretAccessKey": siblings[0], "SessionToken": siblings[1]}})
-    for source in ("const token = getToken();", "if secret_ref == other:", "a=" * 20000 + "(", "k=v&" * 10000 + "[", "token=f();" * 100000):
+    for source in ("const token = getToken();", "if secret_ref == other:", "a=" * 20000 + "(", "k=v&" * 10000 + "[", "token=f();" * 100000, "-----BEGIN A" * 100000, "-----BEGIN " + "PRIVATE KEY " * 83000):
         assert run_hook(source) == "", source
     nested = json.dumps({"SecretString": json.dumps({"password": siblings[0]})})
     for credential_output in (sts, nested, '{"password": "x\\"' + siblings[0] + '"}', f"AWS_SECRET_ACCESS_KEY={siblings[0]}\npassword: '{siblings[1]}'", f"password={siblings[0]},{siblings[1]}", *(f"a=x,password=ab{c}{siblings[0]}" for c in ":=&<(;")):

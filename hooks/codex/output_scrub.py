@@ -1,5 +1,7 @@
 """Return bounded, redacted feedback using the Codex PostToolUse contract."""
 
+from __future__ import annotations
+
 import base64
 import json
 import re
@@ -20,8 +22,19 @@ PATTERNS = (
 # Credentials without a recognizable shape, such as an STS SecretAccessKey, are found by their field name.
 SECRET_NAME_PATTERN = re.compile(r"secret|token|passw(?:or)?d|credential|api[_-]?key|private[_-]?key", re.IGNORECASE)
 FIELD_PATTERN = re.compile(r"""(?<![A-Za-z0-9_-])([A-Za-z0-9_-]+)["']?\s*[:=](?!=)\s*""")
-VALUE_PATTERN = re.compile(r""""(?:[^"\\\n]|\\.)+"?|'(?:[^'\\\n]|\\.)+'?|[^\s"']+""")
-CALL_PATTERN = re.compile(r"[A-Za-z_][\w.]*\([^\s()]*\)")
+# A value is adjacent quoted and bare segments, as in shell; segments do not join across JSON punctuation,
+# so the next field stays visible. A quote spans lines only when a later quote closes it.
+QUOTED_SEGMENT = r""""(?:[^"\\]|\\.)+"|"(?:[^"\\\n]|\\.)+|'(?:[^'\\]|\\.)+'|'(?:[^'\\\n]|\\.)+"""
+VALUE_PATTERN = re.compile(
+    rf"""(?:{QUOTED_SEGMENT}|[^\s"']+)(?:(?<![,;:}}\]])(?:{QUOTED_SEGMENT})|(?![,;:}}\]])[^\s"']+)*""", re.DOTALL
+)
+CALL_PATTERN = re.compile(r"[A-Za-z_][\w.]*\((?:[A-Za-z_][\w.]*)?\)(?![^\s;,)\]}])")
+# Runs before field redaction so the unquoted PEM body printed by `env` or a YAML block is covered.
+# Bounded labels keep repeated `PRIVATE KEY ` words from splitting quadratically.
+PRIVATE_KEY_PATTERN = re.compile(
+    r"-----BEGIN [A-Z0-9 ]{0,40}PRIVATE KEY[A-Z ]{0,20}-----.*?(?:-----END [A-Z0-9 ]{0,40}PRIVATE KEY[A-Z ]{0,20}-----|\Z)",
+    re.DOTALL,
+)
 
 
 def redact_assignments(text: str) -> str:
@@ -29,7 +42,12 @@ def redact_assignments(text: str) -> str:
     end = 0
     for field in FIELD_PATTERN.finditer(text):
         # Code such as `token = getToken()` names a call, not a credential.
-        if field.start() < end or not SECRET_NAME_PATTERN.search(field.group(1)) or CALL_PATTERN.match(text, field.end()):
+        if (
+            field.start() < end
+            or not SECRET_NAME_PATTERN.search(field.group(1))
+            or CALL_PATTERN.match(text, field.end())
+            or text.startswith("[REDACTED_VALUE]", field.end())
+        ):
             continue
         value = VALUE_PATTERN.match(text, field.end())
         if value:
@@ -48,7 +66,7 @@ def is_jwt_header(header: str) -> bool:
 
 
 def scrub(text: str) -> str:
-    text = redact_assignments(text)
+    text = redact_assignments(PRIVATE_KEY_PATTERN.sub("[REDACTED_PRIVATE_KEY]", text))
     parts: list[str] = []
     end = 0
     # Overlapping candidates keep an invalid dotted prefix from hiding a real JWT.
