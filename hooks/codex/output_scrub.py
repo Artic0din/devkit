@@ -42,12 +42,7 @@ def redact_assignments(text: str) -> str:
     end = 0
     for field in FIELD_PATTERN.finditer(text):
         # Code such as `token = getToken()` names a call, not a credential.
-        if (
-            field.start() < end
-            or not SECRET_NAME_PATTERN.search(field.group(1))
-            or CALL_PATTERN.match(text, field.end())
-            or text.startswith("[REDACTED_VALUE]", field.end())
-        ):
+        if field.start() < end or not SECRET_NAME_PATTERN.search(field.group(1)) or CALL_PATTERN.match(text, field.end()):
             continue
         value = VALUE_PATTERN.match(text, field.end())
         if value:

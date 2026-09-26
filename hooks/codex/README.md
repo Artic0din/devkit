@@ -16,6 +16,7 @@ This applies to adjacent quoted and unquoted segments, and to any value except a
 A quoted value spans lines only when its closing quote is present.
 Private-key PEM blocks are redacted wherever they appear.
 This is pattern-based filtering, not a guarantee that arbitrary secrets are detected; long hexadecimal commit IDs and lines such as `password: string;` or `max_tokens: 1000` also match.
+Known gaps include YAML block scalars such as `password: |`, eight-bit C1 control sequences, calls with one identifier argument such as `Summer(Rain)`, and value tails after punctuation or shell `'\''` quoting.
 Avoid emitting sensitive output in the first place.
 The hook runs the first `bash` and `python3` found on `PATH`.
 It does not defend against a hostile `PATH`, because anything placed there already runs with your privileges.

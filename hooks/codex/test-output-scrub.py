@@ -66,7 +66,7 @@ if __name__ == "__main__":
     assert run_hook("token" * 200000) == ""
     assert run_hook("\x1b[32mok\x1b[0m") == ""
     siblings = ("Zsecret/Access+Key0", "ZsessionToken+/=")
-    for short in ("password=hunter2", "password=getToken()hunter2", 'password=getToken()"hunter2"', "PASSWORD='x'\"hunter2\"", "password=hunter2(2)",
+    for short in ("password=hunter2", "password=getToken()hunter2", 'password=getToken()"hunter2"', "PASSWORD='x'\"hunter2\"", "password=hunter2(2)", "password=[REDACTED_VALUE]hunter2",
                   "\x1b[01;31m\x1b[Kpassword\x1b[m\x1b[K=" + "a" * 32 + "hunter2"):
         output = run_hook(short)
         assert json.loads(output)["decision"] == "block" and "hunter2" not in output, output
