@@ -122,7 +122,20 @@ class BaselineTests(unittest.TestCase):
         (self.root / "loop-two").symlink_to("loop-one")
         result = self.run_step(REQUIRED_FILES="loop-one")
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("loop-one", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+        self.assertTrue(result.stderr.startswith((
+            "Cannot resolve required path 'loop-one':",
+            "Required paths do not exist: ['loop-one']",
+        )), result.stderr)
+
+    def test_reports_resolution_invalid_and_missing_failures_together(self) -> None:
+        (self.root / "loop-one").symlink_to("loop-two")
+        (self.root / "loop-two").symlink_to("loop-one")
+        result = self.run_step(REQUIRED_FILES="loop-one, ../outside.md, missing")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("Traceback", result.stderr)
+        for path in ("loop-one", "../outside.md", "missing"):
+            self.assertIn(repr(path), result.stderr)
 
 
 if __name__ == "__main__":

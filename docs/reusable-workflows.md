@@ -16,7 +16,7 @@ Other workflows and existing external callers remain in the old repository until
 | Interface | Behavior |
 | --- | --- |
 | `required-files` | Optional string of comma-separated repository-relative paths; default: `README.md, LICENSE, .gitignore, AGENTS.md` |
-| Validation | Trim whitespace and ignore empty entries; reject an empty list, report invalid paths, or report every missing path |
+| Validation | Trim whitespace and ignore empty entries; reject an empty list or report all invalid, missing, and unresolvable paths together |
 | Paths | Relative paths must resolve within the checkout; reject absolute paths, traversal escapes, and outside symlink targets; internal directories and symlinks count as present; dangling symlinks fail; names containing commas cannot be represented |
 | Permissions and secrets | `contents: read`; no secrets; caller checkout credentials are not persisted |
 | Execution | Ubuntu 24.04, five-minute timeout; isolated Python prevents imports from caller files or `PYTHONPATH` |
