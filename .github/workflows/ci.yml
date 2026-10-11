@@ -47,6 +47,9 @@ jobs:
       - name: Test issue triage (offline, synthetic)
         run: python3 scripts/test-issue-triage.py
 
+      - name: Test reusable baseline (offline, consumer fixtures)
+        run: python3 scripts/test-baseline.py
+
       - name: Test curated skill activation (offline, synthetic)
         run: python3 scripts/test-curated-pstack-links.py
 

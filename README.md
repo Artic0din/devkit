@@ -120,6 +120,11 @@ For the specific legacy topology `~/.claude/skills/NAME/NAME -> ~/.codex/skills/
 
 This mode validates every candidate before unlinking only the extra nested leaves. It preserves the real skill directories, assets, and valid Codex backlinks, and exits before creating roots, building mirrors, pruning, or touching instruction pointers. Names must start with an ASCII letter or digit and contain only letters, digits, `.`, `_`, or `-`; duplicates, missing names, and unknown arguments are rejected. A missing nested leaf is a no-op only with the expected surrounding topology. Redirected or inaccessible roots, unexpected objects or literal targets, and changed directory or link identities cause refusal. Rechecks before each unlink are not atomic concurrency protection: a later error stops the batch and reports removals already completed, without rollback.
 
+## Reusable workflows
+
+DevKit hosts the repository baseline check; [its contract and adoption guide](docs/reusable-workflows.md) describe inputs, permissions, validation, and rollback.
+Other workflows remain in `Artic0din/reusable-workflows` until their independently validated migration under [#33](https://github.com/Artic0din/devkit/issues/33).
+
 ## Repository rename and rollback
 
 Update an existing checkout's `origin` to `https://github.com/Artic0din/devkit.git`; keep its local directory in place.

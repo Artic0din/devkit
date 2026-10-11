@@ -6,6 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Moved the reusable repository baseline check into DevKit, preserving its inputs and check identity and validating it through DevKit's own CI.
 - Updated the canonical repository identity to DevKit and pointed shared triage workflows at `Artic0din/devkit`, preserving installed paths and existing workflow inputs.
 - Fixed manually dispatched issue triage failing before any job ran: the caller template now converts the dispatch input to a number with `fromJSON`, so `gh workflow run issue-triage.yml -f issue-number=<n>` no longer fails with `Unexpected value '<n>'`.
 - Added default issue forms (bug, feature, maintenance, investigated report), PR templates, and an issue triage playbook under `templates/github/`, with repository-first precedence documented in `docs/github-intake.md`.
