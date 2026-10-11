@@ -6,6 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Fixed the repository baseline accepting required paths outside the caller checkout; absolute paths, traversal escapes, and outside symlink targets now fail with an explicit diagnostic.
 - Moved the reusable repository baseline check into DevKit, preserving its inputs and check identity and validating it through DevKit's own CI.
 - Updated the canonical repository identity to DevKit and pointed shared triage workflows at `Artic0din/devkit`, preserving installed paths and existing workflow inputs.
 - Fixed manually dispatched issue triage failing before any job ran: the caller template now converts the dispatch input to a number with `fromJSON`, so `gh workflow run issue-triage.yml -f issue-number=<n>` no longer fails with `Unexpected value '<n>'`.
