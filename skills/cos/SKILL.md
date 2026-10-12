@@ -17,9 +17,10 @@ Intended model: Claude Opus 5.5 at high effort.
 ## Start
 
 1. Find the product.
+   Product folder names use only lowercase letters, digits and hyphens; ignore any other folder.
    An argument (`/cos silo`) names the folder directly.
    Otherwise read every `COS/*/product.json` and pick the product with a repo whose `t3ProjectId` matches this thread's project.
-   Fall back to a repo whose `path` contains the working directory.
+   Fall back to a repo whose `path` is the working directory or one of its parent directories, compared as whole path components after resolving symlinks.
    If none match, list the products and stop.
 2. Read `COS/<product>/direction.md` and `COS/<product>/status.md`.
    Read `decisions-archive.md` only when asked about past decisions.
@@ -40,12 +41,15 @@ Intended model: Claude Opus 5.5 at high effort.
 ## Decisions
 
 - When Ryan makes or confirms a decision, priority change, or parked item, write it to `direction.md` immediately.
+  Re-read the file just before each write and change only the affected lines, so edits from another CoS session survive.
   Date decisions in Melbourne time (`TZ=Australia/Melbourne date +%Y-%m-%d`).
 - Each priority and parked item names the issue or PR numbers, or labels, it covers; the morning refresh ranks only by those.
 - Keep `direction.md` under about 3,500 words; move the oldest Decisions entries to `decisions-archive.md`.
 - Commit after each write, scanning and committing only these two files:
-  `git -C COS add <product>/direction.md <product>/decisions-archive.md && gitleaks git --staged --redact COS && git -C COS commit -m "docs(<product>): <decision in a few words>" -- <product>/direction.md <product>/decisions-archive.md`.
-  If gitleaks reports a finding, unstage both files with `git -C COS restore --staged`, tell Ryan, and do not commit.
+  1. If `git -C COS branch --show-current` is not `main`, tell Ryan and do not commit.
+  2. If `decisions-archive.md` is missing, create it with the heading `# <Name> — Decisions archive`.
+  3. `git -C COS add <product>/direction.md <product>/decisions-archive.md && gitleaks git --staged --redact COS && git -C COS commit -m "docs(<product>): <decision in a few words>" -- <product>/direction.md <product>/decisions-archive.md`.
+     If gitleaks reports a finding, run `git -C COS restore --staged <product>/direction.md <product>/decisions-archive.md`, tell Ryan, and do not commit.
 - Never edit `status.md`; the morning refresh owns it.
 
 ## Delegation
@@ -56,7 +60,10 @@ Intended model: Claude Opus 5.5 at high effort.
    - Grok and Muse run only through `instanceId: "cursor"` (`grok-4.7`, `muse-spark-1.3`), and only when Ryan asks.
    - Branch: `<type>/<issue>-<short-slug>`, where type is `fix` for bugs, `feat` for features, `docs`, `chore`, and so on.
 2. Launch only after Ryan says "go" for that proposal.
-3. For each approved item call `t3_thread_launch` with:
+3. For each approved item, first call `t3_thread_list` with the repo's `t3ProjectId` and `titleContains: <branch>`.
+   If a thread already has that title, report it instead of launching again.
+   Otherwise call `t3_thread_launch` with:
+   - `title`: the branch name.
    - `projectId`: the repo's `t3ProjectId` from `product.json`.
    - `workspaceStrategy`: `{type: "worktree", baseRef: <defaultBranch>, branch: <branch>, startFromOrigin: true}`.
    - `modelSelection`: the implementer.

@@ -1,6 +1,6 @@
 interface:
   display_name: "Chief of Staff"
-  short_description: "Load a product's brief, answer what to work on next, record decisions, and delegate on approval."
-  default_prompt: "Act as the Chief of Staff for this product: load its brief, summarise what needs attention, and wait for questions."
+  short_description: "Product brief, next-up advice, decisions and delegation"
+  default_prompt: "Use $cos to load this product's brief and summarise what needs attention."
 policy:
   allow_implicit_invocation: false
