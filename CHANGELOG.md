@@ -6,6 +6,8 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Fixed CoS decision commits to save the scanned index snapshot and serialize writes with the morning refresh while preserving unrelated staged work.
+- Added the `/cos` Chief of Staff skill, which loads a product brief from `~/Metisary/Enviroment/cos/`, records decisions there, and delegates work only after approval.
 - Allowed local-only agent memory repositories without a remote to commit directly to main without branches, pull requests, or autoreview, while retaining the gitleaks scan.
 - Fixed the repository baseline accepting required paths outside the caller checkout; absolute paths, traversal escapes, and outside symlink targets now fail with an explicit diagnostic.
 - Moved the reusable repository baseline check into DevKit, preserving its inputs and check identity and validating it through DevKit's own CI.
