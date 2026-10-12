@@ -1,0 +1,6 @@
+interface:
+  display_name: "Chief of Staff"
+  short_description: "Load a product's brief, answer what to work on next, record decisions, and delegate on approval."
+  default_prompt: "Act as the Chief of Staff for this product: load its brief, summarise what needs attention, and wait for questions."
+policy:
+  allow_implicit_invocation: false
