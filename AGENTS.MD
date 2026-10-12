@@ -21,6 +21,7 @@ Home Assistant power user: Tesla solar/Powerwall/EVs, GloBird Energy, Daikin HVA
    An actual scanner finding blocks the action; the presence of security vocabulary in documentation, configuration, or tests is not itself a credential finding.
 2. NEVER push with failing local checks. Fix first.
 3. Always use feature branches and PRs for repository code, configuration, workflow, dependency, and documentation changes. Never commit directly to main. Local-only creative asset generation does not require a plan, specification document, issue, branch, worktree, commit, or PR unless the user explicitly requests integration or publication.
+   Local-only agent memory repos with no remote (currently `~/Metisary/Enviroment/cos`) commit directly to `main` with no branch, PR or autoreview; the gitleaks scan still applies.
 4. NEVER mark tasks complete without validation — test everything, require proof.
 5. No unrequested features, files, or changes. If something should be added, ask first. Scope creep is the #1 source of hidden bugs.
 6. If unsure about intent, stop and ask. A wrong assumption costs more than a clarification.
@@ -92,7 +93,7 @@ Full standard: [engineering-constitution.md](/Users/ryanfoyle/Metisary/Enviromen
 - Repos: read their PR template + contributing doc from the repo at PR time (never from memory); with none, use the global defaults in [github-intake.md](/Users/ryanfoyle/Metisary/Enviroment/config/docs/github-intake.md); follow their AI-disclosure/trailer policy — strip AI co-author trailers where banned.
 - Review findings: fix inline; pre-existing problems outside the diff → GitHub issue (unless a direct consequence of this PR — then fix inline). Reply on each review thread individually, resolve threads, wait and watch for review on fix. Never push fixes silently.
 - Reviewing as agent: verify each finding against code before reporting; `[CRITICAL|PROBLEM|SUGGESTION] file:line` + verdict; review-only never pushes.
-- Autoreview is required before every commit and landing; no single provider is required (Claude stands in when Codex is unavailable). Verify findings before accepting them; record rejections. If no provider is reachable, commit with the gap stated and review before landing.
+- Autoreview is required before every commit and landing, except in local-only agent memory repos (Hard rule 3); no single provider is required (Claude stands in when Codex is unavailable). Verify findings before accepting them; record rejections. If no provider is reachable, commit with the gap stated and review before landing.
 - Use a normal GitHub pull request for isolated changes. Use Graphite tooling only when Ryan explicitly requests it.
 - Full playbook: [pr-standards.md](/Users/ryanfoyle/Metisary/Enviroment/config/docs/pr-standards.md) — pipeline order, dep-bump protocol, squash rules, release notes.
 

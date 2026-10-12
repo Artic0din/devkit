@@ -6,6 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Allowed local-only agent memory repositories without a remote to commit directly to main without branches, pull requests, or autoreview, while retaining the gitleaks scan.
 - Fixed the repository baseline accepting required paths outside the caller checkout; absolute paths, traversal escapes, and outside symlink targets now fail with an explicit diagnostic.
 - Moved the reusable repository baseline check into DevKit, preserving its inputs and check identity and validating it through DevKit's own CI.
 - Updated the canonical repository identity to DevKit and pointed shared triage workflows at `Artic0din/devkit`, preserving installed paths and existing workflow inputs.
