@@ -41,6 +41,8 @@ Intended model: Claude Opus 5.5 at high effort.
 ## Decisions
 
 - When Ryan makes or confirms a decision, priority change, or parked item, write it to `direction.md` immediately.
+  First acquire the repo-wide write lock with `mkdir COS/.git/cos-write-lock`; if it already exists, tell Ryan and stop without editing or removing another session's lock.
+  While holding it, require `main` and a clean index (`git -C COS diff --cached --quiet`); otherwise release your lock and stop without altering staged work.
   Re-read the file just before each write and change only the affected lines, so edits from another CoS session survive.
   Date decisions in Melbourne time (`TZ=Australia/Melbourne date +%Y-%m-%d`).
 - Each priority and parked item names the issue or PR numbers, or labels, it covers; the morning refresh ranks only by those.
@@ -48,8 +50,10 @@ Intended model: Claude Opus 5.5 at high effort.
 - Commit after each write, scanning and committing only these two files:
   1. If `git -C COS branch --show-current` is not `main`, tell Ryan and do not commit.
   2. If `decisions-archive.md` is missing, create it with the heading `# <Name> — Decisions archive`.
-  3. `git -C COS add <product>/direction.md <product>/decisions-archive.md && gitleaks git --staged --redact COS && git -C COS commit -m "docs(<product>): <decision in a few words>" -- <product>/direction.md <product>/decisions-archive.md`.
+  3. `git -C COS add <product>/direction.md <product>/decisions-archive.md && gitleaks git --staged --redact COS && git -C COS commit -m "docs(<product>): <decision in a few words>"`.
+     Commit the scanned index without path arguments; those arguments would reread unscanned working-tree edits.
      If gitleaks reports a finding, run `git -C COS restore --staged <product>/direction.md <product>/decisions-archive.md`, tell Ryan, and do not commit.
+  Release your own lock with `rmdir COS/.git/cos-write-lock` after success or any failure.
 - Never edit `status.md`; the morning refresh owns it.
 
 ## Delegation
