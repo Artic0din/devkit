@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Scan the index in the caller's working directory; never echo staged contents.
 if ! command -v git >/dev/null 2>&1; then
   echo 'Staged-secret check unavailable: Git is required.' >&2
   exit 2

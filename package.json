@@ -1,5 +1,5 @@
 {
-  "name": "agent-scripts-tools",
+  "name": "devkit-tools",
   "private": true,
   "type": "module",
   "dependencies": {

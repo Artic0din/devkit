@@ -3,10 +3,6 @@
   "hooks": {
     "beforeShellExecution": [
       {
-        "command": "bash $HOME/.claude/hooks/block-dangerous-git.sh",
-        "timeout": 10
-      },
-      {
         "command": "bash $HOME/.claude/hooks/pre-commit-secrets.sh --cursor",
         "timeout": 60
       }

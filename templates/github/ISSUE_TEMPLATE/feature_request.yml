@@ -1,0 +1,52 @@
+name: Feature request
+description: Propose new behaviour or an improvement to existing behaviour.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the problem before the solution.
+        Search existing issues first; if one matches, add your use case there instead.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or motivation
+      description: What problem does this solve, and who has it?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How it should behave from the user's point of view.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches, including workarounds you use today.
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: How we will know it works
+      description: Observable outcomes, ideally as "Given … when … then …".
+
+  - type: dropdown
+    id: importance
+    attributes:
+      label: How important is this to you?
+      options:
+        - Nice to have
+        - Would use regularly
+        - Blocks my workflow
+
+  - type: textarea
+    id: related
+    attributes:
+      label: Related issues or references
+      description: Existing issues, mockups, or examples elsewhere.

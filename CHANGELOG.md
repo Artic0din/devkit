@@ -6,14 +6,20 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
-- Delivered Cursor-compatible staged-secret warnings and restricted Copilot scans to shell calls.
-
-- Clarified that staged-secret host warnings require successful explicit scans and do not imply universal Git-hook installation.
-
-- Made Copilot staged-secret warnings visible through its supported advisory output.
-
-- Published shared Claude and Codex staged-secret checks that use Gitleaks without printing matching secret values or blocking ordinary product names.
-
+- Published redacted staged-secret checks with advisory host warnings and opt-in Git commit enforcement, without rejecting ordinary product names or printing staged contents.
+- Removed the `/cos` Chief of Staff skill and its local-memory workflow exemption.
+- Fixed the repository baseline accepting required paths outside the caller checkout; absolute paths, traversal escapes, and outside symlink targets now fail with an explicit diagnostic.
+- Moved the reusable repository baseline check into DevKit, preserving its inputs and check identity and validating it through DevKit's own CI.
+- Updated the canonical repository identity to DevKit and pointed shared triage workflows at `Artic0din/devkit`, preserving installed paths and existing workflow inputs.
+- Fixed manually dispatched issue triage failing before any job ran: the caller template now converts the dispatch input to a number with `fromJSON`, so `gh workflow run issue-triage.yml -f issue-number=<n>` no longer fails with `Unexpected value '<n>'`.
+- Added default issue forms (bug, feature, maintenance, investigated report), PR templates, and an issue triage playbook under `templates/github/`, with repository-first precedence documented in `docs/github-intake.md`.
+- Added a reusable issue triage workflow that labels every new issue in an adopting repository `needs-triage`, has Claude investigate it read-only, and records one outcome label and one comment; failures stay visibly pending with a retry link.
+- Updated plain-language writing guidance and added portable, manually invoked Pstack verification skills with complete behavior coverage, read-only audits unless corrections are authorized, and action-specific authorization with safe downstream targets during skill maintenance.
+- Made MVP scope the default, added YAGNI/KISS/DRY guidance, and improved ADHD-friendly explanations across unfamiliar technical stacks.
+- Made the retrospective writing-guide step portable and preserved standards until reviewers load their destination.
+- Updated Matt Pocock's session retrospective to favour automated checks for mechanical mistakes.
+- Separated the manually invoked Gstack weekly retrospective from Matt's session retrospective with a distinct `gstack-retro` command.
+- Removed the dangerous-Git blocker from the default Claude, Codex, Cursor, Copilot, and Antigravity hook registrations while retaining their pre-commit secret checks.
 - Removed stale filesystem references from `AGENTS.MD`: the active-repos table, whose eight paths all pointed at
   directories that no longer exist and which had to be edited each time a checkout moved, and a knowledge rule
   citing `workspace-index.yaml`, which exists nowhere on disk. Locating repositories rather than assuming a fixed

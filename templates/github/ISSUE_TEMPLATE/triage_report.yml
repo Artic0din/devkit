@@ -1,0 +1,73 @@
+name: Investigated report
+description: Filed after someone or an agent has already investigated a problem. For a first report, use Bug report.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form when the evidence has already been gathered.
+        Keep one problem per issue, and redact secrets and private data from everything you paste.
+        Describe what was found; do not present a local patch as the fix.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: The problem in the reporter's own words.
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnosis
+    attributes:
+      label: Diagnosis
+      description: What the investigation found, grounded in logs and source. Mark anything unconfirmed.
+    validations:
+      required: true
+
+  - type: textarea
+    id: root-cause
+    attributes:
+      label: Suspected root cause
+      description: File and line references where known, with confidence.
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Version or commit, platform, and any service involved.
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Relevant log lines, event IDs, or stack traces only. Redact secrets.
+      render: shell
+
+  - type: textarea
+    id: related
+    attributes:
+      label: Related issues
+      description: Similar issues, and why this is not a duplicate. If it is one, comment there instead.
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Workaround
+
+  - type: input
+    id: filed-by
+    attributes:
+      label: Filed by
+      description: The person or agent that produced this report.
+    validations:
+      required: true

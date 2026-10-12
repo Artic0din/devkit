@@ -11,10 +11,14 @@
         "codex-first",
         "codexbar",
         "create-cli",
+        "create-verification-skill",
         "frontend-design",
+        "gstack-retro",
         "i-have-adhd",
         "markdown-converter",
+        "maintain-verification-skill",
         "project-structure",
+        "retro",
         "skill-cleaner"
       ]
     },
@@ -109,6 +113,7 @@
       "title": "Writing",
       "description": "Skills for shaping prose, beats, fragments, and documents written for agents.",
       "skills": [
+        "unslop",
         "writing-beats",
         "writing-for-agents",
         "writing-fragments",

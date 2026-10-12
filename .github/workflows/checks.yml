@@ -7,6 +7,6 @@ permissions:
   contents: read
 jobs:
   baseline:
-    uses: Artic0din/reusable-workflows/.github/workflows/baseline.yml@main
+    uses: ./.github/workflows/baseline.yml
     with:
       required-files: README.md, .gitignore, AGENTS.MD

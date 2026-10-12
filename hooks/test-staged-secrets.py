@@ -1,5 +1,3 @@
-"""Exercise the published entrypoints against real staged content."""
-
 import hashlib
 import json
 import os
@@ -21,7 +19,7 @@ def main() -> None:
         subprocess.run(["git", "init", "-q", str(repository)], check=True)
         document = repository / "notes with spaces.md"
         for host in ("claude", "codex"):
-            command = ["/bin/bash", str(hooks / "check-staged-secrets.sh")]
+            command = [str(hooks / "check-staged-secrets.sh")]
             document.write_text("Document powerwall, teslemetry and API_KEY names.\n")
             subprocess.run(["git", "add", "."], cwd=repository, check=True)
             result = subprocess.run(command, cwd=repository, capture_output=True)
@@ -73,7 +71,6 @@ def main() -> None:
                 if not target.exists():
                     target.symlink_to(shutil.which(executable))
             environment = {**os.environ, "PATH": str(binaries)}
-            # The wrappers invoke bash as well as the scanner.
             bash = binaries / "bash"
             if not bash.exists():
                 bash.symlink_to("/bin/bash")
@@ -106,7 +103,6 @@ def main() -> None:
                   "-c", "user.email=hook-test@example.invalid", "commit", "-qm", "test"]
         subprocess.run(commit, cwd=repository, capture_output=True, check=True)
         document.write_text(secret + "\n")
-        # The index is clean before git commit -a performs its own staging.
         result = subprocess.run(commit + ["-a"], cwd=repository, capture_output=True)
         assert result.returncode != 0, result
         assert b"Staged-secret check failed" in result.stderr

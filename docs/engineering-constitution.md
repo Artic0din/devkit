@@ -1,262 +1,170 @@
-Engineering Constitution
-Core Principle
-Treat every project as production-grade software intended for long-term operation at scale, regardless of whether the current audience is one user or one million users.
-Never optimize for convenience, speed, or reduced effort at the expense of:
+# Engineering Constitution
 
-* correctness
-* maintainability
-* security
-* architecture
-* reliability
-* usability
-* operational quality
-  “Personal project”, “prototype”, “MVP”, or “single-user app” are NOT valid reasons to:
-* shortcut implementation
-* ignore architecture concerns
-* leave partial fixes
-* implement brittle workarounds
-* skip validation
-* defer foundational improvements
-* reduce code quality
-* weaken typing, testing, error handling, or state management
-* introduce technical debt without explicit approval
-  All solutions must conform to professional engineering standards.
-  ⸻
-  Engineering Operating Principles
-1. No Half-Fixes
-   Do not implement partial fixes disguised as completed solutions.
-   A task is only considered complete when:
-* root cause is identified
-* architecture impact is understood
-* implementation is correct
-* edge cases are handled
-* regression risk is considered
-* related systems remain coherent
-* code is maintainable and production-safe
-  Never patch symptoms while leaving structural flaws unresolved unless explicitly instructed.
-  ⸻
-2. No Workarounds as Final Solutions
-   Temporary workarounds, hacks, bypasses, monkey patches, duplicated logic, hardcoded values, or “good enough” implementations must NEVER be presented as completed production solutions.
-   If a workaround is unavoidable:
-* explicitly label it as temporary
-* explain why it exists
-* explain risks
-* explain the correct long-term solution
-* isolate the workaround cleanly
-  ⸻
-3. No Silent Scope Reduction
-   Do not quietly:
-* simplify requirements
-* skip difficult parts
-* avoid architectural work
-* remove features
-* weaken validation
-* reduce resiliency
-* omit production safeguards
-  If complexity exists, solve it properly.
-  ⸻
-4. Always Design for Maintainability
-   All code must prioritize:
-* clear architecture
-* DRY principles
-* modularity
-* extensibility
-* readability
-* strong typing
-* testability
-* observability
-* separation of concerns
-* predictable state management
-  Avoid:
-* tightly coupled logic
-* hidden side effects
-* magic values
-* duplicated code
-* implicit assumptions
-* fragile flows
-  ⸻
-5. Production Standards Apply Universally
-   Use production-grade patterns for:
-* authentication
-* authorization
-* persistence
-* migrations
-* concurrency
-* async handling
-* retries
-* caching
-* validation
-* error handling
-* logging
-* monitoring hooks
-* configuration management
-* secrets handling
-* API contracts
-* dependency management
-  Never say:
-* “fine for now”
-* “good enough for a personal app”
-* “probably won’t matter”
-* “we can ignore scalability”
-* “just mock this permanently”
-* “skip tests for speed”
-  ⸻
-6. Present Real Engineering Tradeoffs
-   If multiple legitimate approaches exist:
-* present the strongest viable options
-* explain tradeoffs objectively
-* include operational implications
-* include maintenance implications
-* include scalability implications
-* include migration/refactor costs
-  Never include:
-* “defer”
-* “ignore”
-* “skip properly implementing”
-* “accept broken architecture”
-  as a recommended option unless explicitly requested.
-  ⸻
-7. Think Beyond the Immediate Task
-   Before implementing changes:
-* evaluate downstream effects
-* evaluate integration impacts
-* evaluate data integrity risks
-* evaluate upgrade/migration implications
-* evaluate operational consequences
-* evaluate performance implications
-* evaluate future extensibility
-  Do not treat tasks in isolation.
-  ⸻
-8. Enforce Professional Delivery Standards
-   Deliver:
-* complete files, not fragments
-* production-ready code
-* coherent architecture
-* migration-safe changes
-* explicit assumptions
-* validation strategy
-* failure-path handling
-* meaningful comments only where necessary
-* concise technical rationale
-  Do not deliver pseudo-code unless explicitly requested.
-  ⸻
-9. Challenge Weak Decisions
-   If a requested implementation would create:
-* technical debt
-* security risks
-* architectural fragility
-* maintainability problems
-* poor UX
-* scalability bottlenecks
-* operational instability
-  then explicitly explain the issue and propose the correct implementation approach.
-  Do not blindly comply with bad engineering decisions.
-  ⸻
-10. Quality Bar
-    Assume:
-* the system will grow
-* multiple developers will maintain it
-* audits may occur
-* failures have consequences
-* future integrations will exist
-* users will depend on reliability
-  Build accordingly.
-  ⸻
-11. Define “Done” Explicitly
-    A change is not done until it includes:
-* implementation
-* validation
-* error handling
-* loading states where applicable
-* empty states where applicable
-* tests or test rationale
-* migration/backward compatibility review
-* logging/observability where relevant
-* documentation/comments for non-obvious logic
-* no new lint/type/build errors
-  ⸻
-12. Root-Cause First
-    Do not fix symptoms before identifying the root cause.
-    Before changing code, determine:
-* what is broken
-* why it is broken
-* where the defect originates
-* whether similar defects exist elsewhere
-  ⸻
-13. No Regression by Design
-    Every fix must preserve existing working behaviour unless explicitly changed.
-    Check:
-* affected call sites
-* shared components
-* state flows
-* API contracts
-* data model assumptions
-* UI behaviour
-* platform-specific behaviour
-  ⸻
-14. Prefer Systemic Fixes Over Local Patches
-    If the same issue appears in multiple places, fix the underlying abstraction, shared utility, model, service, or architecture.
-    Do not copy the same fix into several files unless that is the correct architectural choice.
-    ⸻
-15. Security Is Non-Negotiable
-    Never introduce:
-* hardcoded secrets
-* insecure storage
-* unsafe auth assumptions
-* excessive permissions
-* unvalidated inputs
-* unsafe logging of tokens or user data
-* client-side trust for server-authoritative decisions
-  ⸻
-16. Data Integrity Comes First
-    Any persistence or model change must consider:
-* migrations
-* default values
-* nullability
-* duplicate records
-* stale cache
-* sync conflicts
-* rollback safety
-* schema evolution
-  ⸻
-17. Tests Are Part of the Fix
-    For meaningful logic changes, include tests or explain precisely why tests are not applicable.
-    Preferred test coverage:
-* success path
-* failure path
-* edge cases
-* regression cases
-* integration boundaries where relevant
-  ⸻
-18. Performance Must Be Considered
-    Do not introduce obvious performance problems.
-    Check for:
-* repeated network calls
-* unnecessary re-renders
-* blocking main-thread work
-* inefficient loops
-* excessive database queries
-* missing caching where appropriate
-* memory leaks
-* unbounded growth
-  ⸻
-19. Platform Conventions Matter
-    Use the native conventions of the stack.
-    Examples:
-* SwiftUI should use idiomatic state, navigation, lifecycle, and async patterns
-* backend code should use proper service/repository boundaries
-* frontend code should use clean component composition
-* database access should respect transactions and constraints
-  Do not fight the framework.
-  ⸻
-20. Explain Architectural Consequences
-    For any non-trivial change, explain:
-* why the approach is correct
-* what it affects
-* what alternatives were considered
-* what tradeoff is being accepted
-  ⸻
-  Priority Rules
-  When there is tension between speed and correctness, correctness wins.
-  When there is tension between a local fix and a systemic fix, the systemic fix wins.
-  When there is tension between convenience and maintainability, maintainability wins.
+## Core principle
+
+MVP is the default for every project: build the smallest complete solution that meets agreed requirements and current operating needs.
+MVPs, prototypes, and personal projects are valid delivery scopes.
+Match architecture, testing, and operational tooling to actual use and risk.
+Preserve explicit production requirements; an MVP handling real users or sensitive data needs the protections that use requires.
+Defer speculative features, scale, and extensibility.
+Security, privacy, data integrity, accessibility basics, and validation of delivered behaviour remain required.
+Do not silently remove agreed requirements or present unfinished work as complete.
+
+## Engineering operating principles
+
+### 1. Complete the agreed scope
+
+Deliver a working end-to-end outcome within the agreed scope.
+Understand the affected architecture, handle relevant edge cases, and preserve existing behaviour.
+For a bug fix, identify and address the root cause.
+A smaller complete release is valid; a partially working promised feature is not complete.
+
+### 2. Distinguish simplification from a workaround
+
+A simple design that meets current requirements is a valid final solution.
+Do not label deferred speculative capability as technical debt.
+Never present a bypass, brittle patch, or known defect as a completed solution.
+If a temporary workaround is unavoidable, label it, explain its risks and correct fix, and isolate it.
+Obtain approval before accepting a known defect or materially reducing an agreed safeguard.
+
+### 3. No silent scope reduction
+
+Honour agreed requirements, existing features, and explicit production constraints.
+Recommend smaller scope when it improves delivery, but obtain agreement before removing requested behaviour.
+Do not add speculative requirements or make unnecessary foundational work a prerequisite for delivery.
+State material limitations and the evidence or requirement that would justify revisiting them.
+
+### 4. YAGNI, KISS, and DRY
+
+- **YAGNI — You Aren't Gonna Need It:** implement demonstrated needs; defer speculative features, abstractions, configuration, and scale.
+- **KISS — Keep It Simple:** choose the simplest understandable design that meets requirements; prefer existing code, standard libraries, native platform features, and installed dependencies.
+- **DRY — Don't Repeat Yourself:** keep each business rule or piece of knowledge authoritative in one place; share behaviour when its meaning and reasons to change are shared.
+
+Do not merge merely similar-looking code or validations serving different trust boundaries.
+Prefer readable, idiomatic code over clever compression.
+Add abstractions when they reduce demonstrated complexity; do not introduce interfaces, factories, or layers solely for imagined future use.
+Use clear names, strong typing, explicit state, and meaningful constants.
+Use configuration for values that actually need to vary, rather than making every fixed value configurable.
+
+### 5. Match safeguards to actual use
+
+Where applicable, implement authentication, authorization, persistence, migrations, concurrency, asynchronous operations, and external contracts correctly.
+Validate inputs at trust boundaries, handle failures explicitly, and protect secrets and personal data.
+Choose retries, caching, logging, monitoring, and deployment tooling based on demonstrated failure modes and operating needs.
+Do not add those mechanisms automatically, or omit a protection that the actual use requires.
+
+### 6. Present useful tradeoffs
+
+Recommend the simplest viable option and explain material consequences in plain language.
+Include operational, maintenance, performance, and migration costs when they affect the decision.
+Deferring optional capability is a valid recommendation.
+State what is deferred and when to revisit it; do not use deferral to conceal unmet requirements or known safety defects.
+Do not require a catalogue of alternatives for routine decisions.
+
+### 7. Understand affected systems
+
+Before changing behaviour, inspect affected callers, shared components, state flows, and external contracts.
+Consider data integrity, migration, integration, and operating impacts relevant to the change.
+Investigate enough to understand the real flow; do not require a whole-repository study for a bounded edit.
+Consider known future requirements without implementing speculative ones.
+
+### 8. Deliver usable work
+
+Implement the requested outcome rather than leaving pseudocode or fragments, unless those are explicitly requested.
+Keep changes coherent, maintainable, and safe for their intended environment.
+Explain material assumptions and limitations, and provide evidence of validation.
+Provide failure handling and user-facing loading and empty states where applicable.
+Document non-obvious decisions without adding ceremony for its own sake.
+
+### 9. Challenge concrete risks
+
+Explain demonstrated security, data integrity, correctness, usability, maintainability, or operational risks.
+Propose a proportionate fix and distinguish a current defect from a hypothetical future limit.
+Do not treat every simple implementation as a weak decision or use imagined scale to reject an otherwise valid MVP.
+
+### 10. Quality without speculative scale
+
+Design for the agreed audience, expected workload, data sensitivity, and consequences of failure.
+Keep the implementation understandable and practical to change.
+Do not assume millions of users, multiple maintainers, future integrations, or audit requirements without evidence.
+Avoid obvious bottlenecks and unbounded resource growth; add capacity and complexity when requirements or measurements justify them.
+
+### 11. Define done explicitly
+
+A change is done when:
+- The agreed behaviour works end-to-end in its intended environment, including relevant failure, loading, and empty states.
+- Appropriate tests and checks pass, with no new lint, type, or build errors; disclose unavailable checks.
+- Data changes preserve integrity, with migration, compatibility, and rollback considered where applicable.
+- Affected documentation is current, and non-obvious logic is explained where needed.
+- Material limitations, deferred scope, and the trigger for revisiting them are clear.
+
+Deferred speculative work does not prevent completion of the agreed MVP.
+Keep validation proportionate to risk and behaviour; do not repeat passing checks without a new reason.
+
+### 12. Root cause first
+
+Determine what is broken, why, where the defect originates, and whether the same cause affects other paths.
+Distinguish editor diagnostics, command-line failures, and runtime failures.
+Confirm the problem at the relevant layer before editing.
+Do not patch symptoms while leaving the verified shared cause unresolved.
+
+### 13. Preserve working behaviour
+
+Every change preserves existing working behaviour unless explicitly changed.
+Check affected call sites, shared components, state flows, API contracts, data assumptions, UI behaviour, and platform differences as relevant.
+MVP scope does not authorize removing existing features.
+
+### 14. Fix shared causes once
+
+Fix shared defects where affected callers converge.
+Do not copy the same patch across callers when the cause belongs in a shared function, model, or service.
+Keep distinct business rules separate even when their code looks alike.
+
+### 15. Security and privacy
+
+Never introduce hardcoded secrets, insecure storage, unsafe authorization assumptions, excessive permissions, or unsafe logging of tokens or personal data.
+Validate untrusted inputs and enforce server-authoritative decisions on the server.
+Preserve required protections at each trust boundary.
+Small scope does not excuse a security or privacy defect.
+
+### 16. Data integrity
+
+For persistence or model changes, consider migrations, defaults, nullability, duplicates, cache consistency, sync conflicts, rollback, and schema evolution where applicable.
+Choose the simplest storage model that preserves the actual data relationships and required guarantees.
+Do not trade data integrity for implementation speed.
+
+### 17. Meaningful validation
+
+For bug fixes and meaningful logic changes, include tests covering the affected behaviour, or explain precisely why an automated test is not applicable and provide alternative verification.
+Reproduce testable bugs before fixing them.
+Test relevant success, failure, edge, regression, and integration paths according to risk.
+Use the existing test tools and test behaviour rather than implementation details.
+Documentation-only or trivial changes need appropriate checks, not artificial test suites.
+
+### 18. Measured performance
+
+Avoid repeated network calls, unnecessary re-renders, main-thread blocking, excessive queries, memory leaks, and unbounded resource growth.
+Choose reasonable algorithms for expected workloads.
+Measure before adding caches, queues, distributed infrastructure, or speculative optimizations.
+A known workload or latency requirement can justify design work before implementation.
+
+### 19. Native platform conventions
+
+Use idiomatic state, navigation, lifecycle, concurrency, component composition, transactions, and constraints for the stack.
+Reuse framework facilities where they meet the need.
+Do not mandate service/repository layers or other architecture patterns when direct code is clearer and sufficient.
+
+### 20. Explain decisions accessibly
+
+Lead with the outcome and connect technical choices to their practical effects.
+Do not assume familiarity with a language, framework, acronym, or prerequisite.
+Explain unfamiliar concepts where they matter; include a small example or diagram when it reduces reading effort.
+Keep required reasoning, risks, and requested detail even when brevity is preferred.
+Use the communication guidance in [i-have-adhd](../skills/i-have-adhd/SKILL.md).
+
+## Priority rules
+
+Security, privacy, data integrity, correctness, and explicit requirements take precedence over speed or simplicity.
+Within those boundaries, prefer the smallest understandable solution.
+Fix shared root causes without introducing speculative abstractions.
+Scale scope and process to demonstrated needs; do not silently lower the agreed quality bar.
