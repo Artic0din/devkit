@@ -1,4 +1,0 @@
-interface:
-  display_name: "NAS Portainer Runtime"
-  short_description: "Verify and operate NAS Docker stacks through live Portainer state."
-  default_prompt: "Check the live NAS Portainer state for the named app or stack, compare it with repo assumptions, and verify the result end to end."
