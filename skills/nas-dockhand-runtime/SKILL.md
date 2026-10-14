@@ -8,7 +8,7 @@ description: Use when checking, deploying, restarting, updating, or debugging ap
 Use live Dockhand and Docker state as the source of truth for NAS work.
 Repository files and local Docker are supporting evidence only.
 
-The current Dockhand API is `http://192.168.1.71:3001/api`; environment `1` is RedwardMedia.
+Resolve the Dockhand API URL and environment ID from local NAS configuration; do not publish machine-specific addresses in shared configuration.
 Read the Dockhand API token from macOS Keychain service `dockhand-api`, account `ryan`.
 Never print, log, copy into files, or commit the token.
 Portainer has been retired from this NAS; do not rely on its endpoint or credentials.
