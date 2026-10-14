@@ -48,7 +48,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 - Adopted the rebuilt environment layout: `agents/` definitions for Claude, Codex, and Antigravity;
   per-tool hook, settings, and MCP files under `config/`; the engineering constitution and PR standards
   under `docs/`; a baseline `checks.yml` workflow; and `skills.lock.json` for install-managed externals.
-  Added 36 skills — 28 Firecrawl, four writing skills, `i-have-adhd`, and `nas-portainer-runtime` — and
+  Added 36 skills — 28 Firecrawl, four writing skills, `i-have-adhd`, and `nas-dockhand-runtime` — and
   grouped them in the catalogue. Moved the Copilot instruction files to `.github/instructions/`, where
   Copilot reads them. Merged the two READMEs into one that describes the target layout and the sync
   mechanism that exists today. The LICENSE keeps the original copyright notice alongside Ryan's.
