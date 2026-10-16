@@ -4,7 +4,8 @@
     "preToolUse": [
       {
         "type": "command",
-        "bash": "bash $HOME/.claude/hooks/pre-commit-secrets.sh",
+        "bash": "bash $HOME/.claude/hooks/pre-commit-secrets.sh --copilot",
+        "matcher": "bash",
         "cwd": ".",
         "timeoutSec": 60
       }

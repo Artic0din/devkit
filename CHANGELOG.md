@@ -6,6 +6,8 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Published redacted staged-secret checks with advisory host warnings and opt-in Git commit enforcement, without rejecting ordinary product names or printing staged contents.
+
 - Redacted complete inline YAML secret values and empty quoted shell segments, withheld ambiguous terminal, YAML-block, and flow-map anchor or tag previews, redacted plain YAML continuations after secret-named keys when the value starts on the key line or after blank lines, comments, CRLF, or a newline inside a flow container, redacted every element of secret-named list and map values and values that start on a later line than their secret-named field, kept the next key of a YAML list item visible, and allowed ordinary hexadecimal commit IDs and UUIDs.
 
 - Blocked output whenever the output filter fails, restored Python 3.8 support, and redacted private-key PEM blocks and concatenated or multiline quoted secret values.
