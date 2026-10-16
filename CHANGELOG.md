@@ -16,6 +16,14 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 - Published the Codex post-tool output filter with redacted blocking feedback and automatic checks for both output channels, GitHub token families and mixed-case hexadecimal values.
 
+- Removed the `/cos` Chief of Staff skill and its local-memory workflow exemption.
+- Fixed the repository baseline accepting required paths outside the caller checkout; absolute paths, traversal escapes, and outside symlink targets now fail with an explicit diagnostic.
+- Moved the reusable repository baseline check into DevKit, preserving its inputs and check identity and validating it through DevKit's own CI.
+- Updated the canonical repository identity to DevKit and pointed shared triage workflows at `Artic0din/devkit`, preserving installed paths and existing workflow inputs.
+- Fixed manually dispatched issue triage failing before any job ran: the caller template now converts the dispatch input to a number with `fromJSON`, so `gh workflow run issue-triage.yml -f issue-number=<n>` no longer fails with `Unexpected value '<n>'`.
+- Added default issue forms (bug, feature, maintenance, investigated report), PR templates, and an issue triage playbook under `templates/github/`, with repository-first precedence documented in `docs/github-intake.md`.
+- Added a reusable issue triage workflow that labels every new issue in an adopting repository `needs-triage`, has Claude investigate it read-only, and records one outcome label and one comment; failures stay visibly pending with a retry link.
+- Updated plain-language writing guidance and added portable, manually invoked Pstack verification skills with complete behavior coverage, read-only audits unless corrections are authorized, and action-specific authorization with safe downstream targets during skill maintenance.
 - Made MVP scope the default, added YAGNI/KISS/DRY guidance, and improved ADHD-friendly explanations across unfamiliar technical stacks.
 - Made the retrospective writing-guide step portable and preserved standards until reviewers load their destination.
 - Updated Matt Pocock's session retrospective to favour automated checks for mechanical mistakes.

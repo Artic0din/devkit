@@ -1,0 +1,53 @@
+name: Maintenance
+description: Propose a refactor, dependency, CI, tooling, documentation, or other upkeep change.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for work that should not change user-visible behaviour.
+        A change that does belongs in a bug report or feature request.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What needs changing
+      description: The current state and why it is a problem now.
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Links, file paths, failing runs, warnings, or measurements that show the problem.
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+    validations:
+      required: true
+
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Risk
+      options:
+        - Low — isolated, easy to revert
+        - Medium — touches shared code or tooling
+        - High — broad blast radius or hard to revert
+    validations:
+      required: true
+
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation
+      description: How to prove the change is safe, such as the tests, builds, or checks to run.
+    validations:
+      required: true
+
+  - type: textarea
+    id: related
+    attributes:
+      label: Related issues

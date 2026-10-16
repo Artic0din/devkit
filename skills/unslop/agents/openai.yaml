@@ -1,0 +1,5 @@
+interface:
+  display_name: "unslop"
+  short_description: "Write clear, complete sentences without AI filler."
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,36 @@
+name: Issue triage
+
+# Copy to .github/workflows/issue-triage.yml in an adopting repository.
+# Needs the CLAUDE_CODE_OAUTH_TOKEN repository or organisation secret.
+# See docs/github-intake.md in Artic0din/devkit.
+
+on:
+  issues:
+    types: [opened]
+  workflow_dispatch:
+    inputs:
+      issue-number:
+        description: Issue to triage or retry
+        required: true
+        type: number
+
+permissions: {}
+
+concurrency:
+  group: issue-triage-${{ github.event.issue.number || inputs.issue-number }}
+  cancel-in-progress: false
+
+jobs:
+  triage:
+    permissions:
+      contents: read
+      issues: write
+    # When adopting, replace both "main" values with the same reviewed commit SHA.
+    uses: Artic0din/devkit/.github/workflows/issue-triage.yml@main
+    with:
+      agent-scripts-ref: main
+      issue-number: ${{ fromJSON(github.event.issue.number || inputs.issue-number) }}
+      # Override label names here when this repository's approved mapping differs, for example:
+      # pending-label: needs-triage
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
