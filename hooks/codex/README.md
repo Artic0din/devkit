@@ -24,6 +24,7 @@ A value that is itself a list or map, such as `"api_keys": ["a", "b"]`, redacts 
 Feedback also omits the rest of the channel when other text follows that bracket on its line inside a YAML map or list, as in `{password: [a]b, user: bob}`, because the value boundary is uncertain.
 For secret-named YAML block scalars or values starting with an anchor or tag, including inside flow maps, feedback omits the rest of that channel because the value boundary is uncertain.
 Standalone secret-named keys with an unquoted plain YAML value use one continuation bound whether that value starts on the key line or after blank lines or `#` comments, including CRLF: more-indented folded lines are redacted with the value, and following sibling keys stay visible, including the next key of a `- ` list item.
+A key with nothing after its colon also redacts a `- ` sequence written at its own indentation, including comment lines between items.
 A quoted value spans lines only when its closing quote is present.
 Private-key PEM blocks are redacted wherever they appear.
 Unlabelled hexadecimal values and UUIDs pass through, so ordinary commit IDs and request IDs stay visible.
