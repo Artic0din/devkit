@@ -47,8 +47,9 @@
     },
     {
       "title": "Media & AI",
-      "description": "Skills for video transcripts and X API work.",
+      "description": "Skills for video transcripts and analysis, and X API work.",
       "skills": [
+        "video-analysis",
         "video-transcript-downloader",
         "xurl"
       ]
