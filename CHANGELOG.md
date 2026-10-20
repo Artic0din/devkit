@@ -6,19 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
-- Redacted complete inline YAML secret values and empty quoted shell segments, withheld ambiguous terminal, YAML-block, and flow-map anchor or tag previews, redacted plain YAML continuations after secret-named keys when the value starts on the key line or after blank lines, comments, CRLF, or a newline inside a flow container, redacted every element of secret-named list and map values and values that start on a later line than their secret-named field, kept the next key of a YAML list item visible, and allowed ordinary hexadecimal commit IDs and UUIDs.
-
-- Blocked output whenever the output filter fails, restored Python 3.8 support, and redacted private-key PEM blocks and concatenated or multiline quoted secret values.
-
-- Redacted credentials split by terminal colour codes and values of secret-named fields such as an STS `SecretAccessKey` and `SessionToken`.
-
-- Isolated output filtering from inherited Python modules and recognized JWT headers containing JSON whitespace.
-
-- Covered temporary AWS identifiers and compact JWTs while preserving ordinary identifiers containing key-like substrings.
-
-- Published the Codex post-tool output filter with redacted blocking feedback and automatic checks for both output channels and GitHub token families.
-- Published the Codex post-tool output filter with redacted blocking feedback and automatic checks for both output channels, GitHub token families and mixed-case hexadecimal values.
-- Published the Codex post-tool output filter with redacted blocking feedback and checks for both output channels.
+- Published the Codex post-tool output filter: it redacts tokens, AWS keys, JWTs, private keys, and secret-named shell, JSON and YAML values (including split, multiline and folded ones) in both output channels, gives redacted blocking feedback, and blocks output whenever the filter itself fails.
 - Updated fleet maintenance for the current fleet: it now covers the iMac, lists the Intel Mac mini and Windows PC as joining, and explains how to run it from a Mac other than the Air.
 - Removed the `gstack-retro` weekly review and its setup notes, because Gstack is no longer installed.
 - Removed the agent host `pre-commit-secrets.sh` hooks and their Claude, Codex, Copilot, Cursor and Antigravity registrations; the opt-in Git `pre-commit` hook still runs the staged-secret scan.

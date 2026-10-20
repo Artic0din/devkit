@@ -30,6 +30,7 @@ FLOW_CLOSERS = {"[": "]", "{": "}"}
 CLOSED_QUOTED_SCALAR = re.compile(r""""(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'""", re.DOTALL)
 FLOW_COLLECTION_TAIL = re.compile(r"[ \t]*(?:[,}\]#\r\n]|\Z)")
 SIBLING_FIELD = re.compile(r"""(?:-[ \t]+)?["']?[A-Za-z0-9_-]+["']?[ \t]*(?:=|:(?:[ \t\r\n]|\Z))""")
+SEQUENCE_ITEM = re.compile(r"-(?=[ \t\r\n]|\Z)")
 CALL_VALUE_EXEMPTION =re.compile(r"[A-Za-z_][\w.]*\((?:[A-Za-z_][\w.]*)?\)(?![^\s;,)\]}])")
 PRIVATE_KEY_LABEL = r"[A-Z0-9 ]{0,40}PRIVATE KEY[A-Z ]{0,20}"
 PRIVATE_KEY_PATTERN = re.compile(
@@ -87,7 +88,7 @@ def _skip_yaml_ignorable_after_colon(text: str, pos: int) -> int:
     return pos
 
 
-def _indented_yaml_continuation_end(text: str, value_line_start: int, line_indent: int) -> int | None:
+def _indented_yaml_continuation_end(text: str, value_line_start: int, line_indent: int, empty_key: bool) -> int | None:
     # Bare `key:` with a more-indented following line is a plain YAML value; lexical
     # VALUE_PATTERN cannot see past ignorable whitespace/comments, so bound by dedent.
     if value_line_start >= len(text):
@@ -96,7 +97,9 @@ def _indented_yaml_continuation_end(text: str, value_line_start: int, line_inden
     content = value_line_start + first_indent
     if content >= len(text) or text[content] in "\r\n#":
         return None
-    if first_indent <= line_indent:
+    # YAML lets an empty key own a block sequence written at the key's own indentation.
+    sequence = empty_key and first_indent == line_indent and SEQUENCE_ITEM.match(text, content)
+    if first_indent <= line_indent and not sequence:
         return None
     scan = value_line_start
     while scan < len(text):
@@ -108,8 +111,10 @@ def _indented_yaml_continuation_end(text: str, value_line_start: int, line_inden
             if segment_end > scan and text[segment_end - 1] == "\r":
                 segment_end -= 1
         indent = _line_indent(text, scan, segment_end)
-        if scan + indent < segment_end and indent <= line_indent:
-            return scan
+        # A YAML comment line never ends a block, whatever its indentation.
+        if scan + indent < segment_end and indent <= line_indent and text[scan + indent] != "#":
+            if not (sequence and indent == line_indent and SEQUENCE_ITEM.match(text, scan + indent)):
+                return scan
         if line_end == -1:
             return len(text)
         scan = line_end + 1
@@ -129,9 +134,9 @@ def _flow_yaml_continuation_end(text: str, value_line_start: int) -> int | None:
     return len(text)
 
 
-def _plain_yaml_fold_end(text: str, value_line_start: int, key_indent: int, standalone: bool) -> int | None:
+def _plain_yaml_fold_end(text: str, value_line_start: int, key_indent: int, standalone: bool, empty_key: bool) -> int | None:
     if standalone:
-        return _indented_yaml_continuation_end(text, value_line_start, key_indent)
+        return _indented_yaml_continuation_end(text, value_line_start, key_indent, empty_key)
     return _flow_yaml_continuation_end(text, value_line_start)
 
 
@@ -245,7 +250,7 @@ def redact_assignments(text: str) -> str:
             key_indent = field.start() - line_start
             if key_indent and text[field.start() - 1] in "\"'":
                 key_indent -= 1
-            fold_end = _plain_yaml_fold_end(text, value_line_start, key_indent, bool(standalone))
+            fold_end = _plain_yaml_fold_end(text, value_line_start, key_indent, bool(standalone), not value)
             if fold_end is not None:
                 redact_end = fold_end if redact_end is None else max(redact_end, fold_end)
         if redact_end is None:
