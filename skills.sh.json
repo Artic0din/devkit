@@ -71,7 +71,7 @@
         "fleet-maintenance",
         "keychain",
         "mac-maintenance",
-        "nas-portainer-runtime",
+        "nas-dockhand-runtime",
         "ssh-doctor",
         "wrangler"
       ]
