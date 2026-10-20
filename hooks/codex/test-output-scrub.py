@@ -306,6 +306,23 @@ def test_many_fields_scan_in_linear_time() -> None:
         assert json.loads(run_hook(text))["decision"] == "block", text[:40]
 
 
+def test_empty_key_owns_same_indent_sequence() -> None:
+    for text in (
+        "password:\n- alpha\n- beta-secret\nuser: bob\n",
+        "password:\n- key: beta-secret\nuser: bob\n",
+        "  tokens:\n  - alpha\n  -\n    beta-secret\n  user: bob\n",
+        "password:\n- alpha\n# note\n- beta-secret\nuser: bob\n",
+    ):
+        for channel in ("stdout", "stderr"):
+            output = run_hook(text if channel == "stdout" else "", text if channel == "stderr" else "")
+            assert output, f"sequence bypassed blocking on {channel}: {text!r}"
+            result = json.loads(output)
+            assert result["decision"] == "block", text
+            assert "beta-secret" not in result["reason"], f"sequence item leaked on {channel}: {text!r}"
+            assert "user: bob" in result["reason"], f"sibling after sequence hidden on {channel}: {text!r}"
+    assert run_hook("- password:\n- user: bob\n") == "", "next list item treated as the key's sequence"
+
+
 def test_list_item_keys_keep_siblings() -> None:
     for text in (
         "- password: first-part\n  user: bob\n",
@@ -334,6 +351,7 @@ if __name__ == "__main__":
     test_values_on_next_line_and_after_collection_closers()
     test_separator_on_later_line_and_flow_comments()
     test_many_fields_scan_in_linear_time()
+    test_empty_key_owns_same_indent_sequence()
     test_list_item_keys_keep_siblings()
     for response in ({}, {"stdout": ""}, {"stderr": ""}):
         result = subprocess.run(
