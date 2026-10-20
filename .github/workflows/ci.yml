@@ -44,6 +44,9 @@ jobs:
       - name: Test autoreview CLI options (offline, synthetic)
         run: python3 skills/autoreview/scripts/test-autoreview.py
 
+      - name: Test Codex output filtering (offline, synthetic)
+        run: python3 hooks/codex/test-output-scrub.py
+
       - name: Test issue triage (offline, synthetic)
         run: python3 scripts/test-issue-triage.py
 

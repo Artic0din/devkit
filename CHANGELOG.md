@@ -8,6 +8,19 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 - Added the `video-analysis` skill: give any agent a video link and get a self-contained HTML brief with a TL;DR, a clickable key-moment timeline, themes, actions tied to Ryan's setup, and a resumable step checklist for tutorials, using only keyless transcript sources.
 - Published redacted staged-secret checks with advisory host warnings and opt-in Git commit enforcement, without rejecting ordinary product names or printing staged contents.
+
+- Redacted complete inline YAML secret values and empty quoted shell segments, withheld ambiguous terminal, YAML-block, and flow-map anchor or tag previews, redacted plain YAML continuations after secret-named keys when the value starts on the key line or after blank lines, comments, CRLF, or a newline inside a flow container, redacted every element of secret-named list and map values and values that start on a later line than their secret-named field, redacted YAML sequences written at their key's indentation, kept the next key of a YAML list item visible, and allowed ordinary hexadecimal commit IDs and UUIDs.
+
+- Blocked output whenever the output filter fails, restored Python 3.8 support, and redacted private-key PEM blocks and concatenated or multiline quoted secret values.
+
+- Redacted credentials split by terminal colour codes and values of secret-named fields such as an STS `SecretAccessKey` and `SessionToken`.
+
+- Isolated output filtering from inherited Python modules and recognized JWT headers containing JSON whitespace.
+
+- Covered temporary AWS identifiers and compact JWTs while preserving ordinary identifiers containing key-like substrings.
+
+- Published the Codex post-tool output filter with redacted blocking feedback and automatic checks for both output channels and GitHub token families.
+
 - Removed the `/cos` Chief of Staff skill and its local-memory workflow exemption.
 - Fixed the repository baseline accepting required paths outside the caller checkout; absolute paths, traversal escapes, and outside symlink targets now fail with an explicit diagnostic.
 - Moved the reusable repository baseline check into DevKit, preserving its inputs and check identity and validating it through DevKit's own CI.
