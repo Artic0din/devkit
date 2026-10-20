@@ -64,7 +64,7 @@ Workflows: `$xcode-sync`, `$instruments-profiling`, `$native-app-performance`.
 ## yt-dlp
 Video, audio, subtitle, and transcript downloads.
 
-Workflow: `$video-transcript-downloader`.
+Workflows: `$video-transcript-downloader` for raw downloads, `$video-analysis` for a visual brief of one video.
 
 ---
 
