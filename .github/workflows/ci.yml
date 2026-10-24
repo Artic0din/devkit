@@ -56,6 +56,9 @@ jobs:
       - name: Test video analysis (offline, synthetic)
         run: python3 skills/video-analysis/scripts/test_video_analysis.py
 
+      - name: Test environment status board (offline, synthetic)
+        run: python3 scripts/test-env-board.py
+
       - name: Test Codex preflight (offline, synthetic)
         run: |
           test_home="$(mktemp -d)"

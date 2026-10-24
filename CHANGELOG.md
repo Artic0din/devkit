@@ -6,6 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Added an environment rebuild status page: `python3 scripts/env-board.py --open` shows one "Do next" item, whether the installed checkout matches `main`, open work grouped into Needs you, In progress, Blocked and Outstanding, what changed and why, and a decision log, combining live GitHub status with chat-only decisions and work kept in `docs/environment-log.md`.
 - Added the `video-analysis` skill: give any agent a video link and get a self-contained HTML brief with a TL;DR, a clickable key-moment timeline, themes, actions tied to Ryan's setup, and a resumable step checklist for tutorials, using only keyless transcript sources.
 - Published redacted staged-secret checks with advisory host warnings and opt-in Git commit enforcement, without rejecting ordinary product names or printing staged contents.
 - Removed the `/cos` Chief of Staff skill and its local-memory workflow exemption.

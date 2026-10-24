@@ -103,6 +103,7 @@ description: "Short generic trigger phrase."
 
 - `scripts/sync-skills`: builds the mirror described above; idempotent; prints changes only. No arguments runs the ordinary sync; `--help` prints usage. Only the scoped `--repair-nested-self-links` mode accepts `--dry-run`.
 - `scripts/validate-skills`: checks every `skills/*/SKILL.md` for front matter, `name`, and `description`.
+- `scripts/env-board.py`: builds the environment rebuild status page from live GitHub status, the installed checkout, and `docs/environment-log.md`; `--open` shows it in the browser.
 - `scripts/docs-list.ts`: walks `docs/`, enforces `summary` and `read_when` front matter, prints onboarding summaries.
 - `scripts/browser-tools.ts`: standalone Chrome DevTools helper (`start --profile`, `nav`, `eval`, `screenshot`, `console`, `network`, `search --content`, `content`, `inspect`, `kill --all --force`); build a binary with `bun build scripts/browser-tools.ts --compile --target bun --outfile bin/browser-tools`.
 
