@@ -57,13 +57,19 @@ Only a confirmed `idle` status permits an archive candidate; active, missing, or
 Task status is new, duplicate, completed, or blocked.
 Every task includes title, repo, evidence, dedupe, and marker.
 Dedupe contains checked, existing_url, and reason.
-Duplicate and completed tasks include an existing URL.
+Duplicate and completed tasks include an `https` URL to the existing work.
 New tasks require a mapped owner/repository and a marker containing the source thread ID.
 Every new task also includes the exact proposed issue body, with Context, Goal, Acceptance criteria, and Technical notes sections and its stable marker.
+Each section has non-empty content apart from the marker, and Acceptance criteria lists at least one `-` or `*` item.
 Task markers must be unique across all new candidates in the preview.
 The task repository must match the mapped project's repository, ignoring letter case.
 Unreadable threads cannot contain new task candidates or verified knowledge candidates.
+An unreadable thread's proposed_title equals its current_title, so it is never renamed.
 
 Knowledge status is verified or rejected.
-Verified candidates include target_note, proposed_content, non-empty primary_sources, and reason.
+Verified candidates include target_note, proposed_content, edit_operation, non-empty primary_sources, and reason.
+edit_operation is `create`, `append`, or `replace_section`.
+`create` writes proposed_content as a new note and requires that target_note does not exist yet.
+`append` adds proposed_content to the end of the existing target_note.
+`replace_section` also names target_section, the exact existing heading whose content proposed_content replaces.
 Rejected candidates use a null target_note and precise rejection reason.
