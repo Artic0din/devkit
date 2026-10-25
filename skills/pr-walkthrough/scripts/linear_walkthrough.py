@@ -52,7 +52,7 @@ def is_web_url(value: object) -> bool:
         return False
     try:
         parsed = urlsplit(value)
-        return parsed.scheme == "https" and bool(parsed.netloc)
+        return parsed.scheme == "https" and bool(parsed.hostname)
     except ValueError:
         return False
 

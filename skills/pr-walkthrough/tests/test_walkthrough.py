@@ -127,6 +127,13 @@ def test_json_root_must_be_object(value):
     assert walkthrough.validate_data(value) == ["Walkthrough data must be an object"]
 
 
+@pytest.mark.parametrize("url", ["https://:443", "https://@", "https://user@/x", "https://[abc"])
+def test_hostless_or_malformed_links_are_rejected(url):
+    data = example()
+    data["meta"]["prUrl"] = url
+    assert walkthrough.validate_data(data)
+
+
 def test_plaintext_http_links_are_rejected():
     data = example()
     data["meta"]["prUrl"] = "http://github.com/example/project/pull/123"
@@ -204,3 +211,11 @@ def test_validate_rejects_stale_context(tmp_path, capsys):
     context_path.write_text(json.dumps(edited))
     assert run_cli("--validate", "--html", html_path, "--data", context_path) == 1
     assert "context.json does not match" in capsys.readouterr().out
+
+
+def test_validate_accepts_matching_context(tmp_path):
+    html_path = tmp_path / "index.html"
+    html_path.write_text(walkthrough.html_template(example()))
+    context_path = tmp_path / "context.json"
+    context_path.write_text(json.dumps(example()))
+    assert run_cli("--validate", "--html", html_path, "--data", context_path) == 0

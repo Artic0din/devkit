@@ -79,8 +79,10 @@ gh pr view <number> --json baseRefName,headRefName,title,body,url,state,reviews,
 Take `<owner>/<repo>` from the PR URL; the `{owner}/{repo}` placeholders can resolve to a fork's parent.
 
 ```bash
-gh api --paginate "repos/<owner>/<repo>/pulls/<number>/comments"
+gh api --paginate --slurp "repos/<owner>/<repo>/pulls/<number>/comments"
 ```
+
+`--slurp` returns one valid JSON array with one inner array per page; flatten it before reading the comments.
 
 3. Fetch the base and compare against `origin/<base>`:
 
