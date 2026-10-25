@@ -115,15 +115,19 @@ def test_unreadable_mutations() -> None:
         value = task_preview()
         thread = value["threads"][0]
         thread.update(unreadable=True, blocker="Cannot read source", outcome="blocked")
+        thread["proposed_title"] = thread["current_title"]
         value["coverage"].update(audited_threads=0, unreadable_threads=1)
+        expected = "threads[0] unreadable thread cannot propose new tasks"
         if candidate_type == "knowledge":
             thread["task_candidates"] = []
             thread["knowledge_candidates"] = [{
                 "status": "verified", "target_note": "Example", "proposed_content": "Example fact",
                 "primary_sources": ["Synthetic source"], "reason": "Verified fixture",
+                "edit_operation": "append",
             }]
             value["coverage"].update(new_task_candidates=0, verified_knowledge_candidates=1)
-        assert any("unreadable" in error for error in validate_preview(value)), candidate_type
+            expected = "threads[0] unreadable thread cannot propose verified knowledge"
+        assert validate_preview(value) == [expected], (candidate_type, validate_preview(value))
 
 
 def test_task_publication_payload() -> None:
@@ -157,16 +161,22 @@ def test_empty_issue_sections() -> None:
         "## Context\n## Goal\n## Acceptance criteria\n## Technical notes\n" + marker,
         "## Context\nEvidence\n## Goal\nOutcome\n## Acceptance criteria\nNone\n## Technical notes\nConstraints\n" + marker,
         "## Context\nEvidence\n## Goal\nOutcome\n## Acceptance criteria\n- [ ] Verified\n## Technical notes\n" + marker,
+        "## Context\nEvidence\n## Goal\nOutcome\n## Acceptance criteria\n- [ ]\n## Technical notes\nConstraints\n" + marker,
     ):
         value = task_preview()
         value["threads"][0]["task_candidates"][0]["body"] = body
         assert any("section must not be empty" in error or "at least one criterion" in error
                    for error in validate_preview(value)), body
+    value = task_preview()
+    candidate = value["threads"][0]["task_candidates"][0]
+    candidate["body"] = candidate["body"].replace("\n", "\r\n")
+    assert not validate_preview(value), validate_preview(value)
 
 
 def test_existing_url() -> None:
     for status in ("duplicate", "completed"):
-        for url in ("not a URL", "github.com/owner/project/issues/1", "http://github.com/owner/project/issues/1", "https://"):
+        for url in ("not a URL", "github.com/owner/project/issues/1", "http://github.com/owner/project/issues/1", "https://",
+                    "https://[abc", "https://@", "https://user@", "https://:443"):
             value = task_preview()
             value["threads"][0]["task_candidates"][0].update(status=status)
             value["threads"][0]["task_candidates"][0]["dedupe"]["existing_url"] = url
@@ -237,8 +247,9 @@ if __name__ == "__main__":
         assert validate_preview(invalid), observed
     invalid = deepcopy(valid)
     invalid["threads"][0].update(unreadable=True, blocker="Cannot read session")
+    invalid["threads"][0]["proposed_title"] = invalid["threads"][0]["current_title"]
     invalid["coverage"].update(audited_threads=0, unreadable_threads=1)
-    assert validate_preview(invalid), "Unreadable session was accepted for archive"
+    assert validate_preview(invalid) == ["threads[0] archive candidate must be explicitly readable"], validate_preview(invalid)
     for field in ("outcome",):
         invalid = deepcopy(valid)
         invalid["threads"][0][field] = []

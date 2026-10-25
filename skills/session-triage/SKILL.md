@@ -48,7 +48,7 @@ Classify each session as:
 
 For each session, propose:
 
-- a descriptive title of roughly three to eight words;
+- a descriptive title of roughly three to eight words, or the unchanged current title for an unreadable session;
 - a project section derived from the app's saved project information and live repository remote, never the session title alone;
 - an archive decision;
 - unresolved outcomes;
@@ -107,9 +107,10 @@ Run:
 Internal validation requires:
 
 - every eligible thread appears exactly once;
-- every unreadable thread has a precise blocker;
+- every unreadable thread has a precise blocker and keeps its current title;
 - archive candidates are inactive, verified complete, and have no unresolved outcomes or new tasks;
-- every proposed issue has a mapped repository, exact proposed body, evidence, deduplication result, and unique stable marker;
+- every proposed issue has a mapped repository, exact proposed body with non-empty sections and at least one acceptance criterion, evidence, deduplication result, and unique stable marker;
+- every duplicate or completed task links the existing work with an `https` URL;
 - every verified knowledge candidate names current primary sources, a target note, and an edit operation;
 - summary counts match the roster.
 

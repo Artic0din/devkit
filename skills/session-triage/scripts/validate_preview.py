@@ -34,8 +34,11 @@ def _has_text(value: Any) -> bool:
 def _valid_url(value: Any) -> bool:
     if not _has_text(value) or any(character.isspace() for character in value):
         return False
-    parts = urlsplit(value)
-    return parts.scheme == "https" and bool(parts.netloc)
+    try:
+        parts = urlsplit(value)
+    except ValueError:
+        return False
+    return parts.scheme == "https" and bool(parts.hostname)
 
 
 def _valid_timestamp(value: Any) -> bool:
@@ -98,7 +101,7 @@ def _validate_task(
         _require(_has_text(body), f"{path}.body is required", errors)
         if isinstance(body, str):
             content = body.replace(marker, "") if isinstance(marker, str) and marker else body
-            parts = re.split(r"(?m)^## (.+?)[ \t]*$", content)
+            parts = re.split(r"(?m)^## (.+?)\s*$", content)
             sections = dict(zip(parts[1::2], parts[2::2]))
             for heading in ISSUE_SECTIONS:
                 _require(heading in sections, f"{path}.body requires a {heading} section", errors)
@@ -107,7 +110,7 @@ def _validate_task(
                     f"{path}.body {heading} section must not be empty", errors,
                 )
             _require(
-                bool(re.search(r"(?m)^\s*[-*] \S", sections.get("Acceptance criteria", ""))),
+                bool(re.search(r"(?m)^\s*[-*] (?!\[[ xX]\]\s*$)\S", sections.get("Acceptance criteria", ""))),
                 f"{path}.body Acceptance criteria must list at least one criterion", errors,
             )
             _require(isinstance(marker, str) and marker in body, f"{path}.body must include its marker", errors)
