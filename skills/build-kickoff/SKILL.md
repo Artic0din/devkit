@@ -25,8 +25,8 @@ approved phases directly in the current session under that brief.
 - A spec exists and the user wants it executed phase by phase, PR per phase.
 - The user pastes a partial autonomy/build preamble (fill the gaps from here instead).
 
-Do NOT use for: one-off edits to an existing repo, code review (`code-review`/`linus-code-reviewer`),
-or handoffs to another agent (`agent-handoff`).
+Do NOT use for: one-off edits to an existing repo, code review (`autoreview` or `github-deep-review`),
+or handoffs to another agent.
 
 ## Step 1 - Choose the execution mode
 
@@ -106,10 +106,10 @@ Phased build. Standard human-in-the-loop applies: the human presses merge on eve
   merge until the human approves.
 ```
 
-## Step 4 - Hand off
+## Step 4 - Confirm and execute
 
 State the chosen mode and the filled phase list back to the user.
-For a multi-phase build, invoke github-workflow to create or refine its issues and obtain explicit approval of the breakdown before handing off.
+For a multi-phase build, invoke github-workflow to create or refine its issues and obtain explicit approval of the breakdown before executing.
 Reuse an existing approval only when it covers that same scope.
 Then execute the approved phases directly in the current session, one issue, branch, and PR at a time.
 For autonomous runs, continue to the next approved phase; for gated runs, stop after each phase as specified.
