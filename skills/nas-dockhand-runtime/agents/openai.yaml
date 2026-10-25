@@ -1,4 +1,4 @@
 interface:
   display_name: "NAS Dockhand Runtime"
   short_description: "Verify and operate NAS Docker stacks through live Dockhand state."
-  default_prompt: "Check the live NAS Dockhand state for the named app or stack, compare it with repo assumptions, and verify the result end to end."
+  default_prompt: "Use $nas-dockhand-runtime to check the live NAS Dockhand state for the named app or stack, compare it with repo assumptions, and verify the result end to end."
