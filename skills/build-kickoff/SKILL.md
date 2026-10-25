@@ -16,8 +16,8 @@ skill assembles that brief from the canonical templates below so it is identical
 and never hand-retyped or partially remembered.
 
 This is a template/standards skill: it produces a kickoff brief, it does not itself run the
-build. After emitting the brief and completing the issue-breakdown approval below, hand off to the normal execution path (`worker`/`architect`,
-`superpowers:executing-plans`, or `loop` for autonomous runs).
+build. After emitting the brief and completing the issue-breakdown approval below, execute the
+approved phases directly in the current session under that brief.
 
 ## When to use
 
@@ -111,8 +111,8 @@ Phased build. Standard human-in-the-loop applies: the human presses merge on eve
 State the chosen mode and the filled phase list back to the user.
 For a multi-phase build, invoke github-workflow to create or refine its issues and obtain explicit approval of the breakdown before handing off.
 Reuse an existing approval only when it covers that same scope.
-Then proceed via the normal execution path. For autonomous runs, `loop` can drive the approved phase sequence; for gated runs, stop
-after each phase as specified.
+Then execute the approved phases directly in the current session, one issue, branch, and PR at a time.
+For autonomous runs, continue to the next approved phase; for gated runs, stop after each phase as specified.
 
 ## Notes
 
