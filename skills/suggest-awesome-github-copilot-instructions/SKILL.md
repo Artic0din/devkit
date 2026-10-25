@@ -26,8 +26,8 @@ Analyze current repository context and suggest relevant copilot-instruction file
    **AWAIT** user request to proceed with installation or updates of specific instructions. DO NOT INSTALL OR UPDATE UNLESS DIRECTED TO DO SO.
 12. **Download/Update Assets**: For requested instructions, automatically:
     - Download new instructions to `.github/instructions/` folder
-    - Update outdated instructions by replacing with latest version from awesome-copilot
-    - Do NOT adjust content of the files
+    - Update outdated instructions by reviewing the complete diff against a pinned awesome-copilot commit and merging it, keeping any recorded local corrections
+    - Do NOT adjust content of newly downloaded files
     - Use `#fetch` tool to download assets, but may use `curl` using `#runInTerminal` tool to ensure all content is retrieved
     - Use `#todos` tool to track progress
 
@@ -118,5 +118,5 @@ When outdated instructions are identified:
 1. Include them in the output table with ⚠️ status
 2. Document specific differences in the "Suggestion Rationale" column
 3. Provide recommendation to update with key changes noted
-4. When user requests update, replace entire local file with remote version
+4. When user requests update, merge the reviewed pinned-commit diff into the local file instead of replacing it, so recorded local corrections survive
 5. Preserve file location in `.github/instructions/` directory

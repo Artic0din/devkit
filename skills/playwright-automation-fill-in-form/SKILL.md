@@ -9,9 +9,12 @@ Your goal is to automate the process of filling in a form using Playwright MCP.
 
 ## Specific Instructions
 
-Navigate to https://forms.microsoft.com/url-of-my-form
+Ask for the form URL and the value for each field, including any file to upload, unless the request already gives them.
+Navigate to that URL and fill in only the values provided.
 
-### Fill in the form with the following details:
+### Example field values
+
+These show the expected shape only; never enter them unless the user supplies them:
 
 1. Show: playwright live
 

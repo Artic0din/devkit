@@ -9,9 +9,16 @@ description: 'Uploads a local file (screenshot, image, PDF, zip, video) to GitHu
 
 ## Prerequisites
 
+`gh-attach` is third-party code.
+If `gh extension list` does not show it, ask the user before installing, then install the pinned release rather than the latest one:
+
 ```sh
-gh extension list | grep -q 'gh attach' || gh extension install sudosubin/gh-attach
+gh extension install sudosubin/gh-attach --pin v0.4.3
+gh release download v0.4.3 -R sudosubin/gh-attach -p gh-attach_checksums.txt -O -
+shasum -a 256 "${XDG_DATA_HOME:-$HOME/.local/share}/gh/extensions/gh-attach/gh-attach"
 ```
+
+Stop if the installed binary's hash does not match the release checksum for your platform.
 
 Uploads use a GitHub browser session cookie, not the `gh` token. By default, `gh` must be authenticated so `gh-attach` can select the matching browser account. If the wrong account is selected, add `--browser <name> --profile <name>`. For headless use, set `GH_ATTACH_SESSION_TOKEN` to the bare `user_session` cookie value. Treat it as a full account credential.
 

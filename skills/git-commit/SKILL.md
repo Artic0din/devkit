@@ -112,7 +112,8 @@ EOF
 - One logical change per commit
 - Present tense: "add" not "added"
 - Imperative mood: "fix bug" not "fixes bug"
-- Reference issues: `Closes #123`, `Refs #456`
+- Reference issues without closing keywords: `Refs #456`
+- Keep closing keywords such as `Fixes #123` for the pull request body, never the commit message
 - Keep description under 72 characters
 
 ## Git Safety Protocol

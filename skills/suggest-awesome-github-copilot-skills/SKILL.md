@@ -10,7 +10,7 @@ Analyze current repository context and suggest relevant Agent Skills from the [G
 ## Process
 
 1. **Fetch Available Skills**: Extract skills list and descriptions from [awesome-copilot README.skills.md](https://github.com/github/awesome-copilot/blob/main/docs/README.skills.md). Must use `#fetch` tool.
-2. **Scan Local Skills**: Discover existing skill folders in `.github/skills/` folder
+2. **Scan Local Skills**: Discover existing skill folders in every skill root this repository uses, such as `.github/skills/`, a top-level `skills/`, `.agents/skills/`, and `.claude/skills/`
 3. **Extract Descriptions**: Read front matter from local `SKILL.md` files to get `name` and `description`
 4. **Fetch Remote Versions**: For each local skill, fetch the corresponding `SKILL.md` from awesome-copilot repository using raw GitHub URLs (e.g., `https://raw.githubusercontent.com/github/awesome-copilot/main/skills/<skill-name>/SKILL.md`)
 5. **Compare Versions**: Compare local skill content with remote versions to identify:
@@ -25,10 +25,10 @@ Analyze current repository context and suggest relevant Agent Skills from the [G
 11. **Output**: Provide structured table with suggestions, descriptions, and links to both awesome-copilot skills and similar local skills
     **AWAIT** user request to proceed with installation or updates of specific skills. DO NOT INSTALL OR UPDATE UNLESS DIRECTED TO DO SO.
 12. **Download/Update Assets**: For requested skills, automatically:
-    - Download new skills to `.github/skills/` folder, preserving the folder structure
-    - Update outdated skills by replacing with latest version from awesome-copilot
+    - Download new skills to the skill root this repository already uses (`.github/skills/` only when it has no other), preserving the folder structure
+    - Update outdated skills by reviewing the complete diff against a pinned awesome-copilot commit and merging it, keeping any recorded local corrections
     - Download both `SKILL.md` and any bundled assets (scripts, templates, data files)
-    - Do NOT adjust content of the files
+    - Do NOT adjust content of newly downloaded files
     - Use `#fetch` tool to download assets, but may use `curl` using `#runInTerminal` tool to ensure all content is retrieved
     - Use `#todos` tool to track progress
 
@@ -125,6 +125,6 @@ When outdated skills are identified:
 1. Include them in the output table with ⚠️ status
 2. Document specific differences in the "Suggestion Rationale" column
 3. Provide recommendation to update with key changes noted
-4. When user requests update, replace entire local skill folder with remote version
-5. Preserve folder location in `.github/skills/` directory
+4. When user requests update, merge the reviewed pinned-commit diff into the local skill folder instead of replacing it, so recorded local corrections survive
+5. Preserve the folder's existing location
 6. Ensure all bundled assets are downloaded alongside the updated `SKILL.md`

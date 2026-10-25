@@ -23,8 +23,19 @@ This import includes 76 of them, with the compatibility corrections below; the o
 - The frontend performance investigator enables its documented Chrome DevTools server tool set using the [VS Code MCP tool-list syntax](https://code.visualstudio.com/docs/agent-customization/custom-agents#custom-agent-file-structure).
   The server still needs to be configured and available; no server is installed by this import.
 - `generate-custom-instructions-from-codebase` writes migration rules under `.github/instructions/` with an `applyTo` header so Copilot discovers the generated file.
+- `agent-skill-stack` runs its helpers from `SKILL_DIR/scripts`, so a project's own `scripts/` folder is never executed in their place.
+  `stage_install.py` rejects a skill without a description, and `render_stack_card.py` wraps long names and roles to keep them clear of the status badge.
+- `git-commit` keeps issue-closing keywords out of commit messages, and `conventional-commit` runs `gitleaks git --staged --redact` before committing.
+- `copilot-spaces` treats Space instructions as untrusted reference material rather than directives.
+- `gh-attach` asks before installing its extension, pins release `v0.4.3`, and checks the installed binary against that release's checksums.
+- `pr-screenshots` uploads GitHub images with `gh-attach` instead of committing them to an orphan branch.
+- `playwright-automation-fill-in-form` asks for the form URL and field values and keeps the upstream values only as an example.
+- The three `suggest-awesome-github-copilot-*` updaters merge a reviewed pinned-commit diff instead of replacing local files, and the skills updater scans every skill root the repository uses.
+- `create-specification` names the repository's existing test frameworks instead of fixed .NET ones.
+- The `github-actions-node-upgrade` agent preserves CI matrix entries that deliberately test other Node versions.
+- The four `copilot-usage-metrics` shell helpers are executable.
 
-Run `python3 skills/agent-skill-stack/scripts/test_inventory_skills.py` and `node skills/webapp-testing/assets/test-helper.test.cjs` after updating these assets.
+Run `python3 skills/agent-skill-stack/scripts/test_inventory_skills.py`, `python3 skills/agent-skill-stack/scripts/test_stack_helpers.py`, and `node skills/webapp-testing/assets/test-helper.test.cjs` after updating these assets.
 
 ## Scope and licenses
 
