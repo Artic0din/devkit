@@ -10,11 +10,14 @@ import sys
 from datetime import datetime, time, timedelta
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
 OUTCOMES = {"verified_complete", "partial", "blocked", "active", "unclear"}
 TASK_STATUSES = {"new", "duplicate", "completed", "blocked"}
 KNOWLEDGE_STATUSES = {"verified", "rejected"}
+KNOWLEDGE_OPERATIONS = {"create", "append", "replace_section"}
+ISSUE_SECTIONS = ("Context", "Goal", "Acceptance criteria", "Technical notes")
 REPOSITORY_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 MARKER_PATTERN = re.compile(r"^<!-- session-triage:[A-Za-z0-9-]+:[A-Za-z0-9._-]+ -->$")
 
@@ -26,6 +29,13 @@ def _require(condition: bool, message: str, errors: list[str]) -> None:
 
 def _has_text(value: Any) -> bool:
     return isinstance(value, str) and bool(value.strip())
+
+
+def _valid_url(value: Any) -> bool:
+    if not _has_text(value) or any(character.isspace() for character in value):
+        return False
+    parts = urlsplit(value)
+    return parts.scheme == "https" and bool(parts.netloc)
 
 
 def _valid_timestamp(value: Any) -> bool:
@@ -77,8 +87,8 @@ def _validate_task(
         )
         if isinstance(status, str) and status in {"duplicate", "completed"}:
             _require(
-                _has_text(dedupe.get("existing_url")),
-                f"{path}.dedupe.existing_url is required for {status}",
+                _valid_url(dedupe.get("existing_url")),
+                f"{path}.dedupe.existing_url must be an https URL for {status}",
                 errors,
             )
 
@@ -87,11 +97,19 @@ def _validate_task(
         body = task.get("body")
         _require(_has_text(body), f"{path}.body is required", errors)
         if isinstance(body, str):
-            for heading in ("Context", "Goal", "Acceptance criteria", "Technical notes"):
+            content = body.replace(marker, "") if isinstance(marker, str) and marker else body
+            parts = re.split(r"(?m)^## (.+?)[ \t]*$", content)
+            sections = dict(zip(parts[1::2], parts[2::2]))
+            for heading in ISSUE_SECTIONS:
+                _require(heading in sections, f"{path}.body requires a {heading} section", errors)
                 _require(
-                    bool(re.search(rf"(?m)^## {heading}\s*$", body)),
-                    f"{path}.body requires a {heading} section", errors,
+                    heading not in sections or bool(sections[heading].strip()),
+                    f"{path}.body {heading} section must not be empty", errors,
                 )
+            _require(
+                bool(re.search(r"(?m)^\s*[-*] \S", sections.get("Acceptance criteria", ""))),
+                f"{path}.body Acceptance criteria must list at least one criterion", errors,
+            )
             _require(isinstance(marker, str) and marker in body, f"{path}.body must include its marker", errors)
         _require(
             mapping_status == "mapped",
@@ -154,6 +172,17 @@ def _validate_knowledge(candidate: Any, path: str, errors: list[str]) -> None:
         _require(
             _has_text(candidate.get("proposed_content")),
             f"{path}.proposed_content is required",
+            errors,
+        )
+        operation = candidate.get("edit_operation")
+        _require(
+            isinstance(operation, str) and operation in KNOWLEDGE_OPERATIONS,
+            f"{path}.edit_operation is invalid",
+            errors,
+        )
+        _require(
+            operation != "replace_section" or _has_text(candidate.get("target_section")),
+            f"{path}.target_section is required for replace_section",
             errors,
         )
         _require(
@@ -369,6 +398,11 @@ def validate_preview(preview: Any) -> list[str]:
             _require(
                 _has_text(thread.get("blocker")),
                 f"{path}.blocker is required when unreadable",
+                errors,
+            )
+            _require(
+                thread.get("proposed_title") == thread.get("current_title"),
+                f"{path} unreadable thread must keep its current title",
                 errors,
             )
         else:

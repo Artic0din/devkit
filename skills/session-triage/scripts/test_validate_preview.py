@@ -141,6 +141,61 @@ def test_task_publication_payload() -> None:
     assert not validate_preview(value), validate_preview(value)
 
 
+def test_unreadable_title_unchanged() -> None:
+    value = preview()
+    thread = value["threads"][0]
+    thread.update(unreadable=True, blocker="Cannot read source", outcome="unclear", archive_candidate=False)
+    value["coverage"].update(audited_threads=0, unreadable_threads=1, archive_candidates=0)
+    assert "threads[0] unreadable thread must keep its current title" in validate_preview(value)
+    thread["proposed_title"] = thread["current_title"]
+    assert not validate_preview(value), validate_preview(value)
+
+
+def test_empty_issue_sections() -> None:
+    marker = "<!-- session-triage:synthetic:example -->"
+    for body in (
+        "## Context\n## Goal\n## Acceptance criteria\n## Technical notes\n" + marker,
+        "## Context\nEvidence\n## Goal\nOutcome\n## Acceptance criteria\nNone\n## Technical notes\nConstraints\n" + marker,
+        "## Context\nEvidence\n## Goal\nOutcome\n## Acceptance criteria\n- [ ] Verified\n## Technical notes\n" + marker,
+    ):
+        value = task_preview()
+        value["threads"][0]["task_candidates"][0]["body"] = body
+        assert any("section must not be empty" in error or "at least one criterion" in error
+                   for error in validate_preview(value)), body
+
+
+def test_existing_url() -> None:
+    for status in ("duplicate", "completed"):
+        for url in ("not a URL", "github.com/owner/project/issues/1", "http://github.com/owner/project/issues/1", "https://"):
+            value = task_preview()
+            value["threads"][0]["task_candidates"][0].update(status=status)
+            value["threads"][0]["task_candidates"][0]["dedupe"]["existing_url"] = url
+            value["coverage"]["new_task_candidates"] = 0
+            assert any("existing_url" in error for error in validate_preview(value)), (status, url)
+        value["threads"][0]["task_candidates"][0]["dedupe"]["existing_url"] = "https://github.com/owner/project/issues/1"
+        assert not validate_preview(value), validate_preview(value)
+
+
+def test_knowledge_edit_operation() -> None:
+    value = preview()
+    value["threads"][0]["knowledge_candidates"] = [{
+        "status": "verified", "target_note": "Example", "proposed_content": "Example fact",
+        "primary_sources": ["Synthetic source"], "reason": "Verified fixture",
+    }]
+    value["coverage"]["verified_knowledge_candidates"] = 1
+    candidate = value["threads"][0]["knowledge_candidates"][0]
+    for operation in (None, "", "edit", []):
+        candidate["edit_operation"] = operation
+        assert any("edit_operation" in error for error in validate_preview(value)), operation
+    candidate["edit_operation"] = "replace_section"
+    assert any("target_section" in error for error in validate_preview(value))
+    candidate["target_section"] = "Facts"
+    assert not validate_preview(value), validate_preview(value)
+    for operation in ("create", "append"):
+        candidate["edit_operation"] = operation
+        assert not validate_preview(value), validate_preview(value)
+
+
 if __name__ == "__main__":
     test_host_identity()
     test_project_metadata()
@@ -148,6 +203,10 @@ if __name__ == "__main__":
     test_task_repository()
     test_unreadable_mutations()
     test_task_publication_payload()
+    test_unreadable_title_unchanged()
+    test_empty_issue_sections()
+    test_existing_url()
+    test_knowledge_edit_operation()
     valid = preview()
     assert not validate_preview(valid)
     invalid = deepcopy(valid)

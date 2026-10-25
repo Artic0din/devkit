@@ -90,7 +90,7 @@ Search the ryan-knowledge Basic Memory project before proposing any note change.
 Only retain architecture, boundaries, operational facts, or decisions that remain reusable and are verified against current code, tests, repository documentation, or live primary state.
 
 Reject transient pull-request status, task progress, unsupported transcript claims, credentials, and sensitive records.
-For every retained candidate, name the smallest existing note to update, exact proposed content, and primary sources.
+For every retained candidate, name the smallest existing note to update or the new note to create, the edit operation, exact proposed content, and primary sources.
 
 ## 5. Write and validate the preview
 
@@ -110,7 +110,7 @@ Internal validation requires:
 - every unreadable thread has a precise blocker;
 - archive candidates are inactive, verified complete, and have no unresolved outcomes or new tasks;
 - every proposed issue has a mapped repository, exact proposed body, evidence, deduplication result, and unique stable marker;
-- every verified knowledge candidate names current primary sources and a target note;
+- every verified knowledge candidate names current primary sources, a target note, and an edit operation;
 - summary counts match the roster.
 
 After the first successful validation, change validation.status from pending to validated and run the validator again.
@@ -147,9 +147,11 @@ Apply in this order:
    Skip newly completed or duplicate work and record the evidence instead of creating an issue.
    Publish the exact approved title and body; do not invent content during apply.
 2. Re-read each knowledge candidate's named primary sources immediately before writing.
-   Skip changed or unverifiable evidence and return that candidate to preview; otherwise apply the exact approved note edit.
+   Skip changed or unverifiable evidence and return that candidate to preview; otherwise apply the exact approved note edit with its approved edit_operation.
+   Skip and return the candidate to preview when the target no longer fits that operation: a `create` note already exists, or an `append` or `replace_section` note or section is missing.
 3. Rename approved sessions.
-4. Move sessions only when a supported thread tool exists.
+4. Move a session only when its approved preview marks `apply_support` as `supported` and a supported thread tool still exists.
+   Otherwise record the move as unsupported in the ledger.
 5. Archive approved sessions last, refreshing live status immediately before each archive.
    Require the session to still be `idle`; skip active, unknown, or unreadable status even when its timestamp is unchanged.
 
