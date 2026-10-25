@@ -111,9 +111,9 @@ Reference in the PR description:
 
 ### GitHub
 
-> **⚠️ Work in progress.** GitHub's drag-and-drop image upload uses internal endpoints that require browser cookies. There's no clean public API for uploading images to PR descriptions yet.
-
-**Current workaround:** Commit images to a `pr-assets` orphan branch and reference via blob URLs (`github.com/{owner}/{repo}/blob/pr-assets/{file}?raw=true`). It works but is clunky — contributions for a better approach are welcome.
+GitHub has no public API for uploading images to PR descriptions.
+Use the `gh-attach` skill to upload each image to GitHub user-attachments and embed the returned URL.
+Do not commit images to an orphan or other branch just for PR screenshots.
 
 ## Guidelines
 
@@ -125,6 +125,6 @@ Reference in the PR description:
 
 ## Limitations
 
-- GitHub image upload requires workarounds (no public API for PR description images)
+- GitHub image upload depends on the `gh-attach` extension (no public API for PR description images)
 - Azure DevOps attachment filenames can't be reused — plan naming ahead
 - Very large images (>10MB) may not render inline on some platforms

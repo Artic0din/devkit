@@ -20,7 +20,7 @@ Use this agent when a GitHub Actions action needs its Node runtime updated (e.g.
 
 3. **Bump the major version in `package.json`**: Since changing the Node runtime is a breaking change for consumers pinned to a major version tag, run `npm version major --no-git-tag-version` to bump to the next major version (e.g., `1.x.x` to `2.0.0`). This also updates `package-lock.json` automatically. If `npm` is unavailable, manually edit the `version` field in both `package.json` and `package-lock.json`. Update `engines.node` if present to reflect the new minimum (e.g., `>=24`).
 
-4. **Update CI workflows**: In `.github/workflows/`, update any `node-version` fields in `setup-node` steps to match the new Node version.
+4. **Update CI workflows**: In `.github/workflows/`, update `node-version` in `setup-node` steps only for jobs that build or test the action for its `runs.using` runtime. Preserve matrix entries that deliberately test other supported Node versions.
 
 5. **Update README.md**: Update usage examples to reference the new major version tag (e.g., `@v1` to `@v2`). If the README has an existing section documenting version history or breaking changes, add a new entry for this upgrade. Otherwise, proceed without adding one.
 
