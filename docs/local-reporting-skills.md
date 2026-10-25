@@ -5,9 +5,10 @@ Publishing it does not read session history or create a report from private data
 
 `pr-walkthrough` documents its adaptation of Warp's review-orientation concept and retains the Denver Technologies MIT license in its directory.
 Its linear renderer is local code and does not use D3.
-Publication validation fixed single-step browser checks, separated displayed code from executable network checks, and restricted generated links to HTTP(S).
+Publication validation fixed single-step browser checks, separated displayed code from executable network checks, and restricted generated links to HTTPS.
 Browser validation now visits every step, detects JavaScript errors, and accepts consecutive steps with the same title.
 The page opens with its review findings visible.
+Validation rejects findings, explanations, reviewer checks and changed diff lines that are blank, non-string or missing line numbers, and requires `--data` so a `context.json` edited after rendering fails instead of passing against stale HTML.
 The HTML blocks runtime network connections; links to the pull request are intentional user navigation.
 Use a task-owned worktree for reading PR code and retain generated walkthroughs only in the repository's local exclude path.
 

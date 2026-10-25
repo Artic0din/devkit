@@ -52,7 +52,7 @@ def is_web_url(value: object) -> bool:
         return False
     try:
         parsed = urlsplit(value)
-        return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
+        return parsed.scheme == "https" and bool(parsed.netloc)
     except ValueError:
         return False
 
@@ -69,7 +69,7 @@ def validate_data(data: dict) -> list[str]:
             if not isinstance(meta.get(field), str) or not meta[field]:
                 errors.append(f"Missing meta.{field}")
         if not is_web_url(meta.get("prUrl")):
-            errors.append("meta.prUrl must be an HTTP(S) URL")
+            errors.append("meta.prUrl must be an HTTPS URL")
 
     findings = data.get("findings")
     if not isinstance(findings, list):
@@ -93,8 +93,9 @@ def validate_data(data: dict) -> list[str]:
                     f"Finding {index} missing fields: {', '.join(sorted(missing))}"
                 )
             for field in required_finding_fields:
-                if field in finding and not finding.get(field):
-                    errors.append(f"Finding {index} has empty {field}")
+                value = finding.get(field)
+                if field in finding and (not isinstance(value, str) or not value.strip()):
+                    errors.append(f"Finding {index} {field} must be a nonblank string")
             if finding.get("severity") not in ("critical", "major"):
                 errors.append(
                     f"Finding {index} severity must be critical or major"
@@ -151,6 +152,12 @@ def validate_data(data: dict) -> list[str]:
         for field in ("diffs", "explanation", "reviewChecks", "productionExamples"):
             if not isinstance(step.get(field, []), list):
                 errors.append(f"Step {index} {field} must be an array")
+        for field in ("explanation", "reviewChecks"):
+            items = step.get(field)
+            if isinstance(items, list) and (
+                not items or any(not isinstance(item, str) or not item.strip() for item in items)
+            ):
+                errors.append(f"Step {index} {field} needs nonblank strings")
         diffs = step.get("diffs")
         if not diffs:
             errors.append(f"Step {index} has no code diff")
@@ -165,8 +172,18 @@ def validate_data(data: dict) -> list[str]:
                 errors.append(f"Step {index} diff {diff_index} lines must be an array of objects")
             elif not any(line.get("type") in ("add", "remove") for line in lines):
                 errors.append(f"Step {index} diff {diff_index} needs at least one changed line")
+            else:
+                for line_index, line in enumerate(lines, start=1):
+                    number_field = {"add": "newLine", "remove": "oldLine"}.get(line.get("type"))
+                    if number_field is None:
+                        continue
+                    number = line.get(number_field)
+                    if not isinstance(line.get("content"), str) or not isinstance(number, int) or isinstance(number, bool):
+                        errors.append(
+                            f"Step {index} diff {diff_index} line {line_index} needs string content and integer {number_field}"
+                        )
             if diff.get("url") and not is_web_url(diff["url"]):
-                errors.append(f"Step {index} diff {diff_index} URL must be HTTP(S)")
+                errors.append(f"Step {index} diff {diff_index} URL must be HTTPS")
         examples = step.get("productionExamples", [])
         if isinstance(examples, list) and any(not isinstance(example, dict) for example in examples):
             errors.append(f"Step {index} productionExamples must contain objects")
@@ -791,10 +808,12 @@ def main() -> int:
         print(html_template(json.loads(args.data.read_text())))
         return 0
 
-    if args.html is None:
-        parser.error("--validate requires --html")
+    if args.html is None or args.data is None:
+        parser.error("--validate requires --html and --data")
     html_text = args.html.read_text()
     data, errors = static_validate(html_text)
+    if data and json.loads(args.data.read_text()) != data:
+        errors.append(f"{args.data.name} does not match the data embedded in {args.html.name}")
     if errors:
         for error in errors:
             print(f"FAIL - {error}")

@@ -125,3 +125,82 @@ def test_required_review_content():
 @pytest.mark.parametrize("value", [None, [], "invalid", 1])
 def test_json_root_must_be_object(value):
     assert walkthrough.validate_data(value) == ["Walkthrough data must be an object"]
+
+
+def test_plaintext_http_links_are_rejected():
+    data = example()
+    data["meta"]["prUrl"] = "http://github.com/example/project/pull/123"
+    assert walkthrough.validate_data(data)
+    data = example()
+    data["steps"][0]["diffs"][0]["url"] = "http://github.com/example/project/pull/123/files"
+    assert walkthrough.validate_data(data)
+
+
+@pytest.mark.parametrize("field", ["title", "body", "file", "evidence", "remediation"])
+@pytest.mark.parametrize("value", [1, {"reason": "x"}, ["x"], "   "])
+def test_finding_text_fields_must_be_nonblank_strings(field, value):
+    data = example()
+    data["findings"][0][field] = value
+    assert walkthrough.validate_data(data)
+
+
+@pytest.mark.parametrize("field", ["explanation", "reviewChecks"])
+@pytest.mark.parametrize("value", [[], [""], ["  "], [1], [None]])
+def test_step_guidance_needs_nonblank_strings(field, value):
+    data = example()
+    data["steps"][0][field] = value
+    assert walkthrough.validate_data(data)
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        {"type": "add"},
+        {"type": "add", "content": "x"},
+        {"type": "add", "content": 1, "newLine": 11},
+        {"type": "add", "content": "x", "newLine": "11"},
+        {"type": "add", "content": "x", "newLine": True},
+        {"type": "remove", "content": "x", "newLine": 11},
+    ],
+)
+def test_changed_lines_need_content_and_line_number(line):
+    data = example()
+    data["steps"][0]["diffs"][0]["lines"] = [line]
+    assert walkthrough.validate_data(data)
+
+
+def test_valid_changed_lines_pass():
+    data = example()
+    data["steps"][0]["diffs"][0]["lines"] = [
+        {"type": "add", "oldLine": None, "newLine": 11, "content": ""},
+        {"type": "remove", "oldLine": 10, "newLine": None, "content": "x"},
+    ]
+    assert walkthrough.validate_data(data) == []
+
+
+def run_cli(*args: str) -> int:
+    import sys
+    from unittest import mock
+
+    with mock.patch.object(sys, "argv", ["linear_walkthrough.py", *map(str, args)]):
+        try:
+            return walkthrough.main()
+        except SystemExit as exc:
+            return exc.code
+
+
+def test_validate_requires_context_data(tmp_path):
+    html_path = tmp_path / "index.html"
+    html_path.write_text(walkthrough.html_template(example()))
+    assert run_cli("--validate", "--html", html_path) != 0
+
+
+def test_validate_rejects_stale_context(tmp_path, capsys):
+    html_path = tmp_path / "index.html"
+    html_path.write_text(walkthrough.html_template(example()))
+    edited = example()
+    edited["meta"]["summary"] = "Edited after rendering"
+    context_path = tmp_path / "context.json"
+    context_path.write_text(json.dumps(edited))
+    assert run_cli("--validate", "--html", html_path, "--data", context_path) == 1
+    assert "context.json does not match" in capsys.readouterr().out

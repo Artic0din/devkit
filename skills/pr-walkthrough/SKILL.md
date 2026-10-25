@@ -251,13 +251,14 @@ Validate:
 
 ```bash
 python3 "$WALKTHROUGH_RENDERER" \
-  --validate --html .warp/pr-walkthrough/index.html --require-browser
+  --validate --html .warp/pr-walkthrough/index.html \
+  --data .warp/pr-walkthrough/context.json --require-browser
 ```
 
 Before reporting completion, confirm:
 
 - The page contains one review path.
-- `context.json` contains the complete structured context rendered in the page.
+- `context.json` contains the complete structured context rendered in the page; the validator fails when it differs from the embedded data.
 - The page contains the critical and major findings section, including its explicit empty state when there are no findings.
 - The page contains the interfaces tab showing all adjacent-system changes, including its explicit empty state.
 - Every step renders a real diff.
