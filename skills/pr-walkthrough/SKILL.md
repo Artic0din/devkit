@@ -75,6 +75,13 @@ For a PR URL:
 gh pr view <number> --json baseRefName,headRefName,title,body,url,state,reviews,comments,files,commits
 ```
 
+`comments` holds conversation comments and `reviews` holds review summaries; neither includes line-level review threads, so fetch those separately.
+Take `<owner>/<repo>` from the PR URL; the `{owner}/{repo}` placeholders can resolve to a fork's parent.
+
+```bash
+gh api --paginate "repos/<owner>/<repo>/pulls/<number>/comments"
+```
+
 3. Fetch the base and compare against `origin/<base>`:
 
 ```bash
