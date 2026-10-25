@@ -1,6 +1,6 @@
 ---
 name: nas-dockhand-runtime
-description: Use when checking, deploying, restarting, updating, or debugging apps running on Ryan's Synology NAS through Dockhand, especially stacks, container health, runtime parity, logs, ports, and volumes.
+description: Use for any question about an app Ryan runs on his Synology NAS through Dockhand (what it supports, how it is configured, or why it isn't working) and when checking, deploying, restarting, updating, or debugging it, especially stacks, container health, runtime parity, logs, ports, and volumes.
 ---
 
 # NAS Dockhand Runtime
