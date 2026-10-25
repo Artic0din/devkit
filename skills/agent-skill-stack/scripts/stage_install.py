@@ -13,25 +13,20 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+from inventory_skills import parse_frontmatter
+
 
 NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
 def parse_name(skill_file: Path) -> str:
-    lines = skill_file.read_text(encoding="utf-8", errors="strict").splitlines()
-    if not lines or lines[0].strip() != "---":
-        raise ValueError(f"{skill_file}: missing opening frontmatter delimiter")
-    end = next((i for i in range(1, len(lines)) if lines[i].strip() == "---"), None)
-    if end is None:
-        raise ValueError(f"{skill_file}: missing closing frontmatter delimiter")
-    for line in lines[1:end]:
-        match = re.match(r"^name:\s*([^#]+?)\s*$", line)
-        if match:
-            name = match.group(1).strip().strip('"\'')
-            if len(name) > 63 or not NAME_RE.fullmatch(name):
-                raise ValueError(f"{skill_file}: invalid skill name {name!r}")
-            return name
-    raise ValueError(f"{skill_file}: missing name")
+    metadata, issues = parse_frontmatter(skill_file.read_text(encoding="utf-8", errors="strict"))
+    if issues:
+        raise ValueError(f"{skill_file}: {'; '.join(issues)}")
+    name = metadata["name"]
+    if len(name) > 63 or not NAME_RE.fullmatch(name):
+        raise ValueError(f"{skill_file}: invalid skill name {name!r}")
+    return name
 
 
 def collect_files(source: Path) -> list[Path]:

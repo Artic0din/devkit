@@ -7,6 +7,8 @@ description: 'Find, evaluate, and assemble the smallest compatible set of AI Age
 
 Build the smallest useful stack for the user's actual outcome. Never force a domain example or a fixed lifecycle onto a different request.
 
+The helper scripts live in `scripts/` next to this file; call that folder `SKILL_DIR/scripts` and run each helper by that absolute path, never a `scripts/` path relative to the user's project.
+
 ## 1. Choose the user-facing depth
 
 Default to **plain-language mode**. Assume the user does not need to understand paths, revisions, hashes, manifests, static analysis, or runtime details.
@@ -40,7 +42,7 @@ Read [references/local-index-and-profiles.md](references/local-index-and-profile
 If a current local Skill index exists, search it before the filesystem or internet. If it is missing or stale, rebuild it from the relevant Skill roots:
 
 ```bash
-python3 scripts/skill_index.py build \
+python3 SKILL_DIR/scripts/skill_index.py build \
   --root ~/.codex/skills \
   --root ~/.codex/plugins/cache \
   --root .codex/skills \
@@ -139,7 +141,7 @@ Offer `查看技术详情` when useful. The technical view may include canonical
 When the user wants a reusable artifact, create a shareable recommendation card from structured JSON:
 
 ```bash
-python3 scripts/render_stack_card.py \
+python3 SKILL_DIR/scripts/render_stack_card.py \
   --input /path/to/stack-card.json \
   --output /path/to/stack-card.svg
 ```
@@ -155,7 +157,7 @@ Default to staged installation. Allow a one-click batch only when every selected
 For already downloaded and checked Skill directories, preview first:
 
 ```bash
-python3 scripts/stage_install.py \
+python3 SKILL_DIR/scripts/stage_install.py \
   --source /path/to/skill-a \
   --dest ~/.codex/skills \
   --manifest ./skill-stack-lock.json
@@ -166,7 +168,7 @@ Repeat with `--apply` only after approval. Never silently add credentials, accep
 After the user selects the stack, offer to create a project profile in dry-run mode:
 
 ```bash
-python3 scripts/project_profile.py \
+python3 SKILL_DIR/scripts/project_profile.py \
   --project /path/to/project \
   --name project-stack \
   --skill skill-a \

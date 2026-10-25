@@ -26,9 +26,17 @@ def clean_text(value: object, limit: int) -> str:
     return text[:limit]
 
 
+SKILL_NAME_WIDTH = 52
+SKILL_ROLE_WIDTH = 80
+
+
+def row_height(name_lines: list[str], role_lines: list[str]) -> int:
+    return 72 + (len(name_lines) - 1) * 30 + (len(role_lines) - 1) * 24
+
+
 def wrap(value: object, width: int, limit: int) -> list[str]:
     text = clean_text(value, limit)
-    return textwrap.wrap(text, width=width, break_long_words=False) or [""]
+    return textwrap.wrap(text, width=width, break_long_words=True) or [""]
 
 
 def atomic_write(path: Path, content: str) -> None:
@@ -75,7 +83,13 @@ def render(payload: dict[str, object]) -> str:
     warning_lines: list[str] = []
     for warning in warnings[:3]:
         warning_lines.extend(wrap(warning, 92, 240)[:2])
-    height = 250 + len(goal_lines) * 34 + len(skills) * 92 + max(1, len(warning_lines)) * 30 + 110
+    # Names and roles wrap to stay left of the status badge at x=956.
+    skill_rows = [
+        (wrap(skill.get("name"), SKILL_NAME_WIDTH, 80), wrap(skill.get("role"), SKILL_ROLE_WIDTH, 180), skill)
+        for skill in skills
+    ]
+    rows_height = sum(row_height(name_lines, role_lines) + 20 for name_lines, role_lines, _ in skill_rows)
+    height = 250 + len(goal_lines) * 34 + rows_height + max(1, len(warning_lines)) * 30 + 110
 
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img" aria-labelledby="title desc">',
@@ -94,19 +108,24 @@ def render(payload: dict[str, object]) -> str:
         y += 34
     y += 22
 
-    for skill in skills:
-        name = clean_text(skill.get("name"), 80)
-        role = clean_text(skill.get("role"), 180)
+    for name_lines, role_lines, skill in skill_rows:
         status = clean_text(skill.get("status"), 40).lower() or "recommended"
         foreground, background = STATUS_COLORS.get(status, ("#334155", "#e2e8f0"))
+        box_height = row_height(name_lines, role_lines)
+        parts.append(f'<rect x="56" y="{y}" width="1088" height="{box_height}" rx="18" fill="#ffffff" opacity="0.96"/>')
+        line_y = y + 31
+        for line in name_lines:
+            parts.append(text_element(84, line_y, line, 24, "#0f172a", 700))
+            line_y += 30
+        line_y -= 4
+        for line in role_lines:
+            parts.append(text_element(84, line_y, line, 18, "#475569", 400))
+            line_y += 24
         parts.extend([
-            f'<rect x="56" y="{y}" width="1088" height="72" rx="18" fill="#ffffff" opacity="0.96"/>',
-            text_element(84, y + 31, name, 24, "#0f172a", 700),
-            text_element(84, y + 57, role, 18, "#475569", 400),
             f'<rect x="956" y="{y + 18}" width="160" height="36" rx="18" fill="{background}"/>',
             text_element(976, y + 43, status.replace("-", " ").title(), 16, foreground, 700),
         ])
-        y += 92
+        y += box_height + 20
 
     parts.append(text_element(64, y + 4, "SAFETY BOUNDARY", 18, "#7dd3fc", 700))
     y += 34

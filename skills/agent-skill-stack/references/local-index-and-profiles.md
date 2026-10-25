@@ -30,7 +30,7 @@ The index does not execute Skills and stores no prompts, hit rates, or usage his
 Build:
 
 ```bash
-python3 scripts/skill_index.py build \
+python3 SKILL_DIR/scripts/skill_index.py build \
   --root ~/.codex/skills \
   --root ~/.codex/plugins/cache \
   --root .codex/skills \
@@ -42,7 +42,7 @@ python3 scripts/skill_index.py build \
 Search:
 
 ```bash
-python3 scripts/skill_index.py search \
+python3 SKILL_DIR/scripts/skill_index.py search \
   --index ~/.codex/skill-index.json \
   --query "natural Chinese writing" \
   --limit 8
@@ -65,7 +65,7 @@ The profile records:
 Create a preview:
 
 ```bash
-python3 scripts/project_profile.py \
+python3 SKILL_DIR/scripts/project_profile.py \
   --project /path/to/project \
   --name my-project-stack \
   --skill primary-skill \
