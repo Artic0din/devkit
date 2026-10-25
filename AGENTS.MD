@@ -56,6 +56,7 @@ Full standard: [engineering-constitution.md](/Users/ryanfoyle/Metisary/Enviromen
 - No workarounds presented as final solutions. If unavoidable: label temporary, state risk, state correct fix.
 - Fix a shared root cause where affected callers converge; similar-looking code alone does not justify a shared abstraction.
 - Correctness > speed. Maintainability > convenience.
+- Make the best decision that will elevate all three: the user experience (UX), developer experience (DX), and agent experience (AX) always, without breaking anything.
 - Done = agreed scope works end-to-end + relevant failure/loading/empty states + appropriate tests/checks + affected docs updated + no new lint/type/build errors; disclose material limitations and when to revisit them.
 
 ## Code
@@ -128,6 +129,7 @@ Full standard: [engineering-constitution.md](/Users/ryanfoyle/Metisary/Enviromen
 - No emojis in UI.
 - One font family (two max). Consistent spacing scale. Sufficient contrast in both themes.
 - Every visible string informs or instructs — no fluff, no AI-marketing words, no fake social proof, no placeholder text in commits.
+- Cut taglines, helper text and secondary labels. If a screen needs them to make sense, fix the layout.
 - Specific CTAs ("Start free trial", not "Get started").
 
 ## Docs
