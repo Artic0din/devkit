@@ -51,6 +51,8 @@ Full standard: [engineering-constitution.md](/Users/ryanfoyle/Metisary/Enviromen
 - Defer speculative features, scale, and extensibility; preserve explicit production requirements, security, privacy, data integrity, accessibility basics, and validation.
 - YAGNI: build for demonstrated needs. KISS: prefer the simplest understandable design and existing/native tools. DRY: share business rules and knowledge, not merely similar-looking code.
 - Root cause first. Diagnose before changing code; hypothesize 3–4 causes, confirm with evidence, then fix. Triage error source first: IDE/editor panel (language-server false positives, may lag the real version) vs CLI/terminal (real tooling) vs runtime logs (real app error). Don't fix a phantom that doesn't reproduce in the CLI.
+- "Why isn't this working?" about anything: diagnose it live yourself (reproduce it, read the logs, query the running service and its config) before answering. Never wait for Ryan to ask for each check.
+- Questions about Ryan's own apps, servers or setup: check the live instance first (running service, config, logs, Dockhand), then the project's source repository, then official docs. Never present a third-party listing or generic install guide as Ryan's setup; label anything not checked on his system as unverified.
 - Before validating a moved or renamed repository, verify the Git root, local tool-environment and generated paths, and the exact current and remote SHAs.
 - Suspiciously perfect = investigate. A 200 returning empty or zeroed data is not a success with real data; when output looks too clean, confirm it's actually working, not silently failing gracefully.
 - No workarounds presented as final solutions. If unavoidable: label temporary, state risk, state correct fix.
