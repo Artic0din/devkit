@@ -26,11 +26,14 @@ class DataExtractor(HTMLParser):
         self.runtime_parts: list[str] = []
         self.capture_runtime = False
         self.asset_reference = False
+        self.csp_policies: list[str] = []
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         attributes = dict(attrs)
         if tag in {"script", "link", "img"} and ("src" in attributes or "href" in attributes):
             self.asset_reference = True
+        if tag == "meta" and (attributes.get("http-equiv") or "").lower() == "content-security-policy":
+            self.csp_policies.append(attributes.get("content") or "")
         if tag == "script":
             self.capture = attributes.get("id") == "walkthrough-data"
             self.capture_runtime = not self.capture
@@ -142,6 +145,9 @@ def validate_data(data: dict) -> list[str]:
         missing = REQUIRED_STEP_FIELDS - step.keys()
         if missing:
             errors.append(f"Step {index} missing fields: {', '.join(sorted(missing))}")
+        for field in ("title", "orientation"):
+            if field in step and (not isinstance(step[field], str) or not step[field].strip()):
+                errors.append(f"Step {index} {field} must be a nonblank string")
         step_id = step.get("id")
         if not isinstance(step_id, str) or not step_id:
             errors.append(f"Step {index} id must be a nonempty string")
@@ -594,6 +600,7 @@ def runtime() -> str:
     if (activeIndex < data.steps.length - 1) { activeIndex += 1; renderStep(); }
   });
   document.addEventListener('keydown', event => {
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
     if (event.key === 'ArrowRight' || event.key.toLowerCase() === 'n') next.click();
     if (event.key === 'ArrowLeft' || event.key.toLowerCase() === 'p') previous.click();
   });
@@ -705,7 +712,7 @@ def static_validate(html_text: str) -> tuple[dict, list[str]]:
     parser.feed(html_text)
     if parser.asset_reference:
         errors.append("HTML contains a runtime asset reference")
-    if "connect-src 'none'" not in html_text:
+    if not any("connect-src 'none'" in policy for policy in parser.csp_policies):
         errors.append("CSP does not block runtime network connections")
     for network_api in ("fetch(", "XMLHttpRequest", "WebSocket", "sendBeacon"):
         if network_api in "".join(parser.runtime_parts):

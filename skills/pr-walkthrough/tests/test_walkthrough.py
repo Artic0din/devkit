@@ -219,3 +219,43 @@ def test_validate_accepts_matching_context(tmp_path):
     context_path = tmp_path / "context.json"
     context_path.write_text(json.dumps(example()))
     assert run_cli("--validate", "--html", html_path, "--data", context_path) == 0
+
+
+@pytest.mark.parametrize("field", ["title", "orientation"])
+@pytest.mark.parametrize("value", [None, "", "  ", 1])
+def test_step_heading_fields_need_nonblank_strings(field, value):
+    data = example()
+    data["steps"][0][field] = value
+    assert walkthrough.validate_data(data)
+
+
+def test_csp_check_reads_the_policy_not_review_text():
+    data = example()
+    data["steps"][0]["diffs"][0]["lines"][0]["content"] = "connect-src 'none'"
+    rendered = re.sub(r'<meta http-equiv="Content-Security-Policy"[^>]*>', "", walkthrough.html_template(data))
+    assert "CSP does not block runtime network connections" in walkthrough.static_validate(rendered)[1]
+
+
+def test_modified_shortcuts_keep_the_current_step(tmp_path):
+    sync_api = pytest.importorskip("playwright.sync_api")
+    data = example()
+    second = deepcopy(data["steps"][0])
+    second["id"] += "-second"
+    data["steps"].append(second)
+    path = tmp_path / "index.html"
+    path.write_text(walkthrough.html_template(data))
+    with sync_api.sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        try:
+            page = browser.new_page()
+            page.goto(path.as_uri())
+            page.wait_for_selector("body.walkthrough-ready")
+            page.locator('[data-tab="steps"]').click()
+            first = page.locator(".nav-step").nth(0)
+            for shortcut in ("Shift+ArrowRight", "Control+ArrowRight", "Alt+n", "Meta+n"):
+                page.keyboard.press(shortcut)
+                assert first.get_attribute("aria-current") == "step", shortcut
+            page.keyboard.press("ArrowRight")
+            assert page.locator(".nav-step").nth(1).get_attribute("aria-current") == "step"
+        finally:
+            browser.close()
