@@ -129,6 +129,44 @@
         "writing-fragments",
         "writing-shape"
       ]
+    },
+    {
+      "title": "Awesome Copilot",
+      "description": "Existing imported workflows from the pinned Awesome Copilot library.",
+      "skills": [
+        "agent-skill-stack",
+        "anti-ui-slop",
+        "context-map",
+        "conventional-branch",
+        "conventional-commit",
+        "copilot-spaces",
+        "copilot-usage-metrics",
+        "create-readme",
+        "create-specification",
+        "create-tldr-page",
+        "doc-and-modernize",
+        "documentation-writer",
+        "folder-structure-blueprint-generator",
+        "generate-custom-instructions-from-codebase",
+        "gh-attach",
+        "git-commit",
+        "git-flow-branch-creator",
+        "github-actions-runtime-upgrade-conventions",
+        "github-codespaces-efficiency",
+        "playwright-automation-fill-in-form",
+        "playwright-explore-website",
+        "playwright-generate-test",
+        "pr-screenshots",
+        "premium-frontend-ui",
+        "suggest-awesome-github-copilot-agents",
+        "suggest-awesome-github-copilot-instructions",
+        "suggest-awesome-github-copilot-skills",
+        "technology-stack-blueprint-generator",
+        "ui-screenshots",
+        "update-specification",
+        "webapp-testing",
+        "what-context-needed"
+      ]
     }
   ]
 }
