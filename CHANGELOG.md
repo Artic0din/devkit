@@ -6,6 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Replaced the `nas-portainer-runtime` skill with `nas-dockhand-runtime`, which also loads for questions about what a NAS app supports, how it is configured, or why it isn't working.
 - Published the Codex post-tool output filter: it redacts tokens, AWS keys, JWTs, private keys, and secret-named shell, JSON and YAML values (including split, multiline and folded ones) in both output channels, gives redacted blocking feedback, and blocks output whenever the filter itself fails.
 - Updated fleet maintenance for the current fleet: it now covers the iMac, lists the Intel Mac mini and Windows PC as joining, and explains how to run it from a Mac other than the Air.
 - Removed the `gstack-retro` weekly review and its setup notes, because Gstack is no longer installed.
