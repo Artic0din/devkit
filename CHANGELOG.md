@@ -6,6 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Updated fleet maintenance for the current fleet: the iMac is reachable as `ryans-imac.local`, and the Intel Mac mini and Windows PC are listed as joining.
 - Removed the `gstack-retro` weekly review and its setup notes, because Gstack is no longer installed.
 - Removed the agent host `pre-commit-secrets.sh` hooks and their Claude, Codex, Copilot, Cursor and Antigravity registrations; the opt-in Git `pre-commit` hook still runs the staged-secret scan.
 - Fixed skill sync and its audit to preserve existing canonical aliases and variants and allow the retired manager root to be absent.

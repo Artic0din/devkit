@@ -1,6 +1,6 @@
 ---
 name: fleet-maintenance
-description: "Maintain Ryan's three Macs over LAN SSH: audit host health and disk, update Homebrew and global npm packages, fast-forward clean repos, route Xcode through $xcode-sync, and report per-host state including unreachable hosts."
+description: "Maintain Ryan's Macs over LAN SSH: audit host health and disk, update Homebrew and global npm packages, fast-forward clean repos, route Xcode through $xcode-sync, and report per-host state including unreachable hosts."
 ---
 
 # Fleet Maintenance
@@ -10,11 +10,16 @@ For a single explicitly chosen Mac, use `$mac-maintenance` instead.
 
 ## Hosts
 
+Run from any Mac; the host you are on is local, so check `scutil --get LocalHostName` first.
+SSH aliases live in each Mac's own `~/.ssh/config`, so an alias that works on one Mac can be missing on another.
+
 | Host | Reach | Notes |
 | --- | --- | --- |
-| `Ryans-MacBook-Air` | local | Daily driver. Homebrew at `/opt/homebrew`. |
-| `MacBook-Pro` | `ssh mbp` (192.168.1.9) | Homebrew at `/opt/homebrew`. Key `~/.ssh/id_ed25519_migrate` via the `mbp` alias in `~/.ssh/config`. |
-| iMac | `ssh imac` (192.168.1.210) | Alias resolves, but Remote Login was still off on 2026-09-18 and port 22 timed out. Report `pending`; do not attempt repair. |
+| `Ryans-MacBook-Air` | local on the Air | Homebrew at `/opt/homebrew`. |
+| `MacBook-Pro` | from the Air: `ssh mbp` (192.168.1.9) | Runs the T3 Code server where agent sessions run. Homebrew at `/opt/homebrew`. Key `~/.ssh/id_ed25519_migrate` via the `mbp` alias in the Air's `~/.ssh/config`. |
+| iMac (`iMac.localdomain`) | `ssh ryans-imac.local` (192.168.1.210), user `ryanfoyle` | Apple silicon; Homebrew at `/opt/homebrew`. Remote Login is on and the MacBook Pro's `~/.ssh/id_ed25519` is authorized (2026-10-27). Runs T3 Code (Nightly) as its own environment. The `imac` alias exists only on the Air. |
+| Intel Mac mini (`mac-mini-2.localdomain`) | `Mac-mini-2.local` (192.168.1.103) | Joining for simple tasks. No Mac trusts its host key yet: report `pending` until Ryan confirms the key. |
+| Windows PC | not covered | Joining; this skill only maintains Macs over SSH. Report `pending`. |
 
 Confirm identity before mutating any host:
 
@@ -28,7 +33,7 @@ Remote Login on a host during maintenance; report it and let Ryan decide.
 ### Remote PATH
 
 Non-interactive SSH does not load `/opt/homebrew/bin`, so `brew`, `node`, `npm`, `gh`,
-and `xcodes` all appear missing on `mbp`. The bundled scripts find Homebrew themselves;
+and `xcodes` all appear missing on `mbp` and the iMac. The bundled scripts find Homebrew themselves;
 every ad-hoc remote command must export PATH or it will report a false absence:
 
 ```bash
@@ -187,7 +192,7 @@ repository's `package.json` or lockfile here.
 2. Run `npm outdated -g --depth=0 --json`; a nonzero exit can mean updates exist.
 3. Update each registry package to `name@latest`. Skip and report linked, file, Git,
    and bundled packages.
-4. Homebrew owns npm on both Macs, so let `brew upgrade` update npm itself.
+4. Homebrew owns npm on the Air and the MacBook Pro, so let `brew upgrade` update npm itself.
 5. Re-run the inventory and smoke-test the updated CLIs. Use `$npm` only if a private
    package actually needs registry authentication.
 
