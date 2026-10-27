@@ -14,6 +14,10 @@ risk, proof/test state, blockers, and next action. Never return only queue numbe
 Output is URL-first: every surfaced issue, PR, or repo item includes its GitHub URL in the first line
 or first sentence for that item. For a shortlist, print one URL per item.
 
+Triage of a single newly opened issue (classify, duplicates, missing information, one outcome label) follows the
+repository's `.github/triage/PLAYBOOK.md`, or the global `templates/github/triage/PLAYBOOK.md`; see
+`docs/github-intake.md`. Adopting repositories run it automatically on every new issue.
+
 ## Owners and scope
 
 Ryan's work spans two owners:

@@ -1,0 +1,5 @@
+interface:
+  display_name: "Gstack weekly retrospective"
+  short_description: "Review weekly shipping history and engineering activity."
+policy:
+  allow_implicit_invocation: false

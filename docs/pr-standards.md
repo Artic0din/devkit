@@ -27,6 +27,7 @@ AGENTS.md carries the short rules; this doc is the detail behind them.
 
 ## PR body
 
+- Use the repository's PR template; without one, use the global default for the change type ([github-intake.md](github-intake.md)).
 - Plain English: what was broken, what this fixes, test plan. Reference the linked issue (`Fixes #N` here, not in commits).
 - Release note line: any user-visible change (CLI/API/UI/config/behaviour/perf/deprecation/security fix) gets a one-sentence user-facing summary in the body, past tense, written for users not developers ("Fixed X not updating when Y" — not "refactored coordinator"). Tests/build/unreleased-bug fixes need no release-note line — but CHANGELOG.md `[Unreleased]` is still updated in every PR (docs-check enforces it); use a `Changed`/`Internal` entry for non-user-facing work.
 - Breaking change or deprecation: dedicated section stating (1) what breaks, (2) how users fix/migrate, (3) why it was necessary. Include "action required" phrasing when the user must do something.

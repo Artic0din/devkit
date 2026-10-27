@@ -1,0 +1,56 @@
+name: Reusable repository baseline
+on:
+  workflow_call:
+    inputs:
+      required-files:
+        description: Comma-separated repository-relative files required by this project
+        type: string
+        default: README.md, LICENSE, .gitignore, AGENTS.md
+permissions:
+  contents: read
+jobs:
+  baseline:
+    name: Repository baseline
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out caller
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Validate required files
+        env:
+          REQUIRED_FILES: ${{ inputs.required-files }}
+        run: |
+          python3 -I - <<'PY'
+          import os
+          from pathlib import Path
+
+          paths = [entry.strip() for entry in os.environ["REQUIRED_FILES"].split(",") if entry.strip()]
+          if not paths:
+              raise SystemExit("required-files must include at least one path")
+          root = Path.cwd().resolve()
+          invalid, missing = [], []
+          errors = []
+          for path in paths:
+              candidate = Path(path)
+              if candidate.is_absolute():
+                  invalid.append(path)
+                  continue
+              try:
+                  resolved = candidate.resolve()
+              except (OSError, RuntimeError) as error:
+                  errors.append(f"Cannot resolve required path {path!r}: {error}")
+                  continue
+              if not resolved.is_relative_to(root):
+                  invalid.append(path)
+              elif not candidate.exists():
+                  missing.append(path)
+          if invalid:
+              errors.append(f"Required paths must be relative and stay within the checkout: {invalid!r}")
+          if missing:
+              errors.append(f"Required paths do not exist: {missing!r}")
+          if errors:
+              raise SystemExit("\n".join(errors))
+          print(f"Validated {len(paths)} required paths")
+          PY

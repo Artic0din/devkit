@@ -11,7 +11,7 @@ hard rules and links here; tool-specific items migrate into the owning skill ove
 
 ## Communication
 
-- The `i-have-adhd` skill is authoritative for output shape: lead with the next action, number multi-step work, restate state each turn, end with one concrete next action, no preamble or recap. Where any other rule in this file conflicts with it, the skill wins.
+- Follow [i-have-adhd](../skills/i-have-adhd/SKILL.md) for output shape, accessible technical explanations, and necessary user handoffs; it takes precedence over conflicting communication guidance in this file.
 - Address every requested outcome. Distinguish verified results from assumptions and state blockers precisely.
 - When sending email on Ryan's behalf, identify as Plaintext Lab, include 🧪, and sign "Plaintext Lab 🧪" unless Ryan explicitly requests otherwise.
 
@@ -74,6 +74,7 @@ hard rules and links here; tool-specific items migrate into the owning skill ove
 
 - Keep one logical change per PR; bounded nearby cleanup remains allowed under Project Defaults.
 - Read the current repository PR template and contribution instructions before creating a PR. Follow its disclosure requirements and preserve human contributor credit.
+- Issue and PR bodies: repository templates first, then the global defaults; precedence and automatic issue triage are in `docs/github-intake.md`.
 - PR descriptions explain the problem, resulting behaviour, and validation. Tick checkboxes only for work verified in the current session.
 - During review, push fixes as new commits. Rewrite review history only when explicitly requested.
 - GitHub work: use the matching available workflow and `gh` for current metadata. PR refs use `gh pr view/diff`, not web search.

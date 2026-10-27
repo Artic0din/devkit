@@ -130,9 +130,10 @@ Skill mirror drift between this repo, `~/.codex/skills`, and `~/.claude/skills`:
 skills/fleet-maintenance/scripts/agent-skill-links-audit.sh
 ```
 
-Drift is expected while the repo is deliberately not installed: it reports the missing
-`~/.codex/skills/agent-scripts` root and the `AGENTS.md` links still pointing at
-`~/Development/Workspace/Codex`. Do not run `--repair` until that install is intended.
+The active canonical root is `~/Metisary/Enviroment/config`.
+Missing instruction or skill links, or links to the retired `~/Development/Workspace/Codex` tree, are drift.
+When repair is authorized, use `--repair` to restore the pointers managed by the sync tool.
+Existing real files are preserved and reported as conflicts.
 
 ## Repository sync
 

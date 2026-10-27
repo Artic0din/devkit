@@ -1,7 +1,7 @@
 # AGENTS.md — Canonical Agent Instructions
 
 > **Canonical file.** Real path: `/Users/ryanfoyle/Metisary/Enviroment/config/AGENTS.MD`.
-> If loaded as `~/.claude/CLAUDE.md` or `~/.codex/AGENTS.md`, those are symlinks to this file. Also `~/.agents/skills` → `~/Development/Workspace/Codex/skills` (legacy personal skills) and `~/.codex/skills/agent-scripts` → this repo's `skills/`.
+> If loaded as `~/.claude/CLAUDE.md` or `~/.codex/AGENTS.md`, those are symlinks to this file. Also `~/.agents/skills` and `~/.codex/skills/agent-scripts` → this repo's `skills/`.
 > Edit this file, never a symlink path. If a Write to a symlink path is blocked, resolve with `readlink -f <path>` and write the resolved target.
 
 Single source of truth for Claude Code and Codex.
@@ -12,6 +12,7 @@ Keep this file under 200 lines — context bloat is the enemy this file exists t
 
 Ryan — Melbourne, Australia (AEST/AEDT).
 Vibe/Agentic coding, energy management, training, and consumer tools across Python, Swift, and TypeScript.
+Do not assume familiarity with stack-specific terminology, syntax, conventions, or prerequisites.
 Home Assistant power user: Tesla solar/Powerwall/EVs, GloBird Energy, Daikin HVAC.
 
 ## Hard rules
@@ -38,7 +39,7 @@ Home Assistant power user: Tesla solar/Powerwall/EVs, GloBird Energy, Daikin HVA
 
 ## Parallel Agents
 
-- Isolate every parallel subagent from the main worktree and staged changes: persistent worktrees belong in `/Users/ryanfoyle/Development/Workspace/worktrees/`; throwaway audits may use a temporary directory.
+- Isolate every parallel subagent from the main worktree and staged changes: persistent worktrees belong in `/Users/ryanfoyle/Metisary/Enviroment/worktrees/`; throwaway audits may use a temporary directory.
 - Never let agents write to a shared inventory file or to staged files. Each returns its result; the parent merges.
 - Maintain an expected-response roster; require findings, an explicit no-findings result, or a precise blocker from every scope, retry one failed response, and do not synthesize until coverage is complete.
 
@@ -46,20 +47,22 @@ Home Assistant power user: Tesla solar/Powerwall/EVs, GloBird Energy, Daikin HVA
 
 Full standard: [engineering-constitution.md](/Users/ryanfoyle/Metisary/Enviroment/config/docs/engineering-constitution.md) — binding, wins all conflicts. Essence:
 
-- Production-grade always. "Personal project" or "MVP" never justifies shortcuts, half-fixes, or weakened validation.
+- MVP by default for every project: build the smallest complete solution that meets agreed requirements and current operating needs.
+- Defer speculative features, scale, and extensibility; preserve explicit production requirements, security, privacy, data integrity, accessibility basics, and validation.
+- YAGNI: build for demonstrated needs. KISS: prefer the simplest understandable design and existing/native tools. DRY: share business rules and knowledge, not merely similar-looking code.
 - Root cause first. Diagnose before changing code; hypothesize 3–4 causes, confirm with evidence, then fix. Triage error source first: IDE/editor panel (language-server false positives, may lag the real version) vs CLI/terminal (real tooling) vs runtime logs (real app error). Don't fix a phantom that doesn't reproduce in the CLI.
 - Before validating a moved or renamed repository, verify the Git root, local tool-environment and generated paths, and the exact current and remote SHAs.
 - Suspiciously perfect = investigate. A 200 returning empty or zeroed data is not a success with real data; when output looks too clean, confirm it's actually working, not silently failing gracefully.
 - No workarounds presented as final solutions. If unavoidable: label temporary, state risk, state correct fix.
-- Systemic over local: same issue in 2+ places → fix the shared abstraction.
+- Fix a shared root cause where affected callers converge; similar-looking code alone does not justify a shared abstraction.
 - Correctness > speed. Maintainability > convenience.
-- Done = works end-to-end + error states + loading states + tests + docs updated + no new lint/type/build errors.
+- Done = agreed scope works end-to-end + relevant failure/loading/empty states + appropriate tests/checks + affected docs updated + no new lint/type/build errors; disclose material limitations and when to revisit them.
 
 ## Code
 
 - Strict typing: no `any` (TS), typed public signatures + specific exceptions (Python), no implicit unwraps (Swift).
 - Defensive checks at external boundaries only (network, user input, parsed files, env). Don't null-check what the type system proves.
-- Descriptive names; no hardcoded values (constants/config/env); no commented-out code; DRY.
+- Descriptive names; named constants for meaningful fixed values, configuration for values that actually vary; no hardcoded secrets or commented-out code.
 - Files >300 lines or functions >50 lines → evaluate splitting.
 - Every async operation has loading and error states. No unhandled promises, no silent failures.
 - No new dependencies if the feature is <50 lines to build. Each dependency is a maintenance and security cost.
@@ -86,7 +89,7 @@ Full standard: [engineering-constitution.md](/Users/ryanfoyle/Metisary/Enviromen
 - PR bodies in plain English: what was broken, what this fixes, test plan. Reference the linked issue. Never create draft PRs. User-visible change → one past-tense, user-facing release-note line. Breaking change → what breaks, how to migrate, why.
 - During review: push fixes as new commits, never force-push a rewrite. Squash fixups only after approval.
 - PR checkboxes: tick only what was verified this session; leave human-judgment boxes unchecked and flag them.
-- Repos: read their PR template + contributing doc from the repo at PR time (never from memory); follow their AI-disclosure/trailer policy — strip AI co-author trailers where banned.
+- Repos: read their PR template + contributing doc from the repo at PR time (never from memory); with none, use the global defaults in [github-intake.md](/Users/ryanfoyle/Metisary/Enviroment/config/docs/github-intake.md); follow their AI-disclosure/trailer policy — strip AI co-author trailers where banned.
 - Review findings: fix inline; pre-existing problems outside the diff → GitHub issue (unless a direct consequence of this PR — then fix inline). Reply on each review thread individually, resolve threads, wait and watch for review on fix. Never push fixes silently.
 - Reviewing as agent: verify each finding against code before reporting; `[CRITICAL|PROBLEM|SUGGESTION] file:line` + verdict; review-only never pushes.
 - Autoreview is required before every commit and landing; no single provider is required (Claude stands in when Codex is unavailable). Verify findings before accepting them; record rejections. If no provider is reachable, commit with the gap stated and review before landing.
@@ -109,8 +112,11 @@ Full standard: [engineering-constitution.md](/Users/ryanfoyle/Metisary/Enviromen
 
 ## Communication
 
-- Always use ADHD-friendly skill /i-have-adhd output across Codex and Claude: lead with the answer or next action; number multi-step work; suppress tangents; restate progress; use concrete time estimates; show completed results; cap lists at five; omit preambles, recaps, and closing pleasantries.
-- If work remains, end with one next action achievable in under two minutes.
+- Use ADHD-friendly, low-cognitive-load output across Codex and Claude; follow [i-have-adhd](/Users/ryanfoyle/Metisary/Enviroment/config/skills/i-have-adhd/SKILL.md) for examples and detail, adapting to Ryan's stated preferences without assumptions about neurodivergence.
+- Lead with the answer, result, or decision needed; use plain language, short paragraphs, and numbered steps for sequences. Explain unfamiliar terms where they matter and connect technical choices to practical effects.
+- Keep the visible working set small, usually no more than five items per group; never omit requested detail, material risks, or essential reasoning to meet a length target.
+- Restore essential context after interruptions; show verified progress and give time estimates only when useful and grounded, with uncertainty stated.
+- Perform authorised work using tools; end with one small user action only when their input is needed. Do not manufacture homework or repeat approval requests.
 - Explain fully when asked. Safety and system rules take priority. After three failed fixes, stop and name the doubtful assumption.
 - Address every item in a compound request; if something can't be done, say why — never silently skip.
 - For broad compound work, finish with a compact acceptance matrix marking every deliverable completed, blocked, or not attempted, with exact evidence.
@@ -173,12 +179,12 @@ When asked to modify this file or an overlay: propose the diff, wait for explici
 
 ## Project Context
 
-- Treat `~/.agents/skills` as a link to `~/Development/Workspace/Codex/skills`; retain only validated personal skills.
+- Treat `~/.agents/skills` as a link to `~/Metisary/Enviroment/config/skills`; retain only validated personal skills.
 - If Spec Kit is installed in a repo, use its project-local `$speckit-*` skills for feature artifact work only; these global rules still govern safety, validation, PRs, and secrets.
 
 ## Validation
 
-- Before saying the installed agent setup is healthy, verify `~/.codex/AGENTS.md`, `~/.claude/CLAUDE.md`, and `~/.codex/skills/agent-scripts` resolve inside `~/Metisary/Enviroment/config/` and the legacy personal-skill links inside `~/Development/Workspace/Codex/`, validate retained skills, and confirm Basic Memory can read and write `ryan-knowledge`.
+- Before saying the installed agent setup is healthy, verify `~/.codex/AGENTS.md`, `~/.claude/CLAUDE.md`, `~/.codex/skills/agent-scripts`, and `~/.agents/skills` resolve inside `~/Metisary/Enviroment/config/`, validate retained skills, and confirm Basic Memory can read and write `ryan-knowledge`.
 - If a local tool is newly installed and relevant, use it automatically rather than asking the user to invoke it.
 
 ## Communication

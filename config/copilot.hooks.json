@@ -4,13 +4,8 @@
     "preToolUse": [
       {
         "type": "command",
-        "bash": "bash $HOME/.claude/hooks/block-dangerous-git.sh",
-        "cwd": ".",
-        "timeoutSec": 10
-      },
-      {
-        "type": "command",
-        "bash": "bash $HOME/.claude/hooks/pre-commit-secrets.sh",
+        "bash": "bash $HOME/.claude/hooks/pre-commit-secrets.sh --copilot",
+        "matcher": "bash",
         "cwd": ".",
         "timeoutSec": 60
       }

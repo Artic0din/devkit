@@ -6,11 +6,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash $HOME/.claude/hooks/block-dangerous-git.sh",
-            "timeout": 10
-          },
-          {
-            "type": "command",
             "command": "bash $HOME/.claude/hooks/pre-commit-secrets.sh",
             "timeout": 60
           }
