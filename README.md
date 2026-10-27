@@ -85,9 +85,6 @@ The [vendored tstack skills](docs/curated-tstack.md) file, babysit, review, mode
 `skills/retro` contains [Matt Pocock's session retrospective](https://github.com/mattpocock/skills/blob/c55ee46073ed923f86ce59a5eb3b6d895095d1b7/skills/in-progress/retro/SKILL.md).
 It is invoked explicitly to review a coding session and suggest improvements to the agent environment.
 For Claude, the selected `~/.claude/skills/retro` link points to this folder.
-`skills/gstack-retro` registers the distinct, manually invoked weekly review and reads the installed Gstack instructions without editing generated files.
-Point the Claude and Codex `gstack-retro` links to that wrapper.
-In Codex's user skill settings, disable the original `skills/gstack/retro/SKILL.md` and `skills/gstack/.agents/skills/gstack-retro/SKILL.md` entries so only Matt's skill registers as `retro`.
 
 Each `skills/<name>/SKILL.md` has YAML front matter with a quoted `description`:
 

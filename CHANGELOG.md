@@ -6,6 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Removed the `gstack-retro` weekly review and its setup notes, because Gstack is no longer installed.
 - Removed the agent host `pre-commit-secrets.sh` hooks and their Claude, Codex, Copilot, Cursor and Antigravity registrations; the opt-in Git `pre-commit` hook still runs the staged-secret scan.
 - Fixed skill sync and its audit to preserve existing canonical aliases and variants and allow the retired manager root to be absent.
 - Recorded the existing Metisary skill and worktree paths, Cursor and Copilot instruction links, and Antigravity registration files.
