@@ -6,6 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Preserved build planning and session organisation workflows with approved previews, current evidence checks, and consistent GitHub publication safeguards.
 - Fixed skill sync and its audit to preserve existing canonical aliases and variants and allow the retired manager root to be absent.
 - Recorded the existing Metisary skill and worktree paths, Cursor and Copilot instruction links, and Antigravity registration files.
 - Added Theo Browne's tstack PR-workflow skills (`full-send`, `full-stop`, `council`, `sol-loop`, `file-pr`, `takeover`, `babysit-pr`, `modernize`, `leaving-pr-comments`), so agents can file, review, babysit, and land pull requests end to end.

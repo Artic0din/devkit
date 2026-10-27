@@ -1,0 +1,4 @@
+interface:
+  display_name: "Build Kickoff"
+  short_description: "Prepare a phased build brief and approval gates"
+  default_prompt: "Use $build-kickoff to assemble a build brief: choose autonomous implementation or human-gated review, fill the project phases and stack, and preserve issue-breakdown approval and existing merge authorization."

@@ -1,0 +1,13 @@
+interface:
+  display_name: "GitHub Workflow"
+  short_description: "Run solo development work through GitHub"
+  default_prompt: "Use $github-workflow to plan or deliver tracked work through GitHub Issues and a reviewed pull request."
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "github"
+      description: "Read and update GitHub repositories, issues, pull requests, reviews, and workflow state"
+
+policy:
+  allow_implicit_invocation: true
