@@ -60,7 +60,7 @@ Display analysis results in structured table comparing awesome-copilot skills wi
 
 ## Local Skills Discovery Process
 
-1. List all folders in `.github/skills/` directory
+1. List all skill folders in every skill root this repository uses, such as `.github/skills/`, a top-level `skills/`, `.agents/skills/`, and `.claude/skills/`
 2. For each folder, read `SKILL.md` front matter to extract `name` and `description`
 3. List any bundled assets within each skill folder
 4. Build comprehensive inventory of existing skills with their capabilities
@@ -101,7 +101,7 @@ description: 'Brief description of what this skill provides and when to use it'
 
 - Use `fetch` tool to get content from awesome-copilot repository skills documentation
 - Use `githubRepo` tool to get individual skill content for download
-- Scan local file system for existing skills in `.github/skills/` directory
+- Scan local file system for existing skills in every skill root this repository uses, not only `.github/skills/`
 - Read YAML front matter from local `SKILL.md` files to extract names and descriptions
 - Compare local skills with remote versions to detect outdated skills
 - Compare against existing skills in this repository to avoid duplicates
