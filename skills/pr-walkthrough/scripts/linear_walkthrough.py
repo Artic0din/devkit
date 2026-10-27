@@ -129,9 +129,13 @@ def validate_data(data: dict) -> list[str]:
                     errors.append(
                         f"Interface {index} category must be one of: {', '.join(sorted(valid_categories))}"
                     )
+                for field in ("file", "description"):
+                    if field in iface and (not isinstance(iface[field], str) or not iface[field].strip()):
+                        errors.append(f"Interface {index} {field} must be a nonblank string")
                 for field in ("addedLines", "removedLines"):
-                    if not isinstance(iface.get(field, []), list):
-                        errors.append(f"Interface {index} {field} must be an array")
+                    lines = iface.get(field, [])
+                    if not isinstance(lines, list) or any(not isinstance(line, str) for line in lines):
+                        errors.append(f"Interface {index} {field} must be an array of strings")
 
     steps = data.get("steps")
     if not isinstance(steps, list) or not steps:

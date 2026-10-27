@@ -259,3 +259,23 @@ def test_modified_shortcuts_keep_the_current_step(tmp_path):
             assert page.locator(".nav-step").nth(1).get_attribute("aria-current") == "step"
         finally:
             browser.close()
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"file": ""},
+        {"description": "  "},
+        {"file": None},
+        {"addedLines": [{}]},
+        {"removedLines": [1]},
+    ],
+)
+def test_interface_fields_need_nonblank_strings(change):
+    data = example()
+    data["interfaces"] = [
+        {"category": "grpc", "file": "api/service.proto", "description": "Adds a field.", "addedLines": ["int32 id = 1;"]}
+    ]
+    assert walkthrough.validate_data(data) == []
+    data["interfaces"][0].update(change)
+    assert walkthrough.validate_data(data)
