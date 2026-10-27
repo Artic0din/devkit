@@ -10,21 +10,26 @@ For a single explicitly chosen Mac, use `$mac-maintenance` instead.
 
 ## Hosts
 
-Run from any Mac; the host you are on is local, so check `scutil --get LocalHostName` first.
+Check `scutil --get LocalHostName` first; the host you are on is local.
+The remote examples below run from the Air against `mbp`.
+Repeat each one for every other reachable host, using its route from the table.
+From another Mac, run the local commands for that Mac and use the table's route for the rest.
 SSH aliases live in each Mac's own `~/.ssh/config`, so an alias that works on one Mac can be missing on another.
 
 | Host | Reach | Notes |
 | --- | --- | --- |
-| `Ryans-MacBook-Air` | local on the Air | Homebrew at `/opt/homebrew`. |
-| `MacBook-Pro` | from the Air: `ssh mbp` (192.168.1.9) | Runs the T3 Code server where agent sessions run. Homebrew at `/opt/homebrew`. Key `~/.ssh/id_ed25519_migrate` via the `mbp` alias in the Air's `~/.ssh/config`. |
-| iMac (`iMac.localdomain`) | `ssh ryans-imac.local` (192.168.1.210), user `ryanfoyle` | Apple silicon; Homebrew at `/opt/homebrew`. Remote Login is on and the MacBook Pro's `~/.ssh/id_ed25519` is authorized (2026-10-27). Runs T3 Code (Nightly) as its own environment. The `imac` alias exists only on the Air. |
-| Intel Mac mini (`mac-mini-2.localdomain`) | `Mac-mini-2.local` (192.168.1.103) | Joining for simple tasks. No Mac trusts its host key yet: report `pending` until Ryan confirms the key. |
+| `Ryans-MacBook-Air` | local on the Air | Homebrew at `/opt/homebrew`. No other Mac has a verified route to it; from elsewhere, report it `pending`. |
+| `MacBook-Pro` | from the Air: `ssh mbp` | Runs the T3 Code server where agent sessions run. Homebrew at `/opt/homebrew`. |
+| `Ryans-iMac` | `ssh imac` from the Air or the MacBook Pro | Apple silicon; Homebrew at `/opt/homebrew`. Runs T3 Code (Nightly) as its own environment. |
+| Intel Mac mini | `Mac-mini-2.local` | Joining for simple tasks. No Mac can log in yet: report `pending`. |
 | Windows PC | not covered | Joining; this skill only maintains Macs over SSH. Report `pending`. |
 
-Confirm identity before mutating any host:
+Confirm identity on each remote host before mutating it:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=8 mbp 'scutil --get LocalHostName; sw_vers; uname -m'
+for host in mbp imac; do
+  ssh -o BatchMode=yes -o ConnectTimeout=8 "$host" 'scutil --get LocalHostName; sw_vers; uname -m'
+done
 ```
 
 An unreachable host is `pending`, never `current`. Do not wake, power on, or enable
@@ -33,7 +38,7 @@ Remote Login on a host during maintenance; report it and let Ryan decide.
 ### Remote PATH
 
 Non-interactive SSH does not load `/opt/homebrew/bin`, so `brew`, `node`, `npm`, `gh`,
-and `xcodes` all appear missing on `mbp` and the iMac. The bundled scripts find Homebrew themselves;
+and `xcodes` all appear missing on remote hosts. The bundled scripts find Homebrew themselves;
 every ad-hoc remote command must export PATH or it will report a false absence:
 
 ```bash
@@ -50,7 +55,7 @@ exists on each host before scanning, and never assume a root is populated:
 - Air: `~/Developer` and `~/Development/projects`. The audit recurses, so `~/Developer`
   already covers `~/Developer/projects` and `~/Developer/copilot-worktrees`.
 - `~/Metisary/Projects` is the migration target. Scan it once it holds repos.
-- `mbp`: discover with `find ~ -maxdepth 4 -name .git -not -path '*/node_modules/*'`.
+- `mbp` and `imac`: discover with `find ~ -maxdepth 4 -name .git -not -path '*/node_modules/*'`.
 
 A missing root exits 2 without scanning, so passing a root that does not exist yet is
 safe. An empty root is not an error and not proof that a host has no repos.
@@ -116,7 +121,8 @@ installed software. It needs no inventory file:
 
 ```bash
 node skills/fleet-maintenance/scripts/fleet-profile.mjs collect
-ssh -o RequestTTY=no -o RemoteCommand=none mbp 'node --input-type=module - collect' \
+ssh -o RequestTTY=no -o RemoteCommand=none mbp \
+  'export PATH=/opt/homebrew/bin:$PATH; node --input-type=module - collect' \
   < skills/fleet-maintenance/scripts/fleet-profile.mjs
 ```
 
