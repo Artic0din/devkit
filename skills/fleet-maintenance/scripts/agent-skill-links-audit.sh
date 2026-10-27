@@ -23,7 +23,7 @@ fi
 
 if [ "$repair" = "--repair" ]; then
   sync="$CANONICAL_SYNC_SKILLS"
-  for required_root in "$agent_skills" "$manager_skills"; do
+  for required_root in "$agent_skills"; do
     if [ ! -d "$required_root" ]; then
       printf 'skill-links\tstatus=error\treason=canonical-root-missing\tpath=%s\n' "$required_root" >&2
       exit 2
@@ -53,7 +53,9 @@ check_link() {
 }
 
 check_link "$agent_skills" "$codex_root/agent-scripts"
-check_link "$manager_skills" "$codex_root/manager"
+if [ -d "$manager_skills" ] || [ -e "$codex_root/manager" ] || [ -L "$codex_root/manager" ]; then
+  check_link "$manager_skills" "$codex_root/manager"
+fi
 check_link "$agents_md" "$HOME/.codex/AGENTS.md"
 check_link "$agents_md" "$HOME/.claude/CLAUDE.md"
 check_link "$agents_md" "$HOME/.claude/AGENTS.md"
@@ -75,6 +77,7 @@ check_skill_root() {
     if [ "$root" = "$manager_skills" ] && [ -f "$agent_skills/$name/SKILL.md" ]; then
       continue
     fi
+    canonical_skill_link "$claude_root/$name" && continue
     check_link "$expected" "$claude_root/$name"
   done
 }

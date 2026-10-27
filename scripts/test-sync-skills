@@ -135,6 +135,41 @@ recurrence() {
 recurrence
 [ "$recurrence_only" -eq 0 ] || exit 0
 
+new_case canonical-harness-aliases
+base_fixture
+make_skill "$agent/review"
+make_skill "$agent/gstack/.harness/claude/review"
+make_skill "$agent/gstack/.harness/claude/qa"
+make_skill "$agent/gstack/.harness/claude/browse"
+ln -s "$agent/gstack/.harness/claude/review" "$claude/review"
+ln -s "$agent/gstack/.harness/claude/qa" "$codex/qa"
+ln -s "$codex/qa" "$claude/qa"
+ln -s "$agent/gstack/.harness/claude/browse" "$claude/browse"
+snapshot "$claude" >"$case_root/aliases-before"
+run_sync >"$output" 2>&1
+snapshot "$claude" >"$case_root/aliases-after"
+cmp "$case_root/aliases-before" "$case_root/aliases-after" || fail 'sync changed preserved canonical aliases'
+run_audit >"$output"
+contains 'status=current'
+snapshot "$fixture_home" >"$case_root/before"
+run_sync >"$output" 2>&1
+unchanged
+ln -sfn "$agent/gstack/.harness/claude/browse" "$claude/review"
+if run_audit >"$output"; then fail 'audit accepted a mismatched alias'; fi
+run_sync >"$output" 2>&1
+[ "$(readlink "$claude/review")" = "$agent/review" ] || fail 'sync preserved a mismatched alias'
+rm -r "$manager"
+run_sync >"$output" 2>&1
+[ ! -L "$codex/manager" ] || fail 'retired manager registration remained'
+run_audit >"$output"
+contains 'status=current'
+# A deleted skill must still be pruned, including a former preserved alias.
+rm "$agent/gstack/.harness/claude/qa/SKILL.md"
+rm -r "$agent/gstack/.harness/claude/qa"
+run_sync >"$output" 2>&1
+[ ! -L "$claude/qa" ] || fail 'sync retained a broken canonical alias'
+printf 'canonical harness aliases and stale cleanup: PASS\n'
+
 new_case six-loop-lifecycle
 base_fixture
 six_skills loops

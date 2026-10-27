@@ -5,7 +5,7 @@
 # Claude Code loads only ~/.claude/skills/<name>/SKILL.md (one level deep,
 # per-entry symlinks followed, no recursive scan; verified live on 2.1.197),
 # so it gets a flat per-skill symlink mirror instead.
-# Collision priority: agent-scripts > manager > codex-local extras.
+# Collision priority: preserved canonical aliases > agent-scripts > manager > codex-local extras.
 set -eo pipefail
 
 usage() {
@@ -164,7 +164,12 @@ mkdir -p "$CLAUDE_ROOT" "$CODEX_ROOT"
 
 # --- Codex: whole-root links.
 [ -d "$AGENT_SKILLS" ] && link "$AGENT_SKILLS" "$CODEX_ROOT/agent-scripts"
-[ -d "$MANAGER_SKILLS" ] && link "$MANAGER_SKILLS" "$CODEX_ROOT/manager"
+if [ -d "$MANAGER_SKILLS" ]; then
+  link "$MANAGER_SKILLS" "$CODEX_ROOT/manager"
+elif [ -L "$CODEX_ROOT/manager" ] && [ "$(readlink "$CODEX_ROOT/manager")" = "$MANAGER_SKILLS" ]; then
+  rm "$CODEX_ROOT/manager"
+  note "pruned retired manager registration $CODEX_ROOT/manager"
+fi
 
 # --- Claude: collect desired name -> target (bash 3.2: parallel arrays).
 names=()
@@ -191,6 +196,11 @@ claim() { # claim <root> <label>; first root to claim a name wins.
     targets+=("$entry")
   done
 }
+for entry in "$CLAUDE_ROOT"/*; do
+  canonical_skill_link "$entry" || continue
+  names+=("${entry##*/}")
+  targets+=("$(readlink "$entry")")
+done
 claim "$AGENT_SKILLS" agent-scripts
 claim "$MANAGER_SKILLS" manager
 claim "$CODEX_ROOT" codex-local

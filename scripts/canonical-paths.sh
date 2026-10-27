@@ -21,3 +21,15 @@ CANONICAL_SYNC_SKILLS="$CANONICAL_CONFIG_ROOT/scripts/sync-skills"
 
 CANONICAL_CODEX_ROOT="$HOME/.codex/skills"
 CANONICAL_CLAUDE_ROOT="$HOME/.claude/skills"
+
+# Harness aliases may intentionally select a nested variant of a shared skill.
+canonical_skill_link() {
+  [ -L "$1" ] && [ -f "$1/SKILL.md" ] || return 1
+  local physical
+  physical=$(cd "$1" && pwd -P) || return 1
+  [ "${physical##*/}" = "${1##*/}" ] || return 1
+  case "$physical" in
+    "$CANONICAL_AGENT_SKILLS"/*) return 0 ;;
+    *) return 1 ;;
+  esac
+}

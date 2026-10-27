@@ -32,7 +32,8 @@ builds the per-machine skill mirror and instruction pointers:
 
 - Codex scans nested directories, so it gets a whole-root link: `~/.codex/skills/agent-scripts -> ~/Metisary/Enviroment/config/skills`.
 - Claude Code loads only `~/.claude/skills/<name>/SKILL.md` (one level deep; per-entry symlinks are followed, category folders are not scanned). It gets a flat per-skill link mirror.
-- Name collisions resolve agent-scripts > codex-local; the script prints skipped duplicates and prunes broken or stale managed links, and never clobbers real files.
+- Existing aliases to canonical skill sources retain their selected variants; new name collisions resolve agent-scripts > manager > codex-local.
+  The script prints skipped duplicates and prunes broken or stale managed links, and never clobbers real files.
 - `sync-skills` and `skills/fleet-maintenance/scripts/agent-skill-links-audit.sh` share `scripts/canonical-paths.sh`, so the sync and the audit cannot disagree about where the repo lives.
 
 On an activated machine, `~/.codex/AGENTS.md`, `~/.claude/CLAUDE.md`, `~/.claude/AGENTS.md` and
