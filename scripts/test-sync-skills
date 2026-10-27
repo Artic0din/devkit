@@ -138,13 +138,13 @@ recurrence
 new_case canonical-harness-aliases
 base_fixture
 make_skill "$agent/review"
-make_skill "$agent/gstack/.harness/claude/review"
-make_skill "$agent/gstack/.harness/claude/qa"
-make_skill "$agent/gstack/.harness/claude/browse"
-ln -s "$agent/gstack/.harness/claude/review" "$claude/review"
-ln -s "$agent/gstack/.harness/claude/qa" "$codex/qa"
+make_skill "$agent/suite/.harness/claude/review"
+make_skill "$agent/suite/.harness/claude/qa"
+make_skill "$agent/suite/.harness/claude/browse"
+ln -s "$agent/suite/.harness/claude/review" "$claude/review"
+ln -s "$agent/suite/.harness/claude/qa" "$codex/qa"
 ln -s "$codex/qa" "$claude/qa"
-ln -s "$agent/gstack/.harness/claude/browse" "$claude/browse"
+ln -s "$agent/suite/.harness/claude/browse" "$claude/browse"
 snapshot "$claude" >"$case_root/aliases-before"
 run_sync >"$output" 2>&1
 snapshot "$claude" >"$case_root/aliases-after"
@@ -154,7 +154,7 @@ contains 'status=current'
 snapshot "$fixture_home" >"$case_root/before"
 run_sync >"$output" 2>&1
 unchanged
-ln -sfn "$agent/gstack/.harness/claude/browse" "$claude/review"
+ln -sfn "$agent/suite/.harness/claude/browse" "$claude/review"
 if run_audit >"$output"; then fail 'audit accepted a mismatched alias'; fi
 run_sync >"$output" 2>&1
 [ "$(readlink "$claude/review")" = "$agent/review" ] || fail 'sync preserved a mismatched alias'
@@ -164,8 +164,8 @@ run_sync >"$output" 2>&1
 run_audit >"$output"
 contains 'status=current'
 # A deleted skill must still be pruned, including a former preserved alias.
-rm "$agent/gstack/.harness/claude/qa/SKILL.md"
-rm -r "$agent/gstack/.harness/claude/qa"
+rm "$agent/suite/.harness/claude/qa/SKILL.md"
+rm -r "$agent/suite/.harness/claude/qa"
 run_sync >"$output" 2>&1
 [ ! -L "$claude/qa" ] || fail 'sync retained a broken canonical alias'
 printf 'canonical harness aliases and stale cleanup: PASS\n'
