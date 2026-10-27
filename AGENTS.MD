@@ -101,7 +101,6 @@ Full standard: [engineering-constitution.md](/Users/ryanfoyle/Metisary/Enviromen
 - GitHub Issues are the task source of truth for planned, multi-session, or backlog work.
 - The user-level `Development` GitHub Project is closed and must not be used for work tracking.
 - GitHub is the source of truth for branches, pull requests, reviews, and CI.
-- Basic Memory stores reusable verified knowledge only and never mirrors task status.
 - Small fixes that fit in one focused pull request do not require an issue.
 - For a multi-phase build, plan GitHub-first: before writing code, create or update the fewest independently deliverable issues, then present the breakdown for approval.
 - After approval, implement one issue per feature branch and pull request; issue-backed branches include the number, such as `fix/123-short-description` or `cursor/123-short-description`.
@@ -159,13 +158,6 @@ Operational agent rules (routing, PR and CI mechanics, GitHub posting, disclosur
 
 When asked to modify this file or an overlay: propose the diff, wait for explicit confirmation, then apply.
 
-## Knowledge completion
-
-- Search the `ryan-knowledge` Basic Memory project before creating durable workspace or project knowledge.
-- Add or update a note only when the result is reusable and verified against code, tests, repo documentation, or another primary source.
-- Store project context and decisions in the `AI Memory/` folder of that project — on disk `/Users/ryanfoyle/Development/Knowledge/Ryan-Knowledge/AI Memory/`; never store secrets, credentials, work-restricted material, or unsupported assumptions.
-- Knowledge notes complement primary sources and never override code, tests, or repo instructions.
-
 # Codex overlay
 
 > Rules that apply ONLY to Codex.
@@ -184,7 +176,7 @@ When asked to modify this file or an overlay: propose the diff, wait for explici
 
 ## Validation
 
-- Before saying the installed agent setup is healthy, verify `~/.codex/AGENTS.md`, `~/.claude/CLAUDE.md`, `~/.codex/skills/agent-scripts`, and `~/.agents/skills` resolve inside `~/Metisary/Enviroment/config/`, validate retained skills, and confirm Basic Memory can read and write `ryan-knowledge`.
+- Before saying the installed agent setup is healthy, verify `~/.codex/AGENTS.md`, `~/.claude/CLAUDE.md`, `~/.codex/skills/agent-scripts`, and `~/.agents/skills` resolve inside `~/Metisary/Enviroment/config/`, and validate retained skills.
 - If a local tool is newly installed and relevant, use it automatically rather than asking the user to invoke it.
 
 ## Communication

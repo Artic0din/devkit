@@ -106,13 +106,3 @@ work their employer directed; almost everyone has an employer.
 
 Never quote private phone, email, or contact details unless Ryan asks. Do not compile a
 profile beyond what the review needs.
-
-## Durable notes
-
-Record a contributor finding only when it creates future review value: a first good
-merge, unusually strong work, repeated quality problems, no-repro churn, or identity
-confirmation. Ordinary review noise is not worth keeping.
-
-Notes belong in the `ryan-knowledge` Basic Memory project, which is the existing home
-for durable verified knowledge. Search it before writing, and keep each note terse,
-dated, and linked to the pull request it came from.

@@ -31,9 +31,6 @@ and include its short `Author context:` block near the top of the review. Skip t
 `Artic0din` and for bot authors such as `app/copilot-swe-agent` and `app/dependabot`, which is nearly
 every PR on his own repositories; review the diff on its merits instead.
 
-Afterwards, record a contributor note only when the interaction creates durable future-review signal,
-following the same skill.
-
 For repo-local review, also inspect:
 
 ```bash
