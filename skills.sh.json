@@ -12,10 +12,12 @@
         "codexbar",
         "create-cli",
         "create-verification-skill",
+        "find-skills",
         "frontend-design",
         "i-have-adhd",
         "markdown-converter",
         "maintain-verification-skill",
+        "playwright",
         "project-structure",
         "retro",
         "skill-cleaner"

@@ -6,6 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Published the installed Playwright and skill-discovery skills with their original license notices: Playwright runs a pinned CLI isolated from project-local executables and browser settings and needs Node.js 20 or newer, and Find Skills routes authorized imports through this repository.
 - Published the local pull-request walkthrough with visible review findings, validated navigation, synthetic checks, and provenance notes.
 - Replaced the `nas-portainer-runtime` skill with `nas-dockhand-runtime`, which also loads for questions about what a NAS app supports, how it is configured, or why it isn't working.
 - Published the Codex post-tool output filter: it redacts tokens, AWS keys, JWTs, private keys, and secret-named shell, JSON and YAML values (including split, multiline and folded ones) in both output channels, gives redacted blocking feedback, and blocks output whenever the filter itself fails.
