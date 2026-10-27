@@ -74,6 +74,7 @@ hard rules and links here; tool-specific items migrate into the owning skill ove
 
 - Keep one logical change per PR; bounded nearby cleanup remains allowed under Project Defaults.
 - Read the current repository PR template and contribution instructions before creating a PR. Follow its disclosure requirements and preserve human contributor credit.
+- Issue and PR bodies: repository templates first, then the global defaults; precedence and automatic issue triage are in `docs/github-intake.md`.
 - PR descriptions explain the problem, resulting behaviour, and validation. Tick checkboxes only for work verified in the current session.
 - During review, push fixes as new commits. Rewrite review history only when explicitly requested.
 - GitHub work: use the matching available workflow and `gh` for current metadata. PR refs use `gh pr view/diff`, not web search.

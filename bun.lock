@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "agent-scripts-tools",
+      "name": "devkit-tools",
       "dependencies": {
         "commander": "^15.0.0",
         "puppeteer-core": "^25.9.0",

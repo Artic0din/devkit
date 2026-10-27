@@ -1,0 +1,5 @@
+interface:
+  display_name: "video-analysis"
+  short_description: "Turn a video link into a visual HTML brief with actions and steps."
+policy:
+  allow_implicit_invocation: true

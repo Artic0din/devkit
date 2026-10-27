@@ -44,8 +44,17 @@ jobs:
       - name: Test autoreview CLI options (offline, synthetic)
         run: python3 skills/autoreview/scripts/test-autoreview.py
 
+      - name: Test issue triage (offline, synthetic)
+        run: python3 scripts/test-issue-triage.py
+
+      - name: Test reusable baseline (offline, consumer fixtures)
+        run: python3 scripts/test-baseline.py
+
       - name: Test curated skill activation (offline, synthetic)
         run: python3 scripts/test-curated-pstack-links.py
+
+      - name: Test video analysis (offline, synthetic)
+        run: python3 skills/video-analysis/scripts/test_video_analysis.py
 
       - name: Test Codex preflight (offline, synthetic)
         run: |

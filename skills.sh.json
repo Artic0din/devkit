@@ -24,12 +24,21 @@
     },
     {
       "title": "GitHub",
-      "description": "Skills for GitHub review, project triage, and maintainer coordination.",
+      "description": "Skills for GitHub review, project triage, PR delivery, and maintainer coordination.",
       "skills": [
+        "babysit-pr",
         "codex-debugging",
+        "council",
+        "file-pr",
+        "full-send",
+        "full-stop",
         "github-author-context",
         "github-deep-review",
-        "github-project-triage"
+        "github-project-triage",
+        "leaving-pr-comments",
+        "modernize",
+        "sol-loop",
+        "takeover"
       ]
     },
     {
@@ -47,8 +56,9 @@
     },
     {
       "title": "Media & AI",
-      "description": "Skills for video transcripts and X API work.",
+      "description": "Skills for video transcripts and analysis, and X API work.",
       "skills": [
+        "video-analysis",
         "video-transcript-downloader",
         "xurl"
       ]
