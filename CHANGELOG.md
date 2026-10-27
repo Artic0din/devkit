@@ -6,6 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Added two `AGENTS.MD` rules: every decision should improve the user, developer and agent experience (UX, DX, AX) without breaking anything, and screens should drop taglines, helper text and secondary labels, with the layout fixed when a screen depends on them.
 - Removed the Basic Memory rules from `AGENTS.MD` and the `github-author-context` and `github-deep-review` skills: the `ryan-knowledge` project, its `AI Memory/` folder, and every agent's Basic Memory server are already gone, so agents no longer search or write notes there or require Basic Memory for a healthy setup.
 - Published the installed Playwright and skill-discovery skills with their original license notices: Playwright runs a pinned CLI isolated from project-local executables and browser settings and needs Node.js 20 or newer, and Find Skills routes authorized imports through this repository.
 - Published the local pull-request walkthrough with visible review findings, validated navigation, synthetic checks, and provenance notes.
