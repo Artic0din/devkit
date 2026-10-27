@@ -20,7 +20,7 @@ Portainer has been retired from this NAS; do not rely on its endpoint or credent
    Read the repo `AGENTS.md`, deployment docs, Compose files, `.env.example`, `git status`, and recent commits when a repo is involved.
 
 2. **Check the control path.** Request Dockhand health, then authenticate with its Keychain token and query the environment/container inventory.
-   If the token is unavailable, check local environment and configuration files before asking for access.
+   If the Keychain item is missing or the keychain is locked, stop and report the service and account you looked for; never substitute a token from a file, environment variable or login.
    Do not fall back to the removed Portainer service.
 
 3. **Inspect live state.** Read the target container and stack details, including image IDs, Compose source type and path, mounts, ports, restart policy, health checks, and recent logs.
@@ -47,5 +47,5 @@ Portainer has been retired from this NAS; do not rely on its endpoint or credent
 ## Stop Conditions
 
 - Complete only after live runtime evidence proves the requested state, not after a successful local build alone.
-- If the Dockhand token or API is unavailable after checking local configuration, report exactly what was checked and the access path that failed.
+- If the Keychain token or the Dockhand API is unavailable, report exactly what was checked and the access path that failed.
 - After three failed attempts against the same failure mode, stop and recommend a reset or rollback point with the exact commit, image, or stack snapshot if known.
