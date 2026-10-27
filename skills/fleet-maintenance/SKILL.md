@@ -1,6 +1,6 @@
 ---
 name: fleet-maintenance
-description: "Maintain Ryan's three Macs over LAN SSH: audit host health and disk, update Homebrew and global npm packages, fast-forward clean repos, route Xcode through $xcode-sync, and report per-host state including unreachable hosts."
+description: "Maintain Ryan's Macs over LAN SSH: audit host health and disk, update Homebrew and global npm packages, fast-forward clean repos, route Xcode through $xcode-sync, and report per-host state including unreachable hosts."
 ---
 
 # Fleet Maintenance
@@ -10,16 +10,26 @@ For a single explicitly chosen Mac, use `$mac-maintenance` instead.
 
 ## Hosts
 
+Check `scutil --get LocalHostName` first; the host you are on is local.
+The remote examples below run from the Air against `mbp`.
+Repeat each one for every other reachable host, using its route from the table.
+From another Mac, run the local commands for that Mac and use the table's route for the rest.
+SSH aliases live in each Mac's own `~/.ssh/config`, so an alias that works on one Mac can be missing on another.
+
 | Host | Reach | Notes |
 | --- | --- | --- |
-| `Ryans-MacBook-Air` | local | Daily driver. Homebrew at `/opt/homebrew`. |
-| `MacBook-Pro` | `ssh mbp` (192.168.1.9) | Homebrew at `/opt/homebrew`. Key `~/.ssh/id_ed25519_migrate` via the `mbp` alias in `~/.ssh/config`. |
-| iMac | `ssh imac` (192.168.1.210) | Alias resolves, but Remote Login was still off on 2026-09-18 and port 22 timed out. Report `pending`; do not attempt repair. |
+| `Ryans-MacBook-Air` | local on the Air | Homebrew at `/opt/homebrew`. No other Mac has a verified route to it; from elsewhere, report it `pending`. |
+| `MacBook-Pro` | from the Air: `ssh mbp` | Runs the T3 Code server where agent sessions run. Homebrew at `/opt/homebrew`. |
+| `Ryans-iMac` | `ssh imac` from the Air or the MacBook Pro | Apple silicon; Homebrew at `/opt/homebrew`. Runs T3 Code (Nightly) as its own environment. |
+| Intel Mac mini | `Mac-mini-2.local` | Joining for simple tasks. No Mac can log in yet: report `pending`. |
+| Windows PC | not covered | Joining; this skill only maintains Macs over SSH. Report `pending`. |
 
-Confirm identity before mutating any host:
+Confirm identity on each remote host before mutating it:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=8 mbp 'scutil --get LocalHostName; sw_vers; uname -m'
+for host in mbp imac; do
+  ssh -o BatchMode=yes -o ConnectTimeout=8 "$host" 'scutil --get LocalHostName; sw_vers; uname -m'
+done
 ```
 
 An unreachable host is `pending`, never `current`. Do not wake, power on, or enable
@@ -28,7 +38,7 @@ Remote Login on a host during maintenance; report it and let Ryan decide.
 ### Remote PATH
 
 Non-interactive SSH does not load `/opt/homebrew/bin`, so `brew`, `node`, `npm`, `gh`,
-and `xcodes` all appear missing on `mbp`. The bundled scripts find Homebrew themselves;
+and `xcodes` all appear missing on remote hosts. The bundled scripts find Homebrew themselves;
 every ad-hoc remote command must export PATH or it will report a false absence:
 
 ```bash
@@ -45,7 +55,7 @@ exists on each host before scanning, and never assume a root is populated:
 - Air: `~/Developer` and `~/Development/projects`. The audit recurses, so `~/Developer`
   already covers `~/Developer/projects` and `~/Developer/copilot-worktrees`.
 - `~/Metisary/Projects` is the migration target. Scan it once it holds repos.
-- `mbp`: discover with `find ~ -maxdepth 4 -name .git -not -path '*/node_modules/*'`.
+- `mbp` and `imac`: discover with `find ~ -maxdepth 4 -name .git -not -path '*/node_modules/*'`.
 
 A missing root exits 2 without scanning, so passing a root that does not exist yet is
 safe. An empty root is not an error and not proof that a host has no repos.
@@ -111,7 +121,8 @@ installed software. It needs no inventory file:
 
 ```bash
 node skills/fleet-maintenance/scripts/fleet-profile.mjs collect
-ssh -o RequestTTY=no -o RemoteCommand=none mbp 'node --input-type=module - collect' \
+ssh -o RequestTTY=no -o RemoteCommand=none mbp \
+  'export PATH=/opt/homebrew/bin:$PATH; node --input-type=module - collect' \
   < skills/fleet-maintenance/scripts/fleet-profile.mjs
 ```
 
@@ -187,7 +198,7 @@ repository's `package.json` or lockfile here.
 2. Run `npm outdated -g --depth=0 --json`; a nonzero exit can mean updates exist.
 3. Update each registry package to `name@latest`. Skip and report linked, file, Git,
    and bundled packages.
-4. Homebrew owns npm on both Macs, so let `brew upgrade` update npm itself.
+4. Homebrew owns npm on the Air and the MacBook Pro, so let `brew upgrade` update npm itself.
 5. Re-run the inventory and smoke-test the updated CLIs. Use `$npm` only if a private
    package actually needs registry authentication.
 
