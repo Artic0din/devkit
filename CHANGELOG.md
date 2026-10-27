@@ -6,6 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Added Theo Browne's tstack PR-workflow skills (`full-send`, `full-stop`, `council`, `sol-loop`, `file-pr`, `takeover`, `babysit-pr`, `modernize`, `leaving-pr-comments`), so agents can file, review, babysit, and land pull requests end to end.
 - Added the `video-analysis` skill: give any agent a video link and get a self-contained HTML brief with a TL;DR, a clickable key-moment timeline, themes, actions tied to Ryan's setup, and a resumable step checklist for tutorials, using only keyless transcript sources.
 - Published redacted staged-secret checks with advisory host warnings and opt-in Git commit enforcement, without rejecting ordinary product names or printing staged contents.
 - Removed the `/cos` Chief of Staff skill and its local-memory workflow exemption.
