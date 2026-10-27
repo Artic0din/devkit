@@ -1,0 +1,11 @@
+{
+  "entries": [
+    {
+      "path": "~/Metisary/Enviroment/config/skills"
+    },
+    {
+      "path": "~/Metisary/Enviroment/config/skills/synced/6e7b5786-289b-400a-ac51-916a3668085d_94d8eb47-168d-4f9f-8310-2b6fee110384",
+      "exclude": ["skill-creator"]
+    }
+  ]
+}

@@ -1,9 +1,10 @@
-# UI pastes
+# Global instruction entrypoints
 
-Two tools have no file-based global rules. Paste the block below once, and again whenever `AGENTS.MD` changes.
+Cursor reads `~/.cursor/rules/metisary.mdc`, linked to this repository's `config/cursor.rules.mdc`.
+GitHub Copilot CLI reads `~/.copilot/copilot-instructions.md`, linked to the canonical `AGENTS.MD`.
+These local integrations do not require copying the rules into a settings field.
 
-- Cursor: Settings → Rules → User Rules
-- GitHub Copilot: github.com → Settings → Copilot → Personal instructions
+For GitHub Copilot on github.com, optional personal instructions can be pasted under Settings → Copilot → Personal instructions:
 
 ```text
 Read and follow AGENTS.md at the repository root before any work.

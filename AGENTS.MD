@@ -1,7 +1,7 @@
 # AGENTS.md — Canonical Agent Instructions
 
 > **Canonical file.** Real path: `/Users/ryanfoyle/Metisary/Enviroment/config/AGENTS.MD`.
-> If loaded as `~/.claude/CLAUDE.md` or `~/.codex/AGENTS.md`, those are symlinks to this file. Also `~/.agents/skills` → `~/Development/Workspace/Codex/skills` (legacy personal skills) and `~/.codex/skills/agent-scripts` → this repo's `skills/`.
+> If loaded as `~/.claude/CLAUDE.md` or `~/.codex/AGENTS.md`, those are symlinks to this file. Also `~/.agents/skills` and `~/.codex/skills/agent-scripts` → this repo's `skills/`.
 > Edit this file, never a symlink path. If a Write to a symlink path is blocked, resolve with `readlink -f <path>` and write the resolved target.
 
 Single source of truth for Claude Code and Codex.
@@ -39,7 +39,7 @@ Home Assistant power user: Tesla solar/Powerwall/EVs, GloBird Energy, Daikin HVA
 
 ## Parallel Agents
 
-- Isolate every parallel subagent from the main worktree and staged changes: persistent worktrees belong in `/Users/ryanfoyle/Development/Workspace/worktrees/`; throwaway audits may use a temporary directory.
+- Isolate every parallel subagent from the main worktree and staged changes: persistent worktrees belong in `/Users/ryanfoyle/Metisary/Enviroment/worktrees/`; throwaway audits may use a temporary directory.
 - Never let agents write to a shared inventory file or to staged files. Each returns its result; the parent merges.
 - Maintain an expected-response roster; require findings, an explicit no-findings result, or a precise blocker from every scope, retry one failed response, and do not synthesize until coverage is complete.
 
@@ -179,12 +179,12 @@ When asked to modify this file or an overlay: propose the diff, wait for explici
 
 ## Project Context
 
-- Treat `~/.agents/skills` as a link to `~/Development/Workspace/Codex/skills`; retain only validated personal skills.
+- Treat `~/.agents/skills` as a link to `~/Metisary/Enviroment/config/skills`; retain only validated personal skills.
 - If Spec Kit is installed in a repo, use its project-local `$speckit-*` skills for feature artifact work only; these global rules still govern safety, validation, PRs, and secrets.
 
 ## Validation
 
-- Before saying the installed agent setup is healthy, verify `~/.codex/AGENTS.md`, `~/.claude/CLAUDE.md`, and `~/.codex/skills/agent-scripts` resolve inside `~/Metisary/Enviroment/config/` and the legacy personal-skill links inside `~/Development/Workspace/Codex/`, validate retained skills, and confirm Basic Memory can read and write `ryan-knowledge`.
+- Before saying the installed agent setup is healthy, verify `~/.codex/AGENTS.md`, `~/.claude/CLAUDE.md`, `~/.codex/skills/agent-scripts`, and `~/.agents/skills` resolve inside `~/Metisary/Enviroment/config/`, validate retained skills, and confirm Basic Memory can read and write `ryan-knowledge`.
 - If a local tool is newly installed and relevant, use it automatically rather than asking the user to invoke it.
 
 ## Communication
