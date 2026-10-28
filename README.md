@@ -13,7 +13,7 @@ The audit script named under Install reports whether a machine's rules pointers 
 | `AGENTS.MD` | Global hard rules, linked into Claude, Codex, Copilot CLI and Antigravity; Cursor reads it through `config/cursor.rules.mdc`. |
 | `skills/` | Skills, one folder each with `SKILL.md`. Personal and vendored skills are committed here. |
 | `skills.sh.json` | Curated routing catalogue; additional imported skill directories may be present. |
-| `skills.lock.json` | Third-party skills that `install.sh` will fetch into `skills/.external/` (gitignored). |
+| `skills.lock.json` | Where each skill this repo didn't write came from. `source` is the repository, or `local`, `cursor`, `codex` or `ghostex` for your own and app built-in skills; `ref`, `date` and `path` pin the first upstream commit whose `SKILL.md` matches the local copy; `version` records a release when there is no matching commit; `modified` marks a copy that no recorded upstream version matches. |
 | `.github/instructions/` | GitHub Copilot custom instructions, scoped by `applyTo`. |
 | `hooks/` | Repository hook scripts. The tool configs under `config/` currently reference `~/.claude/hooks/`. |
 | `agents/` | Subagent definitions per tool format. |
@@ -63,6 +63,13 @@ variable by exact name (`env_vars`) because Codex does not expand `${VAR}` in `e
 from the Keychain via `$keychain`, and if it is unset the GitHub server starts with no token.
 
 Run `scripts/test-sync-skills` for isolated fixture coverage of the sync and audit.
+
+## See your skills
+
+`scripts/list-skills` writes one page listing every skill in `skills/` and every installed Claude plugin skill, with where it came from, its repository, its version and what it does, then opens it.
+The version column shows the version a skill declares, then its last DevKit commit or the upstream commit recorded in `skills.lock.json`; a release recorded there replaces the declared version.
+It reads only local files and needs no network.
+`ruby scripts/list-skills.test.rb` runs its offline checks.
 
 ## Rules
 
