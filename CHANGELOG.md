@@ -6,6 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Added `scripts/list-skills`: one page that shows every skill and installed Claude plugin skill with where it came from, its repository, its version and what it does, and recorded in `skills.lock.json` where all 140 skills that live outside DevKit came from, plus the upstream repository of 34 DevKit skills that started as copies.
 - Added two `AGENTS.MD` rules: agents now diagnose "why isn't this working?" questions with live checks without being asked for each one, and answer questions about Ryan's own apps and servers from the running instance first, then its source, then official docs, labelling anything unchecked as unverified.
 - Added two `AGENTS.MD` rules: every decision should improve the user, developer and agent experience (UX, DX, AX) without breaking anything, and screens should drop taglines, helper text and secondary labels, with the layout fixed when a screen depends on them.
 - Removed the Basic Memory rules from `AGENTS.MD` and the `github-author-context` and `github-deep-review` skills: the `ryan-knowledge` project, its `AI Memory/` folder, and every agent's Basic Memory server are already gone, so agents no longer search or write notes there or require Basic Memory for a healthy setup.
