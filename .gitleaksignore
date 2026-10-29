@@ -1,3 +1,6 @@
 # Documentation examples of what NOT to do; fake Stripe-shaped strings, not credentials.
 .github/instructions/code-review-generic.instructions.md:stripe-access-token:142
 .github/instructions/security-and-owasp.instructions.md:stripe-access-token:421
+# Web Crypto algorithm names in a SubtleCrypto.supports() code sample, not credentials.
+skills/modern-web-guidance/guides/security/client-side-encryption.md:generic-api-key:187
+skills/modern-web-guidance/guides/security/client-side-encryption.md:generic-api-key:201
