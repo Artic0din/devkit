@@ -1,6 +1,6 @@
 # Installed third-party skill library
 
-These two skill directories were installed locally but absent from this repository.
+These skill directories were installed locally but absent from this repository.
 The initial import matched the pinned upstream trees below by Git blob hash.
 Review adaptations described below make the source work with this repository's activation and validation rules without activating integrations.
 
@@ -8,8 +8,11 @@ Review adaptations described below make the source work with this repository's a
 | --- | --- | ---: | --- |
 | `playwright` | [openai/skills](https://github.com/openai/skills/tree/49f948faa9258a0c61caceaf225e179651397431/skills/.curated/playwright) | 9 | Apache 2.0, license and notice included |
 | `find-skills` | [vercel-labs/skills](https://github.com/vercel-labs/skills/tree/7407f3893ad4dceab546ac002c3ef806e4000c73/skills/find-skills) | 1 | MIT, upstream notice added |
+| `modern-web-guidance` | [GoogleChrome/modern-web-guidance](https://github.com/GoogleChrome/modern-web-guidance/tree/4f2b13e25c5815b3f080ca0d983e828d96561a0f/skills/modern-web-guidance) | 194 | Apache 2.0, upstream license added |
+| `chrome-extensions` | [GoogleChrome/modern-web-guidance](https://github.com/GoogleChrome/modern-web-guidance/tree/4f2b13e25c5815b3f080ca0d983e828d96561a0f/skills/chrome-extensions) | 24 | Apache 2.0, upstream license added |
 
 The initial import contained 10 existing source files and one additional upstream license notice.
+The Google Chrome import contained 218 source files, matched by Git tree hash, and adds the upstream Apache 2.0 license to each directory.
 Each directory retains its own license; the repository's license does not replace the upstream terms.
 
 ## Runtime requirements
@@ -19,6 +22,8 @@ Read each skill's setup instructions before use and follow the current host's to
 
 - `playwright` requires Node.js, its locked CLI installation, and browser installation.
 - `find-skills` uses website and source search; it does not execute a discovery CLI.
+- `modern-web-guidance` runs `npx -y modern-web-guidance@latest`, which needs Node.js and network access.
+- `chrome-extensions` contains Markdown references only and ships no scripts.
 
 ## Review adaptations
 
@@ -28,7 +33,10 @@ A regression check places a fake executable in a project and verifies it is not 
 The wrapper also forces a trusted browser configuration, rejects project configuration overrides, and requires Node.js 20 or newer.
 Setup installs Chromium through the pinned runtime; CI exercises package/configuration isolation and literal session-like command data in a real headless browser.
 Find Skills requires source and license review at a pinned commit and imports through the canonical repository instead of writing directly to a global store.
-Both skills are registered in the catalogue.
+All four skills are registered in the catalogue.
+Modern Web Guidance prefixes every CLI command with `DISABLE_TELEMETRY=1`, because the upstream CLI otherwise sends Google usage data that includes agent search queries.
+The modified `SKILL.md` carries a modification notice.
+Running `skills update` or `modern-web-guidance update` restores the upstream file and removes the opt-out, so reapply it after any update.
 
 Keep future updates tied to an upstream revision and recheck the imported files and license notices together.
 
