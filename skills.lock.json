@@ -1,12 +1,947 @@
 {
   "skills": {
+    "acquire-codebase-knowledge": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "9ce814859eaa473178a1463ee3aa0c54a8860b86",
+      "date": "2026-09-16",
+      "path": "skills/acquire-codebase-knowledge"
+    },
+    "agent-skill-stack": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "233d902c2f59043b434b9b7f228ba767f846afe0",
+      "date": "2026-07-23",
+      "path": "skills/agent-skill-stack"
+    },
+    "anti-ui-slop": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "22e0e1e504f0d1be6561b78f15b88d4d29929008",
+      "date": "2026-08-24",
+      "path": "skills/anti-ui-slop"
+    },
+    "apple-appstore-reviewer": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "c0314d9bcb473fac0cc219e062735e3a3cb67cd3",
+      "date": "2026-08-28",
+      "path": "skills/apple-appstore-reviewer"
+    },
+    "ask-matt": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "954ee7fd7f1911b79bfa82589b4d35ab6c4b13b8",
+      "date": "2026-10-06",
+      "path": "skills/engineering/ask-matt"
+    },
+    "automate": {
+      "source": "cursor"
+    },
+    "autopilot": {
+      "source": "cursor",
+      "modified": true
+    },
+    "build-kickoff": {
+      "source": "local"
+    },
+    "canvas": {
+      "source": "cursor",
+      "modified": true
+    },
+    "changelog-generator": {
+      "source": "https://github.com/ComposioHQ/awesome-claude-skills.git",
+      "ref": "044d48b594f060c164f3b20fac9ea01374721bca",
+      "date": "2025-10-17",
+      "path": "changelog-generator"
+    },
+    "claude-handoff": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "4ec00d966d964d8dd8a67d4f4570e998791152db",
+      "date": "2026-10-06",
+      "path": "skills/in-progress/claude-handoff"
+    },
+    "code-review": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "3da8c01116264675eeefbd6e9d59c734de9095cc",
+      "date": "2026-10-07",
+      "path": "skills/engineering/code-review"
+    },
+    "codebase-design": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "321658273cb1d20b76026717d027d505790106d4",
+      "date": "2026-08-19",
+      "path": "skills/engineering/codebase-design"
+    },
+    "codeql": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "f601edcc8725f914d8b50041eadb1312dc39f232",
+      "date": "2026-03-18",
+      "path": "skills/codeql"
+    },
+    "codex-doctor": {
+      "source": "https://github.com/YizeSun/codex-doctor.git",
+      "ref": "e205be9ccecfefa7e9f4f823a842c27ac1b52c27",
+      "date": "2026-07-25",
+      "path": ""
+    },
+    "computer-use": {
+      "source": "https://github.com/stablyai/orca.git",
+      "ref": "b00257ad626d3ae40f27789aaa564758f57d2cdb",
+      "date": "2026-09-06",
+      "path": "skills/computer-use"
+    },
+    "context-map": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "caab1f623bb68a330f294a11279597d7ae7be737",
+      "date": "2026-02-24",
+      "path": "skills/context-map"
+    },
+    "conventional-branch": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "72c4f54d043cc91855e0a01fedf22414a3c429b4",
+      "date": "2026-05-28",
+      "path": "skills/conventional-branch"
+    },
+    "conventional-commit": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "caab1f623bb68a330f294a11279597d7ae7be737",
+      "date": "2026-02-24",
+      "path": "skills/conventional-commit"
+    },
+    "copilot-cli-quickstart": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "be23740aaf9916b506dd4af6412e8567a3c9e1c3",
+      "date": "2026-02-12",
+      "path": "skills/copilot-cli-quickstart"
+    },
+    "copilot-instructions-blueprint-generator": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "caab1f623bb68a330f294a11279597d7ae7be737",
+      "date": "2026-02-24",
+      "path": "skills/copilot-instructions-blueprint-generator"
+    },
+    "copilot-pr-autopilot": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "d47a6c93b7ad518667a1c62f5d383f56dbbedba7",
+      "date": "2026-07-01",
+      "path": "skills/copilot-pr-autopilot"
+    },
+    "copilot-sdk": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "c5c72193784f1ea25f4670fd86465643846c7fc2",
+      "date": "2026-08-25",
+      "path": "skills/copilot-sdk"
+    },
+    "copilot-spaces": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "13970c3275d4474555656a8efca3b91ca9339f9f",
+      "date": "2026-03-06",
+      "path": "skills/copilot-spaces"
+    },
+    "copilot-usage-metrics": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "5de0d98cb89c959dc246f4a47ee8b8615d36527f",
+      "date": "2026-02-17",
+      "path": "skills/copilot-usage-metrics"
+    },
+    "create-hook": {
+      "source": "cursor",
+      "modified": true
+    },
+    "create-readme": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "caab1f623bb68a330f294a11279597d7ae7be737",
+      "date": "2026-02-24",
+      "path": "skills/create-readme"
+    },
+    "create-rule": {
+      "source": "cursor",
+      "modified": true
+    },
+    "create-skill": {
+      "source": "cursor",
+      "modified": true
+    },
+    "create-specification": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "421418928715158da3610571cb9e9cbb18d4747d",
+      "date": "2026-08-07",
+      "path": "skills/create-specification"
+    },
+    "create-subagent": {
+      "source": "cursor",
+      "modified": true
+    },
+    "create-tldr-page": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "caab1f623bb68a330f294a11279597d7ae7be737",
+      "date": "2026-02-24",
+      "path": "skills/create-tldr-page"
+    },
+    "cua-driver": {
+      "source": "https://github.com/trycua/cua.git",
+      "ref": "2d2f99228d4d2508dc6fcc84c176b296e146714a",
+      "date": "2026-10-19",
+      "path": "libs/cua-driver/rust/Skills/cua-driver"
+    },
+    "dependabot": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "71c55d4e12cf0f05d473bd7b5fb3943f3e1ed112",
+      "date": "2026-06-15",
+      "path": "skills/dependabot"
+    },
+    "deploy-with-vercel": {
+      "source": "https://github.com/vercel-labs/agent-skills.git",
+      "modified": true
+    },
+    "depot-ci": {
+      "source": "https://github.com/depot/skills.git",
+      "ref": "ae685bda66b9569f8f1515168c9b514ce4f21f36",
+      "date": "2026-07-10",
+      "path": "skills/depot-ci"
+    },
+    "depot-container-builds": {
+      "source": "https://github.com/depot/skills.git",
+      "ref": "ae685bda66b9569f8f1515168c9b514ce4f21f36",
+      "date": "2026-07-10",
+      "path": "skills/depot-container-builds"
+    },
+    "depot-general": {
+      "source": "https://github.com/depot/skills.git",
+      "ref": "ae685bda66b9569f8f1515168c9b514ce4f21f36",
+      "date": "2026-07-10",
+      "path": "skills/depot-general"
+    },
+    "depot-github-runners": {
+      "source": "https://github.com/depot/skills.git",
+      "ref": "ae685bda66b9569f8f1515168c9b514ce4f21f36",
+      "date": "2026-07-10",
+      "path": "skills/depot-github-runners"
+    },
+    "diagnosing-bugs": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "f3fc5632f401156837ee3872f14fe33ccf1024ea",
+      "date": "2026-10-07",
+      "path": "skills/engineering/diagnosing-bugs"
+    },
+    "discord-export": {
+      "source": "local"
+    },
+    "doc-and-modernize": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "aa99d75baac687e594d1e509a15be64d593e6440",
+      "date": "2026-07-10",
+      "path": "skills/doc-and-modernize"
+    },
+    "docs-sync-audit": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "f32d7c320dea21594952931b67841b596dece208",
+      "date": "2026-09-08",
+      "path": "skills/docs-sync-audit"
+    },
+    "documentation-writer": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "caab1f623bb68a330f294a11279597d7ae7be737",
+      "date": "2026-02-24",
+      "path": "skills/documentation-writer"
+    },
+    "domain-modeling": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "d80fa0f4ebe0c5714af0adf8670336065233ecc6",
+      "date": "2026-09-17",
+      "path": "skills/engineering/domain-modeling"
+    },
+    "env-setup": {
+      "source": "cursor"
+    },
+    "find-skills": {
+      "source": "https://github.com/vercel-labs/skills.git",
+      "modified": true
+    },
+    "firecrawl": {
+      "source": "https://github.com/firecrawl/skills.git",
+      "ref": "f6c9b2dd6384e0f05f713727ed18ba9db94d5191",
+      "date": "2026-08-27",
+      "path": "skills/core/firecrawl"
+    },
+    "firecrawl-agent": {
+      "source": "https://github.com/firecrawl/skills.git",
+      "ref": "f6c9b2dd6384e0f05f713727ed18ba9db94d5191",
+      "date": "2026-08-27",
+      "path": "skills/core/firecrawl-agent"
+    },
+    "firecrawl-company-directories": {
+      "source": "https://github.com/firecrawl/skills.git",
+      "ref": "15ad25f8d4d89186c8cca47070242faa3d033584",
+      "date": "2026-08-21",
+      "path": "skills/workflows/firecrawl-company-directories"
+    },
+    "firecrawl-competitive-intel": {
+      "source": "https://github.com/firecrawl/skills.git",
+      "ref": "15ad25f8d4d89186c8cca47070242faa3d033584",
+      "date": "2026-08-21",
+      "path": "skills/workflows/firecrawl-competitive-intel"
+    },
+    "firecrawl-crawl": {
+      "source": "https://github.com/firecrawl/skills.git",
+      "ref": "f6c9b2dd6384e0f05f713727ed18ba9db94d5191",
+      "date": "2026-08-27",
+      "path": "skills/core/firecrawl-crawl"
+    },
+    "firecrawl-dashboard-reporting": {
+      "source": "https://github.com/firecrawl/skills.git",
+      "ref": "15ad25f8d4d89186c8cca47070242faa3d033584",
+      "date": "2026-08-21",
+      "path": "skills/workflows/firecrawl-dashboard-reporting"
+    },
+    "firecrawl-deep-research": {
+      "source": "https://github.com/firecrawl/skills.git",
+      "ref": "15ad25f8d4d89186c8cca47070242faa3d033584",
+      "date": "2026-08-21",
+      "path": "skills/workflows/firecrawl-deep-research"
+    },
+    "firecrawl-demo-walkthrough": {
+      "source": "https://github.com/firecrawl/skills.git",
+      "ref": "15ad25f8d4d89186c8cca47070242faa3d033584",
+      "date": "2026-08-21",
+      "path": "skills/workflows/firecrawl-demo-walkthrough"
+    },
+    "firecrawl-developer-index": {
+      "source": "https://github.com/firecrawl/skills.git",
+      "ref": "f6c9b2dd6384e0f05f713727ed18ba9db94d5191",
+      "date": "2026-08-27",
+      "path": "skills/core/firecrawl-developer-index"
+    },
+    "firecrawl-download": {
+      "source": "https://github.com/firecrawl/skills.git",
+      "ref": "f6c9b2dd6384e0f05f713727ed18ba9db94d5191",
+      "date": "2026-08-27",
+      "path": "skills/core/firecrawl-download"
+    },
+    "firecrawl-interact": {
+      "source": "https://github.com/firecrawl/skills.git",
+      "ref": "f6c9b2dd6384e0f05f713727ed18ba9db94d5191",
+      "date": "2026-08-27",
+      "path": "skills/core/firecrawl-interact"
+    },
+    "firecrawl-knowledge-base": {
+      "source": "https://github.com/firecrawl/skills.git",
+      "ref": "15ad25f8d4d89186c8cca47070242faa3d033584",
+      "date": "2026-08-21",
+      "path": "skills/workflows/firecrawl-knowledge-base"
+    },
+    "firecrawl-knowledge-ingest": {
+      "source": "https://github.com/firecrawl/skills.git",
+      "ref": "15ad25f8d4d89186c8cca47070242faa3d033584",
+      "date": "2026-08-21",
+      "path": "skills/workflows/firecrawl-knowledge-ingest"
+    },
+    "firecrawl-lead-gen": {
+      "source": "https://github.com/firecrawl/skills.git",
+      "ref": "15ad25f8d4d89186c8cca47070242faa3d033584",
+      "date": "2026-08-21",
+      "path": "skills/workflows/firecrawl-lead-gen"
+    },
+    "firecrawl-lead-research": {
+      "source": "https://github.com/firecrawl/skills.git",
+      "ref": "15ad25f8d4d89186c8cca47070242faa3d033584",
+      "date": "2026-08-21",
+      "path": "skills/workflows/firecrawl-lead-research"
+    },
+    "firecrawl-map": {
+      "source": "https://github.com/firecrawl/skills.git",
+      "ref": "f6c9b2dd6384e0f05f713727ed18ba9db94d5191",
+      "date": "2026-08-27",
+      "path": "skills/core/firecrawl-map"
+    },
+    "firecrawl-market-research": {
+      "source": "https://github.com/firecrawl/skills.git",
+      "ref": "15ad25f8d4d89186c8cca47070242faa3d033584",
+      "date": "2026-08-21",
+      "path": "skills/workflows/firecrawl-market-research"
+    },
+    "firecrawl-monitor": {
+      "source": "https://github.com/firecrawl/skills.git",
+      "ref": "d3b5571fd44ff6fcd17510f5dd55f30f73ccf872",
+      "date": "2026-09-02",
+      "path": "skills/core/firecrawl-monitor"
+    },
+    "firecrawl-parse": {
+      "source": "https://github.com/firecrawl/skills.git",
+      "ref": "f6c9b2dd6384e0f05f713727ed18ba9db94d5191",
+      "date": "2026-08-27",
+      "path": "skills/core/firecrawl-parse"
+    },
+    "firecrawl-qa": {
+      "source": "https://github.com/firecrawl/skills.git",
+      "ref": "15ad25f8d4d89186c8cca47070242faa3d033584",
+      "date": "2026-08-21",
+      "path": "skills/workflows/firecrawl-qa"
+    },
+    "firecrawl-research-index": {
+      "source": "https://github.com/firecrawl/skills.git",
+      "ref": "f6c9b2dd6384e0f05f713727ed18ba9db94d5191",
+      "date": "2026-08-27",
+      "path": "skills/core/firecrawl-research-index"
+    },
+    "firecrawl-research-papers": {
+      "source": "https://github.com/firecrawl/skills.git",
+      "ref": "15ad25f8d4d89186c8cca47070242faa3d033584",
+      "date": "2026-08-21",
+      "path": "skills/workflows/firecrawl-research-papers"
+    },
+    "firecrawl-scrape": {
+      "source": "https://github.com/firecrawl/skills.git",
+      "ref": "f6c9b2dd6384e0f05f713727ed18ba9db94d5191",
+      "date": "2026-08-27",
+      "path": "skills/core/firecrawl-scrape"
+    },
+    "firecrawl-search": {
+      "source": "https://github.com/firecrawl/skills.git",
+      "ref": "f6c9b2dd6384e0f05f713727ed18ba9db94d5191",
+      "date": "2026-08-27",
+      "path": "skills/core/firecrawl-search"
+    },
+    "firecrawl-seo-audit": {
+      "source": "https://github.com/firecrawl/skills.git",
+      "ref": "15ad25f8d4d89186c8cca47070242faa3d033584",
+      "date": "2026-08-21",
+      "path": "skills/workflows/firecrawl-seo-audit"
+    },
+    "firecrawl-shop": {
+      "source": "https://github.com/firecrawl/skills.git",
+      "ref": "15ad25f8d4d89186c8cca47070242faa3d033584",
+      "date": "2026-08-21",
+      "path": "skills/workflows/firecrawl-shop"
+    },
+    "firecrawl-website-design-clone": {
+      "source": "https://github.com/firecrawl/skills.git",
+      "ref": "15ad25f8d4d89186c8cca47070242faa3d033584",
+      "date": "2026-08-21",
+      "path": "skills/workflows/firecrawl-website-design-clone"
+    },
+    "firecrawl-workflows": {
+      "source": "https://github.com/firecrawl/skills.git",
+      "ref": "15ad25f8d4d89186c8cca47070242faa3d033584",
+      "date": "2026-08-21",
+      "path": "skills/workflows/firecrawl-workflows"
+    },
+    "folder-structure-blueprint-generator": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "caab1f623bb68a330f294a11279597d7ae7be737",
+      "date": "2026-02-24",
+      "path": "skills/folder-structure-blueprint-generator"
+    },
+    "generate-custom-instructions-from-codebase": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "caab1f623bb68a330f294a11279597d7ae7be737",
+      "date": "2026-02-24",
+      "path": "skills/generate-custom-instructions-from-codebase"
+    },
+    "gh-attach": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "bfefe9ddc68d7116ff57d19eb25d9044638c6d68",
+      "date": "2026-08-05",
+      "path": "skills/gh-attach"
+    },
+    "git-commit": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "e24be77e6f203409cf99ab7d5a67e1540cb386d3",
+      "date": "2026-01-23",
+      "path": "skills/git-commit"
+    },
+    "git-flow-branch-creator": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "caab1f623bb68a330f294a11279597d7ae7be737",
+      "date": "2026-02-24",
+      "path": "skills/git-flow-branch-creator"
+    },
+    "git-guardrails-claude-code": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "321658273cb1d20b76026717d027d505790106d4",
+      "date": "2026-08-19",
+      "path": "skills/misc/git-guardrails-claude-code"
+    },
+    "github-actions-efficiency": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "12666c97ee0d0f8d419e8ec40dd3fc4503ec69ee",
+      "date": "2026-05-25",
+      "path": "skills/github-actions-efficiency"
+    },
+    "github-actions-hardening": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "df566343b3a685e821f8ebe8ea70a2a8eb8b857b",
+      "date": "2026-06-16",
+      "path": "skills/github-actions-hardening"
+    },
+    "github-actions-runtime-upgrade-conventions": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "128b0eda416c7c4c9a52e0ae17792e54bd6ce914",
+      "date": "2026-06-19",
+      "path": "skills/github-actions-runtime-upgrade-conventions"
+    },
+    "github-codespaces-efficiency": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "12666c97ee0d0f8d419e8ec40dd3fc4503ec69ee",
+      "date": "2026-05-25",
+      "path": "skills/github-codespaces-efficiency"
+    },
+    "github-copilot-starter": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "b91369d1b5d76a83f63f394ec43c1530d93d99f4",
+      "date": "2026-03-10",
+      "path": "skills/github-copilot-starter"
+    },
+    "github-issues": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "5c41b09e01a9987895231cd8e9472befaf7e3155",
+      "date": "2026-08-31",
+      "path": "skills/github-issues"
+    },
+    "github-release": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "421418928715158da3610571cb9e9cbb18d4747d",
+      "date": "2026-08-07",
+      "path": "skills/github-release"
+    },
+    "github-workflow": {
+      "source": "local"
+    },
+    "goal": {
+      "source": "cursor",
+      "modified": true
+    },
+    "graphify": {
+      "source": "https://github.com/Graphify-Labs/graphify.git",
+      "ref": "3d19463484ebcf773b399ddad9fd3363b2ab3bff",
+      "date": "2026-08-07",
+      "path": "graphify"
+    },
+    "grill-me": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "fcf0071560d32913c9d4f820e0d7ca467c881619",
+      "date": "2026-08-15",
+      "path": "skills/productivity/grill-me"
+    },
+    "grill-with-docs": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "447ca70872026d5b79d6073a546dac082117fed7",
+      "date": "2026-08-15",
+      "path": "skills/engineering/grill-with-docs"
+    },
+    "grilling": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "95249b0b49782349740fd9b8c6ce32b4e59e497a",
+      "date": "2026-10-07",
+      "path": "skills/productivity/grilling"
+    },
+    "handoff": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "0f5e033ebc47b142f5ffa56a582ede6d9d9bada3",
+      "date": "2026-10-06",
+      "path": "skills/productivity/handoff"
+    },
     "i-have-adhd": {
       "source": "local"
+    },
+    "implement": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "6d6a5b9072f47ee7ba1d972d8ce0ee98b7ed4394",
+      "date": "2026-10-07",
+      "path": "skills/engineering/implement"
+    },
+    "implement-spec": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "c612defa9e5cf9372262d0279eb124993ba77b71",
+      "date": "2026-09-24",
+      "path": "skills/engineering/implement-spec"
+    },
+    "improve-codebase-architecture": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "d80fa0f4ebe0c5714af0adf8670336065233ecc6",
+      "date": "2026-09-17",
+      "path": "skills/engineering/improve-codebase-architecture"
+    },
+    "loop": {
+      "source": "cursor"
+    },
+    "loop-me": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "321658273cb1d20b76026717d027d505790106d4",
+      "date": "2026-08-19",
+      "path": "skills/in-progress/loop-me"
+    },
+    "migrate-to-builds": {
+      "source": "cursor"
+    },
+    "migrate-to-shoehorn": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "c90b246c926a940bb4b74c90bf39f75b2e414319",
+      "date": "2026-02-04",
+      "path": "migrate-to-shoehorn"
+    },
+    "migrate-to-skills": {
+      "source": "cursor",
+      "modified": true
+    },
+    "new-repo": {
+      "source": "cursor",
+      "modified": true
+    },
+    "onboard": {
+      "source": "cursor"
+    },
+    "orchestration": {
+      "source": "https://github.com/stablyai/orca.git",
+      "ref": "908e19645283869fee2b00dadffffcadb6dbc711",
+      "date": "2026-09-06",
+      "path": "skills/orchestration"
+    },
+    "origin": {
+      "source": "cursor",
+      "modified": true
+    },
+    "parametric-3d-printing": {
+      "source": "https://github.com/flowful-ai/cad-skill.git",
+      "ref": "fe4215970d39f388ff1afc411fac49a9c5f79756",
+      "date": "2026-07-14",
+      "path": ""
+    },
+    "playwright-automation-fill-in-form": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "caab1f623bb68a330f294a11279597d7ae7be737",
+      "date": "2026-02-24",
+      "path": "skills/playwright-automation-fill-in-form"
+    },
+    "playwright-explore-website": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "caab1f623bb68a330f294a11279597d7ae7be737",
+      "date": "2026-02-24",
+      "path": "skills/playwright-explore-website"
+    },
+    "playwright-generate-test": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "caab1f623bb68a330f294a11279597d7ae7be737",
+      "date": "2026-02-24",
+      "path": "skills/playwright-generate-test"
     },
     "ponytail": {
       "source": "https://github.com/DietrichGebert/ponytail.git",
       "ref": "e3ba2aa6f1e6f0bc4d69eb09c9f0d0a93af56156",
       "path": "skills/ponytail"
+    },
+    "pr": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "modified": true
+    },
+    "pr-dashboard": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "4beca2f03b955687c2e4af6d1da1f28cef4cdb69",
+      "date": "2026-04-30",
+      "path": "skills/pr-dashboard"
+    },
+    "pr-screenshots": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "5cab59b03e515ea8c9a0a210e9f9d260459b4ffd",
+      "date": "2026-05-25",
+      "path": "skills/pr-screenshots"
+    },
+    "premium-frontend-ui": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "66a60afe70fb20f90e6210befa46c24b85a88862",
+      "date": "2026-04-15",
+      "path": "skills/premium-frontend-ui"
+    },
+    "prototype": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "321658273cb1d20b76026717d027d505790106d4",
+      "date": "2026-08-19",
+      "path": "skills/engineering/prototype"
+    },
+    "react19-concurrent-patterns": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "7f7b1b9b46ac7fa0b8774ed6e3e0fa3e1f089a79",
+      "date": "2026-04-09",
+      "path": "skills/react19-concurrent-patterns"
+    },
+    "react19-source-patterns": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "7f7b1b9b46ac7fa0b8774ed6e3e0fa3e1f089a79",
+      "date": "2026-04-09",
+      "path": "skills/react19-source-patterns"
+    },
+    "react19-test-patterns": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "421418928715158da3610571cb9e9cbb18d4747d",
+      "date": "2026-08-07",
+      "path": "skills/react19-test-patterns"
+    },
+    "rename-chat": {
+      "source": "cursor",
+      "version": "3.25.6"
+    },
+    "repo-standardizer": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "09e7be729f591ed44eaf8e34492edcd4e2fbd8e2",
+      "date": "2026-08-21",
+      "path": "skills/repo-standardizer"
+    },
+    "research": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "321658273cb1d20b76026717d027d505790106d4",
+      "date": "2026-08-19",
+      "path": "skills/engineering/research"
+    },
+    "resolving-merge-conflicts": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "321658273cb1d20b76026717d027d505790106d4",
+      "date": "2026-08-19",
+      "path": "skills/engineering/resolving-merge-conflicts"
+    },
+    "retro": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "modified": true
+    },
+    "reverse-engineer-anything": {
+      "source": "https://github.com/morluto/rea.git",
+      "version": "6.3.0"
+    },
+    "review-bugbot": {
+      "source": "cursor",
+      "modified": true
+    },
+    "review-security": {
+      "source": "cursor",
+      "modified": true
+    },
+    "scaffold-exercises": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "d1beb4fe61574b3325ed96cd0d9a31966d31a02a",
+      "date": "2026-03-13",
+      "path": "scaffold-exercises"
+    },
+    "sdk": {
+      "source": "cursor",
+      "modified": true
+    },
+    "sentry-cli": {
+      "source": "https://github.com/getsentry/toolkit.git",
+      "ref": "79116f2cc74a6b9ec5d1cd32dcf523badca2d51b",
+      "date": "2026-08-29",
+      "path": "plugins/sentry-cli/skills/sentry-cli"
+    },
+    "session-insights": {
+      "source": "local"
+    },
+    "session-triage": {
+      "source": "local"
+    },
+    "setup-matt-pocock-skills": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "5b7cade4d68947f34dae71326a0ce89f09e22c9c",
+      "date": "2026-10-07",
+      "path": "skills/engineering/setup-matt-pocock-skills"
+    },
+    "setup-pre-commit": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "321658273cb1d20b76026717d027d505790106d4",
+      "date": "2026-08-19",
+      "path": "skills/misc/setup-pre-commit"
+    },
+    "setup-ts-deep-modules": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "321658273cb1d20b76026717d027d505790106d4",
+      "date": "2026-08-19",
+      "path": "skills/in-progress/setup-ts-deep-modules"
+    },
+    "share": {
+      "source": "cursor",
+      "modified": true
+    },
+    "shell": {
+      "source": "cursor",
+      "version": "3.25.6"
+    },
+    "skill-creator": {
+      "source": "https://github.com/anthropics/claude-plugins-official.git",
+      "ref": "2a40fd2e7c52207aa903bd33fc4c65716126966e",
+      "date": "2026-04-23",
+      "path": "plugins/skill-creator/skills/skill-creator"
+    },
+    "source-command-audit-setup": {
+      "source": "local"
+    },
+    "source-command-create-issue": {
+      "source": "local"
+    },
+    "source-command-review-ideas": {
+      "source": "local"
+    },
+    "source-command-solve-issue": {
+      "source": "local"
+    },
+    "split-to-prs": {
+      "source": "cursor",
+      "modified": true
+    },
+    "statusline": {
+      "source": "cursor",
+      "version": "3.25.6"
+    },
+    "subscribe": {
+      "source": "cursor"
+    },
+    "suggest-awesome-github-copilot-agents": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "caab1f623bb68a330f294a11279597d7ae7be737",
+      "date": "2026-02-24",
+      "path": "skills/suggest-awesome-github-copilot-agents"
+    },
+    "suggest-awesome-github-copilot-instructions": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "caab1f623bb68a330f294a11279597d7ae7be737",
+      "date": "2026-02-24",
+      "path": "skills/suggest-awesome-github-copilot-instructions"
+    },
+    "suggest-awesome-github-copilot-skills": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "caab1f623bb68a330f294a11279597d7ae7be737",
+      "date": "2026-02-24",
+      "path": "skills/suggest-awesome-github-copilot-skills"
+    },
+    "swift-mcp-server-generator": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "caab1f623bb68a330f294a11279597d7ae7be737",
+      "date": "2026-02-24",
+      "path": "skills/swift-mcp-server-generator"
+    },
+    "tdd": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "3f599139104dfceabc7754eeb91319802f85e042",
+      "date": "2026-10-07",
+      "path": "skills/engineering/tdd"
+    },
+    "teach": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "ad5400b930b297b0c0cb231ff1ffe42a7da666aa",
+      "date": "2026-10-07",
+      "path": "skills/productivity/teach"
+    },
+    "technology-stack-blueprint-generator": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "caab1f623bb68a330f294a11279597d7ae7be737",
+      "date": "2026-02-24",
+      "path": "skills/technology-stack-blueprint-generator"
+    },
+    "to-questionnaire": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "321658273cb1d20b76026717d027d505790106d4",
+      "date": "2026-08-19",
+      "path": "skills/productivity/to-questionnaire"
+    },
+    "to-spec": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "5c89081d4bbeb3d039a42093653f90bb698d780e",
+      "date": "2026-08-19",
+      "path": "skills/engineering/to-spec"
+    },
+    "to-tickets": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "9e2abf8611a345efbf779aacb171cff015bcdeb6",
+      "date": "2026-10-06",
+      "path": "skills/engineering/to-tickets"
+    },
+    "triage": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "d80fa0f4ebe0c5714af0adf8670336065233ecc6",
+      "date": "2026-09-17",
+      "path": "skills/engineering/triage"
+    },
+    "ui-screenshots": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "5cab59b03e515ea8c9a0a210e9f9d260459b4ffd",
+      "date": "2026-05-25",
+      "path": "skills/ui-screenshots"
+    },
+    "update-cli-config": {
+      "source": "cursor",
+      "modified": true
+    },
+    "update-cursor-settings": {
+      "source": "cursor",
+      "modified": true
+    },
+    "update-specification": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "421418928715158da3610571cb9e9cbb18d4747d",
+      "date": "2026-08-07",
+      "path": "skills/update-specification"
+    },
+    "usage-report": {
+      "source": "https://github.com/razzededge/codex-usage-audit.git",
+      "ref": "426d73db9329854cb9d6b300d147461e5e8ae363",
+      "date": "2026-07-22",
+      "path": "skills/usage-report"
+    },
+    "visualize": {
+      "source": "codex",
+      "modified": true
+    },
+    "wait-what": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "d80fa0f4ebe0c5714af0adf8670336065233ecc6",
+      "date": "2026-09-17",
+      "path": "skills/productivity/wait-what"
+    },
+    "wayfinder": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "8295b8e10d4cdb6cce772a56dda7b7c37075074d",
+      "date": "2026-10-07",
+      "path": "skills/engineering/wayfinder"
+    },
+    "web-design-reviewer": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "421418928715158da3610571cb9e9cbb18d4747d",
+      "date": "2026-08-07",
+      "path": "skills/web-design-reviewer"
+    },
+    "webapp-testing": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "b1f3346ef2d05f445b19a46bfeaeb887010b323d",
+      "date": "2026-03-13",
+      "path": "skills/webapp-testing"
+    },
+    "what-context-needed": {
+      "source": "https://github.com/github/awesome-copilot.git",
+      "ref": "caab1f623bb68a330f294a11279597d7ae7be737",
+      "date": "2026-02-24",
+      "path": "skills/what-context-needed"
+    },
+    "wizard": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "321658273cb1d20b76026717d027d505790106d4",
+      "date": "2026-08-19",
+      "path": "skills/engineering/wizard"
+    },
+    "writing-beats": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "321658273cb1d20b76026717d027d505790106d4",
+      "date": "2026-08-19",
+      "path": "skills/in-progress/writing-beats"
+    },
+    "writing-for-agents": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "321658273cb1d20b76026717d027d505790106d4",
+      "date": "2026-08-19",
+      "path": "skills/productivity/writing-for-agents"
+    },
+    "writing-fragments": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "5c89081d4bbeb3d039a42093653f90bb698d780e",
+      "date": "2026-08-19",
+      "path": "skills/in-progress/writing-fragments"
+    },
+    "writing-shape": {
+      "source": "https://github.com/mattpocock/skills.git",
+      "ref": "5c89081d4bbeb3d039a42093653f90bb698d780e",
+      "date": "2026-08-19",
+      "path": "skills/in-progress/writing-shape"
     }
   }
 }

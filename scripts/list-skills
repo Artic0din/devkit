@@ -1,0 +1,239 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# list-skills: write one HTML page listing every skill in this repo's skills/
+# folder and every installed Claude plugin skill, with where each came from,
+# its version, and what it does. Reads git, skills.lock.json and
+# ~/.claude/plugins only; nothing is fetched from the network.
+
+require "date"
+require "json"
+require "open3"
+require "optparse"
+require "tmpdir"
+require "yaml"
+
+Row = Struct.new(:name, :origin, :repo, :version, :description, :note, keyword_init: true)
+
+BUILT_IN = {
+  "local" => "Yours",
+  "cursor" => "Cursor built-in",
+  "codex" => "Codex built-in",
+}.freeze
+
+def front_matter(path)
+  text = File.read(path, encoding: "UTF-8").scrub.delete_prefix("\uFEFF")
+  match = text.match(/\A---\r?\n(.*?)\r?\n---[ \t]*(?:\r?\n|\z)/m)
+  data = match && YAML.safe_load(match[1], permitted_classes: [Date, Time], aliases: false)
+  return data if data.is_a?(Hash)
+
+  warn "list-skills: no readable front matter in #{path}"
+  {}
+rescue Psych::Exception => e
+  warn "list-skills: no readable front matter in #{path}: #{e.message}"
+  {}
+end
+
+def read_json(path)
+  data = File.exist?(path) ? JSON.parse(File.read(path, encoding: "UTF-8")) : {}
+  data.is_a?(Hash) ? data : {}
+rescue JSON::ParserError => e
+  warn "list-skills: skipping unreadable #{path}: #{e.message}"
+  {}
+end
+
+def joined(*parts)
+  parts.compact.map(&:to_s).reject(&:empty?).uniq.join(", ")
+end
+
+def web_url(remote)
+  path = remote.to_s.strip[%r{\A(?:https://github\.com/|git@github\.com:)(.+?)(?:\.git)?/?\z}, 1]
+  path && "https://github.com/#{path}"
+end
+
+def declared_version(data)
+  metadata = data["metadata"].is_a?(Hash) ? data["metadata"] : {}
+  (data["version"] || metadata["version"])&.to_s
+end
+
+def pin(entry)
+  return unless entry["ref"]
+
+  entry["date"] ? "#{entry["ref"][0, 7]} (#{entry["date"]})" : entry["ref"][0, 7]
+end
+
+class Repo
+  def initialize(root)
+    @root = root
+  end
+
+  def git(*args)
+    out, status = Open3.capture2("git", "-C", @root, *args)
+    status.success? ? out : nil
+  end
+
+  def tracked_skills
+    @tracked_skills ||= git("ls-files", "-z", "skills").to_s.split("\0").filter_map do |path|
+      parts = path.split("/")
+      parts[1] if parts.length > 2
+    end.uniq
+  end
+
+  def url
+    @url ||= web_url(git("remote", "get-url", "origin"))
+  end
+
+  def last_change(name)
+    git("log", "-1", "--format=%h (%cs)", "--", "skills/#{name}").to_s.strip
+  end
+end
+
+def skill_rows(root, lock)
+  repo = Repo.new(root)
+  Dir.glob(File.join(root, "skills", "*", "SKILL.md")).sort.map do |path|
+    folder = File.basename(File.dirname(path))
+    data = front_matter(path)
+    entry = lock[folder] || {}
+    upstream = web_url(entry["source"])
+    row = Row.new(name: data["name"] || folder, description: data["description"].to_s)
+
+    if repo.tracked_skills.include?(folder)
+      row.origin = "DevKit"
+      row.repo = repo.url
+      row.version = joined(declared_version(data), repo.last_change(folder))
+      row.note = upstream && "copied from #{upstream}#{", changed since" if entry["modified"]}"
+    elsif upstream
+      row.origin = "Copied from a repo"
+      row.repo = upstream
+      row.version = joined(entry["version"] || declared_version(data), pin(entry))
+      row.note = entry["modified"] && "changed since it was copied"
+    elsif BUILT_IN.key?(entry["source"])
+      row.origin = BUILT_IN[entry["source"]]
+      row.version = entry["version"] || declared_version(data)
+      row.note = entry["modified"] && "differs from the current built-in copy"
+    else
+      row.origin = "Unknown"
+      row.version = declared_version(data)
+    end
+    row
+  end
+end
+
+def synced_rows(root)
+  Dir.glob(File.join(root, "skills", "synced", "*", "*", "SKILL.md")).sort.map do |path|
+    data = front_matter(path)
+    Row.new(name: data["name"] || File.basename(File.dirname(path)), origin: "Claude.ai synced",
+            version: declared_version(data), description: data["description"].to_s)
+  end
+end
+
+def plugin_skill_files(install_path)
+  manifest = read_json(File.join(install_path, ".claude-plugin", "plugin.json"))
+  dirs = ["skills", *Array(manifest["skills"])].map { |dir| File.expand_path(dir.to_s, install_path) }
+  dirs.flat_map do |dir|
+    skill = File.join(dir, "SKILL.md")
+    File.exist?(skill) ? [skill] : Dir.glob(File.join(dir, "*", "SKILL.md"))
+  end.uniq.sort
+end
+
+# The marketplace listing names each plugin's own repository; fall back to the marketplace repository
+# only for plugins stored inside it.
+def plugin_repo(plugins_dir, markets, plugin, market)
+  listing = read_json(File.join(plugins_dir, "marketplaces", market.to_s, ".claude-plugin", "marketplace.json"))
+  entry = Array(listing["plugins"]).find { |item| item.is_a?(Hash) && item["name"] == plugin }
+  source = entry && entry["source"]
+  return web_url(source["url"]) || (source["repo"] && "https://github.com/#{source["repo"]}") if source.is_a?(Hash)
+
+  market_source = markets[market].is_a?(Hash) ? markets[market]["source"] : nil
+  market_source.is_a?(Hash) && market_source["repo"] ? "https://github.com/#{market_source["repo"]}" : nil
+end
+
+def plugin_rows(home)
+  plugins_dir = File.join(home, ".claude", "plugins")
+  markets = read_json(File.join(plugins_dir, "known_marketplaces.json"))
+  plugins = read_json(File.join(plugins_dir, "installed_plugins.json"))["plugins"]
+  return [] unless plugins.is_a?(Hash)
+
+  plugins.sort.flat_map do |id, installs|
+    installs = Array(installs.is_a?(Hash) ? [installs] : installs).grep(Hash)
+    install = installs.find { |item| item["scope"] == "user" } || installs.first
+    next [] unless install && install["installPath"]
+
+    plugin, market = id.split("@", 2)
+    repo = plugin_repo(plugins_dir, markets, plugin, market)
+    plugin_skill_files(install["installPath"]).map do |path|
+      data = front_matter(path)
+      Row.new(name: "#{plugin}:#{data["name"] || File.basename(File.dirname(path))}", origin: "Claude plugin",
+              repo: repo, version: install["version"], description: data["description"].to_s, note: "plugin #{id}")
+    end
+  end
+end
+
+def h(text)
+  text.to_s.gsub(/[&<>"']/, "&" => "&amp;", "<" => "&lt;", ">" => "&gt;", '"' => "&quot;", "'" => "&#39;")
+end
+
+def render(rows)
+  counts = rows.group_by(&:origin).map { |origin, group| "#{h(origin)}: #{group.size}" }.join(" · ")
+  body = rows.map do |row|
+    repo = row.repo ? %(<a href="#{h(row.repo)}">#{h(row.repo.delete_prefix("https://github.com/"))}</a>) : ""
+    note = row.note ? %(<div class="note">#{h(row.note)}</div>) : ""
+    "<tr><td>#{h(row.name)}</td><td>#{h(row.origin)}</td><td>#{repo}</td>" \
+      "<td>#{h(row.version)}</td><td>#{h(row.description)}#{note}</td></tr>"
+  end
+  <<~HTML
+    <!doctype html>
+    <html lang="en">
+    <head>
+    <meta charset="utf-8">
+    <meta name="color-scheme" content="light dark">
+    <title>Skills</title>
+    <style>
+      body { font: 14px/1.45 -apple-system, system-ui, sans-serif; margin: 24px; }
+      input { font: inherit; padding: 6px 8px; width: 320px; margin: 8px 0 16px; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid #8884; }
+      th { position: sticky; top: 0; background: Canvas; }
+      td:first-child { font-weight: 600; white-space: nowrap; }
+      .note { opacity: 0.7; font-size: 12px; margin-top: 2px; }
+    </style>
+    </head>
+    <body>
+    <h1>Skills (#{rows.size})</h1>
+    <p>#{counts}</p>
+    <label for="filter">Filter</label><br>
+    <input id="filter" type="search" autofocus>
+    <table>
+    <thead><tr><th>Skill</th><th>From</th><th>Repo</th><th>Version</th><th>What it does</th></tr></thead>
+    <tbody>
+    #{body.join("\n")}
+    </tbody>
+    </table>
+    <script>
+      const rows = [...document.querySelectorAll("tbody tr")];
+      document.getElementById("filter").addEventListener("input", (event) => {
+        const query = event.target.value.toLowerCase();
+        for (const row of rows) row.hidden = !row.textContent.toLowerCase().includes(query);
+      });
+    </script>
+    </body>
+    </html>
+  HTML
+end
+
+options = { root: File.expand_path("..", __dir__), out: File.join(Dir.tmpdir, "devkit-skills.html"), open: true }
+OptionParser.new do |opts|
+  opts.banner = "usage: list-skills [--root DIR] [--out FILE] [--no-open]"
+  opts.on("--root DIR", "DevKit checkout to read (default: this script's repo)") { |v| options[:root] = File.expand_path(v) }
+  opts.on("--out FILE", "Where to write the page (default: #{options[:out]})") { |v| options[:out] = File.expand_path(v) }
+  opts.on("--no-open", "Write the page without opening it") { options[:open] = false }
+end.parse!
+
+lock = read_json(File.join(options[:root], "skills.lock.json")).fetch("skills", {})
+rows = skill_rows(options[:root], lock) + synced_rows(options[:root]) + plugin_rows(Dir.home)
+File.write(options[:out], render(rows), encoding: "UTF-8")
+puts options[:out]
+if options[:open]
+  opener = RUBY_PLATFORM.include?("darwin") ? "open" : "xdg-open"
+  system(opener, options[:out]) || warn("list-skills: could not run #{opener}; open the file above in a browser")
+end
