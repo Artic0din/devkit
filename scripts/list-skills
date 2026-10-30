@@ -19,7 +19,6 @@ BUILT_IN = {
   "local" => "Yours",
   "cursor" => "Cursor built-in",
   "codex" => "Codex built-in",
-  "ghostex" => "Ghostex built-in",
 }.freeze
 
 def front_matter(path)

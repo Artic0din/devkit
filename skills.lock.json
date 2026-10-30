@@ -440,14 +440,6 @@
       "date": "2026-08-05",
       "path": "skills/gh-attach"
     },
-    "ghostex-browser-use": {
-      "source": "ghostex",
-      "version": "10.38.1"
-    },
-    "ghostex-computer-use": {
-      "source": "ghostex",
-      "version": "10.38.1"
-    },
     "git-commit": {
       "source": "https://github.com/github/awesome-copilot.git",
       "ref": "e24be77e6f203409cf99ab7d5a67e1540cb386d3",

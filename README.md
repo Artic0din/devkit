@@ -13,7 +13,7 @@ The audit script named under Install reports whether a machine's rules pointers 
 | `AGENTS.MD` | Global hard rules, linked into Claude, Codex, Copilot CLI and Antigravity; Cursor reads it through `config/cursor.rules.mdc`. |
 | `skills/` | Skills, one folder each with `SKILL.md`. Personal and vendored skills are committed here. |
 | `skills.sh.json` | Curated routing catalogue; additional imported skill directories may be present. |
-| `skills.lock.json` | Where each skill this repo didn't write came from. `source` is the repository, or `local`, `cursor`, `codex` or `ghostex` for your own and app built-in skills; `ref`, `date` and `path` pin the first upstream commit whose `SKILL.md` matches the local copy; `version` records a release when there is no matching commit; `modified` marks a copy that no recorded upstream version matches. |
+| `skills.lock.json` | Where each skill this repo didn't write came from. `source` is the repository, or `local`, `cursor` or `codex` for your own and app built-in skills; `ref`, `date` and `path` pin the first upstream commit whose `SKILL.md` matches the local copy; `version` records a release when there is no matching commit; `modified` marks a copy that no recorded upstream version matches. |
 | `.github/instructions/` | GitHub Copilot custom instructions, scoped by `applyTo`. |
 | `hooks/` | Repository hook scripts. The tool configs under `config/` currently reference `~/.claude/hooks/`. |
 | `agents/` | Subagent definitions per tool format. |
