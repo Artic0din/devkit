@@ -6,6 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Fixed the Codex post-tool output filter blocking every shell command with "Tool output withheld: output filter failed": it now accepts the single combined output string that current Codex releases send.
 - Added two `AGENTS.MD` rules: agents now diagnose "why isn't this working?" questions with live checks without being asked for each one, and answer questions about Ryan's own apps and servers from the running instance first, then its source, then official docs, labelling anything unchecked as unverified.
 - Added two `AGENTS.MD` rules: every decision should improve the user, developer and agent experience (UX, DX, AX) without breaking anything, and screens should drop taglines, helper text and secondary labels, with the layout fixed when a screen depends on them.
 - Removed the Basic Memory rules from `AGENTS.MD` and the `github-author-context` and `github-deep-review` skills: the `ryan-knowledge` project, its `AI Memory/` folder, and every agent's Basic Memory server are already gone, so agents no longer search or write notes there or require Basic Memory for a healthy setup.

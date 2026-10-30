@@ -1,6 +1,6 @@
 # Codex output feedback hook
 
-`bash-output-scrub.sh` is a synchronous `PostToolUse` hook for Bash results with string `stdout` and `stderr` fields.
+`bash-output-scrub.sh` is a synchronous `PostToolUse` hook for Bash results, given either as one combined output string (current Codex releases) or as string `stdout` and `stderr` fields.
 It needs Bash and Python 3, writes no files, and makes no network requests.
 Ordinary results produce no hook output.
 When its patterns match, the hook returns `decision: "block"` with redacted feedback.
