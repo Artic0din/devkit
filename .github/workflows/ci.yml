@@ -59,6 +59,9 @@ jobs:
       - name: Test Codex output filtering (offline, synthetic)
         run: python3 hooks/codex/test-output-scrub.py
 
+      - name: Test delegate guard (offline, synthetic)
+        run: python3 hooks/test-delegate-guard.py
+
       - name: Test PR walkthrough with synthetic data
         run: |
           python3 -m pip install pytest playwright
