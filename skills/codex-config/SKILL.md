@@ -21,8 +21,8 @@ Never print, copy, or move that file between Macs; each host logs in from its ow
 The root of `~/.codex/config.toml` carries:
 
 ```toml
-model = "gpt-6-astra"
-model_reasoning_effort = "ultra"
+model = "gpt-6.1-sol"
+model_reasoning_effort = "medium"
 model_reasoning_summary = "concise"
 model_verbosity = "medium"
 service_tier = "default"
@@ -35,7 +35,7 @@ sandbox_mode = "danger-full-access"
 `approval_policy = "never"` with `sandbox_mode = "danger-full-access"` means Codex runs commands
 without asking. Treat any change to either as a deliberate decision Ryan makes, not a repair step.
 
-Preserve the selected model when changing anything else. `-m gpt-6-astra` selects a model, not a
+Preserve the selected model when changing anything else. `-m gpt-6.1-sol` selects a model, not a
 provider, and changing reasoning effort or verbosity does not require touching the model.
 
 ## Do not add direct-API context overrides
@@ -57,8 +57,8 @@ billing; a client-side override cannot expand entitlement.
 
 Codex TUI sessions can share an app server through
 `~/.codex/app-server-control/app-server-control.sock`. A running server keeps the configuration it
-loaded at startup, so editing `config.toml` does not reach sessions already attached to it. That
-socket directory is absent right now, which means no shared server is running.
+loaded at startup, so editing `config.toml` does not reach sessions already attached to it. When that
+socket directory exists, a shared server is running and keeps its loaded settings.
 
 After changing configuration:
 

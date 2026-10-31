@@ -44,6 +44,48 @@ hard rules and links here; tool-specific items migrate into the owning skill ove
 
 - Claude Code implementation/refactor/test/fix: `$codex-first`, located at `skills/codex-first/SKILL.md` from the repository root. Apply its native-Claude model gate. Design/API design/tiny edit: direct. Codex session: ignore.
 - Codex worker model, reasoning, and service tier follow the current `$codex-first` launch recipe unless the user requests an override. Use `$codex-config` for Codex settings and its direct-API preflight, and `$autoreview` for isolated reviews; preserve its reviewer isolation.
+
+### Model routing ladder
+
+Four separately metered pools exist on Ryan's Macs: the Claude plan (`claudeAgent`), the ChatGPT plan through Codex (`codex`), the Google account through Antigravity (`antigravity`), and the legacy Cursor Ultra plan (`cursor`).
+Cursor Ultra has two monthly pools: Cursor Models (Grok 4.7, Composer 2.5) and Other Models (Claude 5.5 family, Gemini 4 Argon, Gemini 3.8 Flash, GPT-5.6) at API list price.
+Claude and ChatGPT plans use rolling windows, so children go to the monthly Cursor pools first while they have headroom.
+Cursor's OpenAI lane stops at GPT-5.6; GPT-6 work stays on `codex`.
+Composer 2.5 fast is 6x standard, Grok 4.7 at 500k or fast is 2x; children run standard speed at the smaller context option (256k Grok, 300k Claude).
+
+| Level | Claude lane | Codex lane | Cursor lane | When |
+| --- | --- | --- | --- | --- |
+| L0 helpers | Haiku 5.5 medium | GPT-6 Luna medium | Gemini 3.8 Flash Medium via `antigravity` | extraction, search, summaries |
+| L1 default | Sonnet 5.5 high | Luna high for fully specified work; GPT-6.1 Sol medium for substantial code | Composer 2.5 standard; Sonnet 5.5 high | everything until a trigger fires |
+| L2 | Opus 5.5 high | Sol high | Opus 5.5 high | one trigger |
+| L3 | Opus 5.5 xhigh | Astra low | none | two triggers |
+| L4 | Fable 5.1 high | Astra medium | none | Ryan's approval only |
+
+Start level by `delegate_task` role: `research` L0, `test` and `general` L1, `implementation` L1, `design` L2, `review` on a different family from the implementer at the implementer's level, preferring Gemini 4 Argon medium or Grok 4.7 high as a third family.
+Triggers, one level each: the previous level failed verification; the change crosses three or more modules or needs an architecture decision; correctness-critical domains (money, energy control, scheduling) start at L2; Ryan asks.
+After L3 fails, stop and report; L4 is Ryan's decision.
+A thread may raise its own level with `t3_thread_configure` after a trigger and must say so in chat.
+Escalated calls carry `[escalate:L3]` or `[escalate:L4]` in the title and name the trigger in the task text.
+
+`target` values from `orchestrator_capabilities` (Cursor option ids differ per model):
+
+```json
+{"providerInstanceId":"claudeAgent","model":"claude-sonnet-5-5","options":{"effort":"high"}}
+{"providerInstanceId":"claudeAgent","model":"claude-haiku-5-5","options":{"effort":"medium"}}
+{"providerInstanceId":"codex","model":"gpt-6.1-sol","options":{"reasoningEffort":"medium","serviceTier":"default"}}
+{"providerInstanceId":"codex","model":"gpt-6-luna","options":{"reasoningEffort":"high","serviceTier":"default"}}
+{"providerInstanceId":"antigravity","model":"gemini-3.8-flash-medium"}
+{"providerInstanceId":"cursor","model":"composer-2.5","options":{"fastMode":false}}
+{"providerInstanceId":"cursor","model":"claude-sonnet-5-5","options":{"reasoning_effort":"high","contextWindow":"300k"}}
+{"providerInstanceId":"cursor","model":"claude-opus-5-5","options":{"effort":"high","contextWindow":"300k","fastMode":false}}
+{"providerInstanceId":"cursor","model":"grok-4.7","options":{"contextWindow":"256k","fastMode":false,"reasoning_effort":"high"}}
+{"providerInstanceId":"cursor","model":"gemini-4-argon","options":{"reasoning_effort":"medium"}}
+```
+
+`delegate_task` without `target` inherits the parent's model and effort, so every call sets `target`.
+Native `Agent` calls name `model` and `effort` the same way unless the agent type's own frontmatter sets them; `fork` inherits by design.
+T3 lists only starred models to the orchestrator and omits hidden ones, so the picker favourites per provider are the ladder's models and nothing else.
+T3's load balancing spreads threads across linked machines, not providers; pool choice comes from this ladder.
 - Claude Code parallel/background work (Codex workers, monitors, long jobs): each = own harness-tracked task (`run_in_background: true`), labeled for target, one sidebar chip each. Never `&`-detach durable work — hides it, only agent sees. Quick foreground cmds inline. Other harnesses: ignore.
 - Screenshot/live-UI bugs and computer use: use the available browser or computer-use tools and their applicable skills; verify capabilities before acting.
 - Ryan's Chrome: use available browser or computer-use tools; when mcporter is available, prefer its daemon-backed `chrome-devtools` relay and reuse one long-lived connection per task. Never open raw CDP/WebSocket connections or ad-hoc Puppeteer/CDP clients.

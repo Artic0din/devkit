@@ -48,7 +48,7 @@ Keep landing serial and preserve another worker's lock or unfinished work.
 ## Launch an implementation worker
 
 Inherit the configured Codex model, provider, authentication, sandbox, and approval policy.
-Keep high reasoning and Fast service as the worker defaults unless the user requests different settings.
+Keep medium reasoning on the default service tier as the worker defaults (L1 in the AGENTS.MD routing ladder); raise to high only after a trigger, and use Fast service only when Ryan asks for speed.
 Do not hardcode a model or switch providers to recover from an error.
 Apply an explicit user model override with `--model` on every fresh or resumed launch.
 
@@ -72,8 +72,7 @@ cat >"$task_dir/prompt.md" <<'EOF'
 <Complete work order with scope, authority, checks, and stop condition.>
 EOF
 if command codex exec -C "$repo" \
-  -c 'model_reasoning_effort="high"' \
-  --enable fast_mode -c 'service_tier="fast"' \
+  -c 'model_reasoning_effort="medium"' \
   -o "$task_dir/result.md" - <"$task_dir/prompt.md" \
   >"$task_dir/worker.log" 2>&1; then
   cat "$task_dir/result.md"
@@ -84,6 +83,7 @@ else
 fi
 ```
 
+Medium effort on the default tier is the L1 worker setting from the routing ladder in AGENTS.MD; escalate to L2 with `-c 'model_reasoning_effort="high"'` only after a trigger, and add `--enable fast_mode -c 'service_tier="fast"'` only when Ryan asks for speed.
 Keep logs local and inspect only relevant, redacted errors.
 Read the result file after completion; the file alone does not prove the command succeeded.
 Remove the task's temporary directory only after collecting the result and any needed failure evidence.
@@ -102,8 +102,7 @@ For example, after writing the follow-up prompt and setting the saved `session_i
 
 ```bash
 (cd "$repo" && command codex exec resume "$session_id" \
-  -c 'model_reasoning_effort="high"' \
-  --enable fast_mode -c 'service_tier="fast"' \
+  -c 'model_reasoning_effort="medium"' \
   -o "$task_dir/followup-result.md" - <"$task_dir/followup-prompt.md" \
   >"$task_dir/followup.log" 2>&1)
 ```
