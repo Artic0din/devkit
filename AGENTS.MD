@@ -42,6 +42,10 @@ Home Assistant power user: Tesla solar/Powerwall/EVs, GloBird Energy, Daikin HVA
 - Isolate every parallel subagent from the main worktree and staged changes: persistent worktrees belong in `/Users/ryanfoyle/Metisary/Enviroment/worktrees/`; throwaway audits may use a temporary directory.
 - Never let agents write to a shared inventory file or to staged files. Each returns its result; the parent merges.
 - Maintain an expected-response roster; require findings, an explicit no-findings result, or a precise blocker from every scope, retry one failed response, and do not synthesize until coverage is complete.
+- Model routing: every delegation (T3 `delegate_task`, native `Agent`) names provider, model and effort explicitly; never inherit the parent's model. Start at the cheapest level that fits the role and move up one level per trigger. Table, `target` values and pools: [agent-operations.md](/Users/ryanfoyle/Metisary/Enviroment/config/docs/agent-operations.md) → Routing.
+- Levels: L0 helpers = Haiku 5.5 medium, GPT-6 Luna medium, Gemini 3.8 Flash Medium. L1 default = Sonnet 5.5 high, Composer 2.5 standard, Luna high or GPT-6.1 Sol medium. L2 = Opus 5.5 high, Sol high. L3 = Opus 5.5 xhigh, Astra low. L4 = Fable 5.1 or Astra medium, only with Ryan's approval.
+- Triggers, one level each: the previous level failed verification; the change crosses three or more modules or needs an architecture decision; correctness-critical domains (money, energy control, scheduling) start at L2; Ryan asks. After L3 fails, stop and report (hard rule 7).
+- Review runs on a different model family from the implementer, at the implementer's level. Parent and interactive threads stay on the Claude provider; children may use the Cursor pools while they have headroom, with fast modes off and the smaller context option.
 
 ## Engineering standards
 
