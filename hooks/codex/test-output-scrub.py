@@ -323,6 +323,24 @@ def test_empty_key_owns_same_indent_sequence() -> None:
     assert run_hook("- password:\n- user: bob\n") == "", "next list item treated as the key's sequence"
 
 
+def test_combined_string_response() -> None:
+    # Codex 0.165 sends Bash output as one combined string, not stdout/stderr fields.
+    def run(response: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["bash", str(Path(__file__).with_name("bash-output-scrub.sh"))],
+            input=json.dumps({"tool_name": "Bash", "tool_response": response}), text=True,
+            capture_output=True, timeout=3,
+        )
+    result = run("hello\r\n")
+    assert (result.returncode, result.stdout, result.stderr) == (0, "", ""), result
+    credential = "ghp_" + "Z" * 36
+    result = run("ok\n" + credential + "\n")
+    assert result.returncode == 0 and result.stderr == "", result
+    output = json.loads(result.stdout)
+    assert output["decision"] == "block" and "[REDACTED_GH_TOKEN]" in output["reason"], output
+    assert credential not in result.stdout
+
+
 def test_list_item_keys_keep_siblings() -> None:
     for text in (
         "- password: first-part\n  user: bob\n",
@@ -353,6 +371,7 @@ if __name__ == "__main__":
     test_many_fields_scan_in_linear_time()
     test_empty_key_owns_same_indent_sequence()
     test_list_item_keys_keep_siblings()
+    test_combined_string_response()
     for response in ({}, {"stdout": ""}, {"stderr": ""}):
         result = subprocess.run(
             ["bash", str(Path(__file__).with_name("bash-output-scrub.sh"))],
