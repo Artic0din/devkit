@@ -308,7 +308,8 @@ def main() -> int:
     try:
         payload = json.load(sys.stdin)
         response = payload["tool_response"]
-        stdout, stderr = response["stdout"], response["stderr"]
+        # Newer Codex releases send Bash output as one combined string.
+        stdout, stderr = (response, "") if isinstance(response, str) else (response["stdout"], response["stderr"])
         if not isinstance(stdout, str) or not isinstance(stderr, str):
             raise ValueError("Bash output fields must be strings")
         (clean_stdout, stdout_changed), (clean_stderr, stderr_changed) = redact(stdout), redact(stderr)
