@@ -6,6 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Added two `AGENTS.MD` rules: every PR body and GitHub issue ends with a short ELI5 section, and agents add no attribution to commits, PRs, issues or comments.
 - Updated the vendored tstack skills to `1085050`: `council` now fixes known issues and outstanding PR comments before bringing in reviewers, and `full-stop` also triggers on a closing "Full stop." that reads like emphasis.
 - Fixed the Codex post-tool output filter blocking every shell command with "Tool output withheld: output filter failed": it now accepts the single combined output string that current Codex releases send.
 - Added two `AGENTS.MD` rules: agents now diagnose "why isn't this working?" questions with live checks without being asked for each one, and answer questions about Ryan's own apps and servers from the running instance first, then its source, then official docs, labelling anything unchecked as unverified.
