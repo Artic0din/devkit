@@ -90,6 +90,8 @@ Full standard: [engineering-constitution.md](/Users/ryanfoyle/Metisary/Enviromen
 - Prefactoring separate from feature (own commit minimum, own PR preferred). Drive-by fixes → separate PR or issue, never the feature diff.
 - Never run whole-repo formatters on files you didn't change.
 - PR bodies in plain English: what was broken, what this fixes, test plan. Reference the linked issue. Never create draft PRs. User-visible change → one past-tense, user-facing release-note line. Breaking change → what breaks, how to migrate, why.
+- End every PR body and GitHub issue with a short ELI5 section (one or two plain sentences).
+- No agent attribution anywhere: no Co-Authored-By trailers, "Generated with" or "Created with" footers, or model notes on commits, PRs, issues or comments.
 - During review: push fixes as new commits, never force-push a rewrite. Squash fixups only after approval.
 - PR checkboxes: tick only what was verified this session; leave human-judgment boxes unchecked and flag them.
 - Repos: read their PR template + contributing doc from the repo at PR time (never from memory); with none, use the global defaults in [github-intake.md](/Users/ryanfoyle/Metisary/Enviroment/config/docs/github-intake.md); follow their AI-disclosure/trailer policy — strip AI co-author trailers where banned.
