@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 
 OUTCOMES = {"verified_complete", "partial", "blocked", "active", "unclear"}
 TASK_STATUSES = {"new", "duplicate", "completed", "blocked"}
-ISSUE_SECTIONS = ("Context", "Goal", "Acceptance criteria", "Technical notes")
+ISSUE_SECTIONS = ("Context", "Goal", "Acceptance criteria", "Technical notes", "ELI5")
 REPOSITORY_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 MARKER_PATTERN = re.compile(r"^<!-- session-triage:[A-Za-z0-9-]+:[A-Za-z0-9._-]+ -->$")
 

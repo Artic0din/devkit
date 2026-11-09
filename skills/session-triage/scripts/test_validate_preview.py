@@ -92,7 +92,7 @@ def task_preview() -> dict:
     thread["project"].update(mapping_status="mapped", name="Example", cwd="/tmp/example", repo="owner/project")
     thread["task_candidates"] = [{
         "status": "new", "title": "Example", "repo": "owner/project",
-        "body": "## Context\nEvidence\n## Goal\nOutcome\n## Acceptance criteria\n- [ ] Verified\n## Technical notes\nConstraints\n<!-- session-triage:synthetic:example -->",
+        "body": "## Context\nEvidence\n## Goal\nOutcome\n## Acceptance criteria\n- [ ] Verified\n## Technical notes\nConstraints\n## ELI5\nPlain summary\n<!-- session-triage:synthetic:example -->",
         "evidence": ["Synthetic evidence"], "marker": "<!-- session-triage:synthetic:example -->",
         "dedupe": {"checked": True, "existing_url": None, "reason": "No matching issue"},
     }]
@@ -156,6 +156,10 @@ def test_empty_issue_sections() -> None:
         value["threads"][0]["task_candidates"][0]["body"] = body
         assert any("section must not be empty" in error or "at least one criterion" in error
                    for error in validate_preview(value)), body
+    value = task_preview()
+    task = value["threads"][0]["task_candidates"][0]
+    task["body"] = task["body"].replace("## ELI5\nPlain summary\n", "")
+    assert any("requires a ELI5 section" in error for error in validate_preview(value)), validate_preview(value)
     value = task_preview()
     candidate = value["threads"][0]["task_candidates"][0]
     candidate["body"] = candidate["body"].replace("\n", "\r\n")

@@ -57,7 +57,7 @@ Every task includes title, repo, evidence, dedupe, and marker.
 Dedupe contains checked, existing_url, and reason.
 Duplicate and completed tasks include an `https` URL with a host name that links the existing work.
 New tasks require a mapped owner/repository and a marker containing the source thread ID.
-Every new task also includes the exact proposed issue body, with Context, Goal, Acceptance criteria, and Technical notes sections and its stable marker.
+Every new task also includes the exact proposed issue body, with Context, Goal, Acceptance criteria, Technical notes, and ELI5 sections and its stable marker.
 Each section has non-empty content apart from the marker, and Acceptance criteria lists at least one `-` or `*` item with text, not only an empty checkbox.
 Task markers must be unique across all new candidates in the preview.
 The task repository must match the mapped project's repository, ignoring letter case.

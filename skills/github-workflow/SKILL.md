@@ -34,6 +34,9 @@ The user-level `Development` Project is closed and must not be used.
 
 ## Technical notes
 [Verified constraints, pointers, dependencies, or exclusions]
+
+## ELI5
+[One or two plain sentences someone with no context could follow]
 ```
 
 4. Add only labels that improve retrieval; do not invent milestones, dates, estimates, or custom fields.
@@ -51,7 +54,7 @@ The user-level `Development` Project is closed and must not be used.
 1. Complete required validation and run `gitleaks git --staged --redact` before committing.
    Immediately before each push, run `gitleaks git --redact --log-opts='<remote-base>..HEAD'` over the exact outgoing range; findings block publication.
 2. Open or update one focused pull request with a conventional title.
-3. Include what changed, why, the test plan, and the required release note in the pull request body.
+3. Include what changed, why, the test plan, the required release note, and a closing short ELI5 section in the pull request body.
    Add `Fixes #123` only for an actual linked issue; direct-fix pull requests do not need an issue footer.
 4. Keep issue state aligned with the pull request; pull request review state is authoritative.
 
