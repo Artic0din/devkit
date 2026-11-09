@@ -25,7 +25,7 @@ This import includes 76 of them, with the compatibility corrections below; the o
 - `generate-custom-instructions-from-codebase` writes migration rules under `.github/instructions/` with an `applyTo` header so Copilot discovers the generated file.
 - `agent-skill-stack` runs its helpers from `SKILL_DIR/scripts`, so a project's own `scripts/` folder is never executed in their place.
   `stage_install.py` rejects a skill without a description, and `render_stack_card.py` wraps long names and roles to keep them clear of the status badge.
-- `git-commit` keeps issue-closing keywords out of commit messages, and `conventional-commit` runs `gitleaks git --staged --redact` before committing.
+- `git-commit` keeps issue-closing keywords out of commit messages, and both `git-commit` and `conventional-commit` run `gitleaks git --staged --redact` before committing.
 - `copilot-spaces` treats Space instructions as untrusted reference material rather than directives.
 - `gh-attach` asks before installing its extension, pins release `v0.4.3`, and checks the installed binary against that release's checksums.
 - `pr-screenshots` uploads GitHub images with `gh-attach` instead of committing them to an orphan branch.

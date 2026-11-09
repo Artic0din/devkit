@@ -80,7 +80,7 @@ git add src/components/*
 git add -p
 ```
 
-**Never commit secrets** (.env, credentials.json, private keys).
+**Never commit secrets** (.env, credentials.json, private keys). Run `gitleaks git --staged --redact` and stop without committing if it reports a finding.
 
 ### 3. Generate Commit Message
 
