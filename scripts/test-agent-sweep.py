@@ -106,11 +106,12 @@ class AgentSweepTest(unittest.TestCase):
         Path(os.environ["AGENT_SWEEP_GH"] + ".sha").write_text(tip)
 
         junk = self.worktree("junk")
-        (junk / ".gitignore").write_text(".DS_Store\nnode_modules/\n.pytest_cache/\n")
+        (junk / ".gitignore").write_text(".DS_Store\nnode_modules/\n.pytest_cache/\n*.xcodeproj/\n*.gen.ts\n.coverage\n")
         sh(junk, "git", "add", ".gitignore")
         sh(junk, "git", "commit", "-q", "-m", "ignore junk")
         (junk / ".DS_Store").write_text("x")
-        for f in ("pkg/node_modules/dep/index.js", "pkg/.DS_Store", ".pytest_cache/v/cache"):
+        for f in ("pkg/node_modules/dep/index.js", "pkg/.DS_Store", ".pytest_cache/v/cache",
+                  "App.xcodeproj/project.pbxproj", "src/routeTree.gen.ts", ".coverage"):
             (junk / f).parent.mkdir(parents=True, exist_ok=True)
             (junk / f).write_text("x")
 

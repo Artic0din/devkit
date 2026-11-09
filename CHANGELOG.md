@@ -6,7 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
-- Changed `scripts/agent-sweep` to treat a worktree idle for 14 days as dead: `--apply` now removes it and its branch even with uncommitted or unmerged work, ignores `.DS_Store`, test caches and nested `node_modules` or `.venv` folders, and also scans older agent worktree folders and `/private/tmp`.
+- Changed `scripts/agent-sweep` to treat a worktree idle for 14 days as dead: `--apply` now removes it and its branch even with uncommitted or unmerged work, ignores `.DS_Store`, test caches, coverage data, generated Xcode projects and `*.gen.ts` files, and nested `node_modules` or `.venv` folders, and also scans older agent worktree folders and `/private/tmp`.
 - Changed the nightly `agent-sweep-schedule` run to apply the sweep, so idle worktrees are removed every night instead of only reported.
 - Added `scripts/agent-sweep-schedule`, which installs a daily report-only run of `agent-sweep` on a Mac and keeps the last 14 reports in `~/Library/Logs/agent-sweep`.
 - Added five `AGENTS.MD` rules so agents stop leaving clutter: reuse simulators, share one pnpm or bun store across worktrees, keep read-only subagents from installing or creating worktrees, remove task worktrees and branches once merged or abandoned, and never leave the task's changes uncommitted.

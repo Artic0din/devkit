@@ -29,8 +29,19 @@ DEFAULT_ROOTS = ["~/Metisary/Enviroment/worktrees", "~/Metisary/Projects", "~/De
 SKIP_DIRS = {"node_modules", ".build", "DerivedData", "Pods", ".venv"}
 # Ignored folders that rebuild themselves; any other ignored file (such as .env) keeps a worktree.
 REBUILDABLE = SKIP_DIRS | {"dist", "build", ".next", ".turbo", ".cache", "coverage", "__pycache__", ".ruff_cache",
-                           ".pytest_cache", ".mypy_cache", "test-results"}
-JUNK_FILES = {".DS_Store"}
+                           ".pytest_cache", ".mypy_cache", "test-results", ".deriveddata", ".vite-hooks"}
+JUNK_FILES = {".DS_Store", ".coverage"}
+# Ignored generated output: XcodeGen projects and code generators' *.gen.ts files.
+REBUILDABLE_SUFFIXES = (".xcodeproj",)
+JUNK_SUFFIXES = (".gen.ts",)
+
+
+def rebuildable(name: str) -> bool:
+    return name in REBUILDABLE or name.endswith(REBUILDABLE_SUFFIXES)
+
+
+def junk_file(name: str) -> bool:
+    return name in JUNK_FILES or name.endswith(JUNK_SUFFIXES)
 FETCH_TIMEOUT_S = 60
 
 
@@ -93,9 +104,9 @@ def process_cwds() -> Optional[List[str]]:
 def is_junk(wt: Path, entry: str) -> bool:
     """True for ignored junk files and anything inside a rebuildable folder at any depth."""
     parts = entry.rstrip("/").split("/")
-    if parts[-1] in JUNK_FILES:
+    if junk_file(parts[-1]):
         return True
-    return any(name in REBUILDABLE and (wt.joinpath(*parts[: i + 1])).is_dir() for i, name in enumerate(parts))
+    return any(rebuildable(name) and (wt.joinpath(*parts[: i + 1])).is_dir() for i, name in enumerate(parts))
 
 
 def walk_blocker(wt: Path, entry: str, need_junk: bool) -> str:
@@ -107,8 +118,8 @@ def walk_blocker(wt: Path, entry: str, need_junk: bool) -> str:
     for root, dirs, files in os.walk(top):
         if ".git" in dirs or ".git" in files:
             return f"nested repository {Path(root).relative_to(wt)}"
-        dirs[:] = [d for d in dirs if d not in REBUILDABLE]
-        odd = next((f for f in files if f not in JUNK_FILES), None)
+        dirs[:] = [d for d in dirs if not rebuildable(d)]
+        odd = next((f for f in files if not junk_file(f)), None)
         if need_junk and odd:
             return f"ignored file {(Path(root) / odd).relative_to(wt)} (could be secrets)"
     return ""
