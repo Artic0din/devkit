@@ -39,7 +39,7 @@ Home Assistant power user: Tesla solar/Powerwall/EVs, GloBird Energy, Daikin HVA
 
 ## Parallel Agents
 
-- Isolate every parallel subagent from the main worktree and staged changes: persistent worktrees belong in `/Users/ryanfoyle/Metisary/Enviroment/worktrees/`; throwaway audits may use a temporary directory.
+- Isolate every parallel subagent from the main worktree and staged changes: persistent worktrees belong in `/Users/ryanfoyle/Metisary/Enviroment/worktrees/<tool>/`; scratch files go in `/Users/ryanfoyle/Metisary/Enviroment/scratch/<tool>/`, never `/tmp`.
 - Never let agents write to a shared inventory file or to staged files. Each returns its result; the parent merges.
 - Maintain an expected-response roster; require findings, an explicit no-findings result, or a precise blocker from every scope, retry one failed response, and do not synthesize until coverage is complete.
 

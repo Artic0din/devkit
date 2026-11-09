@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# agent-locations: keep every agent's worktrees and temp files in one place on this Mac.
+#
+#   agent-locations install   create the folders, point Claude Code at them, and
+#                             link the folders Cursor, Codex and T3 can't be told to move
+#   agent-locations status    show what is in place
+#
+# Worktrees: <worktrees>/<tool>/...  Scratch: <scratch>/<tool>/...  (scripts/canonical-paths.sh)
+set -euo pipefail
+. "$(cd "$(dirname "$0")" && pwd -P)/canonical-paths.sh"
+wt=$CANONICAL_WORKTREES_ROOT
+scratch=$CANONICAL_SCRATCH_ROOT
+settings="$HOME/.claude/settings.json"
+hook="$CANONICAL_CONFIG_ROOT/hooks/claude-worktree.py"
+# Folders these apps hardcode (no setting exists), each replaced by a link into the shared root.
+# shortcut: a symlink can break if an app update recreates its folder; status reports that.
+links=("$HOME/.cursor/worktrees=$wt/cursor" "$HOME/.codex/worktrees=$wt/codex" "$HOME/.t3/scratch=$scratch/t3")
+
+link_into() {  # move an app folder's contents into the shared root and leave a link behind
+  local src=$1 dst=$2
+  [[ -d "$(dirname "$src")" ]] || return 0  # app not installed
+  mkdir -p "$dst"
+  if [[ -L "$src" ]]; then
+    [[ "$(readlink "$src")" == "$dst" ]] && return 0
+    # Git records paths through this link, so repointing it would orphan those worktrees.
+    echo "$src already links to $(readlink "$src"); move its contents to $dst by hand" >&2; return 1
+  elif [[ -d "$src" ]]; then
+    find "$src" -mindepth 1 -maxdepth 1 -exec mv -n {} "$dst"/ \;
+    rmdir "$src" || { echo "could not empty $src (name clash in $dst)" >&2; return 1; }
+  fi
+  ln -s "$dst" "$src"
+}
+
+case "${1:-}" in
+  install)
+    [[ -f "$hook" ]] || { echo "missing $hook: pull the main config checkout first" >&2; exit 2; }
+    mkdir -p "$wt"/{claude,codex,cursor,t3} "$scratch"/{claude,codex,cursor,t3}
+    for pair in "${links[@]}"; do link_into "${pair%%=*}" "${pair#*=}"; done
+    mkdir -p "$(dirname "$settings")"
+    python3 -I - "$settings" "$hook" "$wt" "$scratch/claude" <<'PY'
+import json, os, shlex, sys
+path, hook, wt, tmp = sys.argv[1:]
+data = json.load(open(path)) if os.path.exists(path) else {}
+data.setdefault("env", {})["CLAUDE_CODE_TMPDIR"] = tmp
+cmd = f"AGENT_WORKTREES_ROOT={shlex.quote(wt)} python3 {shlex.quote(hook)}"
+hooks = data.setdefault("hooks", {})
+for event, verb in (("WorktreeCreate", "create"), ("WorktreeRemove", "remove")):
+    want = [{"hooks": [{"type": "command", "command": f"{cmd} {verb}"}]}]
+    if hooks.get(event) not in (None, want):
+        print(f"replacing existing {event} hook: {json.dumps(hooks[event])}", file=sys.stderr)
+    hooks[event] = want
+tmp_path = path + ".tmp"
+with open(tmp_path, "w") as f:
+    json.dump(data, f, indent=2)
+    f.write("\n")
+os.replace(tmp_path, path)
+PY
+    echo "installed: worktrees in $wt/<tool>, scratch in $scratch/<tool>"
+    ;;
+  status)
+    ok=0
+    for pair in "${links[@]}"; do
+      src=${pair%%=*} dst=${pair#*=}
+      [[ -d "$(dirname "$src")" ]] || { echo "n/a   $src (app not installed)"; continue; }
+      if [[ -L "$src" && "$(readlink "$src")" == "$dst" ]]; then echo "ok    $src -> $dst"; else echo "DRIFT $src is not a link to $dst"; ok=1; fi
+    done
+    python3 -I - "$settings" "$scratch/claude" <<'PY' || ok=1
+import json, sys
+path, tmp = sys.argv[1:]
+try:
+    data = json.load(open(path))
+except (OSError, ValueError):
+    data = {}
+good = data.get("env", {}).get("CLAUDE_CODE_TMPDIR") == tmp
+hooks = all("claude-worktree.py" in json.dumps(data.get("hooks", {}).get(e, [])) for e in ("WorktreeCreate", "WorktreeRemove"))
+print(("ok   " if good else "DRIFT") + f" Claude Code CLAUDE_CODE_TMPDIR={tmp}")
+print(("ok   " if hooks else "DRIFT") + " Claude Code worktree hooks")
+sys.exit(0 if good and hooks else 1)
+PY
+    exit $ok
+    ;;
+  *)
+    sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
+    exit 2
+    ;;
+esac

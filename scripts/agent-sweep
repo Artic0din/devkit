@@ -8,7 +8,8 @@ the default branch, and has no ignored files beyond rebuildable folders and junk
 such as .DS_Store (any other ignored file could be a secret). Locked worktrees
 and ones a process works in are kept. A branch with no worktree is removed only
 when it is merged: its tip is an ancestor of origin's default branch, or a merged
-PR on GitHub has exactly that tip as its head (squash merges).
+PR on GitHub has exactly that tip as its head (squash merges). Scratch entries
+under the shared scratch folder idle for --days are removed too.
 """
 
 from __future__ import annotations
@@ -42,6 +43,8 @@ def rebuildable(name: str) -> bool:
 
 def junk_file(name: str) -> bool:
     return name in JUNK_FILES or name.endswith(JUNK_SUFFIXES)
+SCRATCH_ROOT = "~/Metisary/Enviroment/scratch"
+SCRATCH_DEPTH = 3  # e.g. claude/claude-501/<project>/<session>: descend past active parents
 FETCH_TIMEOUT_S = 60
 
 
@@ -226,11 +229,58 @@ def last_activity(wt: Path) -> float:
     return max(stamps)
 
 
-def sweep(roots: List[Path], apply: bool, days: int, fetch: bool, out=sys.stdout) -> Dict[str, int]:
+def newest_mtime(path: Path) -> float:
+    newest = path.lstat().st_mtime
+    if path.is_dir() and not path.is_symlink():
+        for root, dirs, files in os.walk(path):
+            for name in dirs + files:
+                try:
+                    newest = max(newest, os.lstat(os.path.join(root, name)).st_mtime)
+                except OSError:
+                    pass
+    return newest
+
+
+def sweep_scratch(scratch: Optional[Path], apply: bool, cutoff: float, days: int, cwds: Optional[List[str]],
+                  totals: Dict[str, int], emit) -> None:
+    """Remove scratch entries untouched for --days, descending into active folders to find idle ones."""
+    if scratch is None or not scratch.is_dir() or cwds is None:
+        return
+
+    def visit(d: Path, depth: int) -> None:
+        for entry in sorted(d.iterdir()):
+            if any(c == str(entry) or c.startswith(str(entry) + "/") for c in cwds):
+                continue
+            if newest_mtime(entry) >= cutoff:
+                if depth < SCRATCH_DEPTH and entry.is_dir() and not entry.is_symlink():
+                    visit(entry, depth + 1)
+                continue
+            kb = 0 if entry.is_symlink() else size_kb(entry)
+            emit("scratch", "remove", str(entry), f"idle {days}+ days", kb)
+            totals["scratch"] += 1
+            if not apply:
+                totals["reclaimable_kb"] += kb
+                continue
+            try:
+                if entry.is_dir() and not entry.is_symlink():
+                    shutil.rmtree(entry)
+                else:
+                    entry.unlink()
+                totals["freed_kb"] += kb
+            except OSError as err:
+                emit("scratch", "error", str(entry), str(err))
+
+    for tool in sorted(scratch.iterdir()):
+        if tool.is_dir() and not tool.is_symlink():
+            visit(tool, 1)
+
+
+def sweep(roots: List[Path], apply: bool, days: int, fetch: bool, out=sys.stdout,
+          scratch: Optional[Path] = None) -> Dict[str, int]:
     cwds = process_cwds()
     me = str(Path.cwd().resolve())
     cutoff = time.time() - days * 86400
-    totals = {"worktrees": 0, "branches": 0, "node_modules": 0, "kept": 0, "freed_kb": 0, "reclaimable_kb": 0}
+    totals = {"worktrees": 0, "branches": 0, "node_modules": 0, "scratch": 0, "kept": 0, "freed_kb": 0, "reclaimable_kb": 0}
 
     def emit(kind: str, verdict: str, path: str, why: str, kb: int = 0) -> None:
         print(f"{kind}\t{verdict}\t{human(kb) if kb else '-'}\t{path}\t{why}", file=out)
@@ -243,7 +293,9 @@ def sweep(roots: List[Path], apply: bool, days: int, fetch: bool, out=sys.stdout
         for t in trees[1:]:  # trees[0] is the main checkout
             wt = Path(t["worktree"])
             busy = cwds is None or me.startswith(str(wt)) or any(c == str(wt) or c.startswith(str(wt) + "/") for c in cwds)
-            inside = any(str(wt) == str(r) or str(wt).startswith(str(r) + "/") for r in roots)
+            # Resolved, so a worktree reached through an app's folder link counts as inside its target.
+            real = str(wt.resolve()) if wt.exists() else str(wt)
+            inside = any(p == str(r) or p.startswith(str(r) + "/") for r in roots for p in (str(wt), real))
             if ("prunable" in t or not wt.exists()) and inside and "locked" not in t:
                 emit("worktree", "remove", str(wt), "folder already gone")
                 if apply:
@@ -319,6 +371,8 @@ def sweep(roots: List[Path], apply: bool, days: int, fetch: bool, out=sys.stdout
             if apply:
                 git(path, "branch", "-D", name)
 
+    sweep_scratch(scratch, apply, cutoff, days, cwds, totals, emit)
+
     if shutil.which("xcrun") and not os.environ.get("AGENT_SWEEP_SKIP_SIMULATORS"):
         sims = run(["xcrun", "simctl", "list", "devices", "unavailable"], timeout=120).stdout
         count = sum(1 for l in sims.splitlines() if "(unavailable" in l)
@@ -338,9 +392,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     if a.days < 0:
         p.error("--days must be 0 or more")
     roots = [Path(r).expanduser().resolve() for r in (a.roots or DEFAULT_ROOTS)]
-    t = sweep(roots, a.apply, a.days, not a.no_fetch)
+    scratch = None if a.roots else Path(SCRATCH_ROOT).expanduser().resolve()
+    t = sweep(roots, a.apply, a.days, not a.no_fetch, scratch=scratch)
     done = f"freed {human(t['freed_kb'])}" if a.apply else f"reclaimable {human(t['reclaimable_kb'])}"
-    print(f"summary\tworktrees={t['worktrees']} branches={t['branches']} node_modules={t['node_modules']} "
+    print(f"summary\tworktrees={t['worktrees']} branches={t['branches']} node_modules={t['node_modules']} scratch={t['scratch']} "
           f"kept={t['kept']} {done}{'' if a.apply else ' (report only; rerun with --apply)'}")
     return 0
 

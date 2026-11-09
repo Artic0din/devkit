@@ -53,6 +53,12 @@ jobs:
       - name: Test agent sweep schedule (offline, synthetic)
         run: scripts/test-agent-sweep-schedule
 
+      - name: Test agent locations installer (offline, synthetic HOME)
+        run: scripts/test-agent-locations
+
+      - name: Test Claude worktree hook (offline, synthetic)
+        run: python3 hooks/test-claude-worktree.py
+
       - name: Test reusable baseline (offline, consumer fixtures)
         run: python3 scripts/test-baseline.py
 

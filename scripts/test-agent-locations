@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Offline test for scripts/agent-locations under a synthetic HOME.
+set -euo pipefail
+here=$(cd "$(dirname "$0")" && pwd -P)
+tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+export HOME="$tmp/home"
+fail() { echo "FAIL: $*" >&2; exit 1; }
+wt="$HOME/Metisary/Enviroment/worktrees" scratch="$HOME/Metisary/Enviroment/scratch"
+mkdir -p "$HOME/.cursor/worktrees/repo/a" "$HOME/.codex" "$HOME/.t3/scratch/job" "$HOME/.claude" "$HOME/Metisary/Enviroment/config/hooks"
+echo x > "$HOME/.cursor/worktrees/repo/a/file"
+echo x > "$HOME/.t3/scratch/job/out"
+touch "$HOME/Metisary/Enviroment/config/hooks/claude-worktree.py"
+echo '{"model": "opus", "env": {"KEEP": "1"}, "hooks": {"Stop": [{"hooks": []}]}}' > "$HOME/.claude/settings.json"
+
+! "$here/agent-locations" status >/dev/null || fail "status passed before install"
+"$here/agent-locations" install >/dev/null
+"$here/agent-locations" install >/dev/null  # idempotent
+[[ "$(readlink "$HOME/.cursor/worktrees")" == "$wt/cursor" ]] || fail "cursor not linked"
+[[ "$(readlink "$HOME/.codex/worktrees")" == "$wt/codex" ]] || fail "codex not linked"
+[[ "$(readlink "$HOME/.t3/scratch")" == "$scratch/t3" ]] || fail "t3 scratch not linked"
+[[ -f "$wt/cursor/repo/a/file" && -f "$scratch/t3/job/out" ]] || fail "contents not moved"
+python3 -I - "$HOME/.claude/settings.json" "$scratch/claude" <<'PY' || fail "settings wrong"
+import json, sys
+d = json.load(open(sys.argv[1]))
+assert d["model"] == "opus" and d["env"]["KEEP"] == "1" and "Stop" in d["hooks"], d
+assert d["env"]["CLAUDE_CODE_TMPDIR"] == sys.argv[2], d
+assert d["hooks"]["WorktreeCreate"][0]["hooks"][0]["command"].endswith("claude-worktree.py create"), d
+PY
+"$here/agent-locations" status >/dev/null || fail "status drift after install"
+rm "$HOME/.codex/worktrees"; ln -s "$tmp/external" "$HOME/.codex/worktrees"
+! "$here/agent-locations" install >/dev/null 2>&1 || fail "install repointed a foreign link"
+[[ "$(readlink "$HOME/.codex/worktrees")" == "$tmp/external" ]] || fail "foreign link changed"
+echo "PASS: install links folders, moves contents, keeps settings, is idempotent"
