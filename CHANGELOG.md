@@ -6,6 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Added `scripts/agent-sweep`, which reports leftover agent worktrees, merged branches, idle `node_modules` folders and unavailable simulators, and with `--apply` removes only worktrees and branches that are clean, merged and idle, `node_modules` idle for 14 days, and unavailable simulators.
 - Added two `AGENTS.MD` rules: every PR body and GitHub issue ends with a short ELI5 section, and agents add no attribution to commits, PRs, issues or comments.
 - Updated the vendored tstack skills to `1085050`: `council` now fixes known issues and outstanding PR comments before bringing in reviewers, and `full-stop` also triggers on a closing "Full stop." that reads like emphasis.
 - Fixed the Codex post-tool output filter blocking every shell command with "Tool output withheld: output filter failed": it now accepts the single combined output string that current Codex releases send.

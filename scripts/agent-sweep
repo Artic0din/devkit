@@ -1,0 +1,278 @@
+#!/usr/bin/env python3
+"""Report agent leftovers (worktrees, branches, stale node_modules, unavailable
+simulators) and, with --apply, remove only what is provably safe.
+
+A worktree is removable only when it sits inside the scanned folders, is idle
+for --days, is not on the default branch, has no uncommitted changes and no
+ignored files beyond rebuildable folders, and is merged: its tip is an ancestor
+of origin's default branch, or a merged PR on GitHub has exactly that tip as its
+head (squash merges). Locked worktrees and ones a process works in are kept.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import shutil
+import subprocess
+import sys
+import time
+from pathlib import Path
+from typing import Dict, List, Optional, Set
+
+DEFAULT_ROOTS = ["~/Metisary/Enviroment/worktrees", "~/Metisary/Projects"]
+SKIP_DIRS = {"node_modules", ".build", "DerivedData", "Pods", ".venv"}
+# Ignored folders that rebuild themselves; any other ignored file (such as .env) keeps a worktree.
+REBUILDABLE = SKIP_DIRS | {"dist", "build", ".next", ".turbo", ".cache", "coverage", "__pycache__"}
+FETCH_TIMEOUT_S = 60
+
+
+def run(args: List[str], cwd: Optional[Path] = None, timeout: int = 60) -> subprocess.CompletedProcess:
+    return subprocess.run(args, cwd=cwd, capture_output=True, text=True, timeout=timeout)
+
+
+def git(repo: Path, *args: str, timeout: int = 60) -> str:
+    out = run(["git", "-C", str(repo), *args], timeout=timeout)
+    return out.stdout.strip() if out.returncode == 0 else ""
+
+
+def git_ok(repo: Path, *args: str) -> bool:
+    return run(["git", "-C", str(repo), *args]).returncode == 0
+
+
+def size_kb(path: Path) -> int:
+    out = run(["du", "-sk", str(path)], timeout=600)
+    return int(out.stdout.split()[0]) if out.returncode == 0 and out.stdout else 0
+
+
+def human(kb: int) -> str:
+    return f"{kb / 1048576:.1f}G" if kb >= 1048576 else f"{kb / 1024:.0f}M"
+
+
+def find_repos(roots: List[Path], depth: int = 4) -> List[Path]:
+    """Return one path per distinct repository (its common git dir's parent work tree)."""
+    commons: Dict[str, Path] = {}
+    for root in roots:
+        if not root.is_dir():
+            continue
+        stack = [(root, 0)]
+        while stack:
+            d, level = stack.pop()
+            if (d / ".git").exists():
+                common = git(d, "rev-parse", "--path-format=absolute", "--git-common-dir")
+                if common and common not in commons:
+                    commons[common] = d
+                continue
+            if level >= depth:
+                continue
+            try:
+                kids = [k for k in d.iterdir() if k.is_dir() and not k.is_symlink() and k.name not in SKIP_DIRS]
+            except OSError:
+                continue
+            stack.extend((k, level + 1) for k in kids)
+    return list(commons.values())
+
+
+def process_cwds() -> Optional[List[str]]:
+    """Working directories of this user's processes, or None if they can't be read."""
+    try:
+        out = run(["lsof", "-a", "-d", "cwd", "-Fn", "-u", str(os.getuid())], timeout=60)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    paths = [line[1:] for line in out.stdout.splitlines() if line.startswith("n")]
+    return paths if paths else None
+
+
+def worktree_state(wt: Path) -> Optional[str]:
+    """Why a worktree's files must be kept, '' if none, or None if git couldn't tell."""
+    out = run(["git", "-C", str(wt), "status", "--porcelain", "--ignored"])
+    if out.returncode != 0:
+        return None
+    for line in out.stdout.splitlines():
+        if not line.startswith("!! "):
+            return "uncommitted changes"
+        if line[3:].split("/", 1)[0] not in REBUILDABLE:
+            return f"ignored file {line[3:]} (could be secrets)"
+    return ""
+
+
+def default_ref(repo: Path) -> Optional[str]:
+    ref = git(repo, "symbolic-ref", "--quiet", "refs/remotes/origin/HEAD")
+    if ref:
+        return ref
+    for name in ("refs/remotes/origin/main", "refs/remotes/origin/master"):
+        if git_ok(repo, "rev-parse", "--verify", "--quiet", name):
+            return name
+    return None
+
+
+def merged_pr_heads(repo: Path) -> Set[str]:
+    """Head SHAs of merged PRs, so squash-merged branches can be recognised."""
+    url = git(repo, "remote", "get-url", "origin")
+    if "github.com" not in url:
+        return set()
+    slug = url.split("github.com")[-1].lstrip(":/").removesuffix(".git")
+    gh = os.environ.get("AGENT_SWEEP_GH", "gh")
+    try:
+        out = run([gh, "pr", "list", "-R", slug, "--state", "merged", "--limit", "1000",
+                   "--json", "headRefOid"], timeout=120)
+        return {pr["headRefOid"] for pr in json.loads(out.stdout or "[]")} if out.returncode == 0 else set()
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return set()
+
+
+class Repo:
+    def __init__(self, path: Path, fetch: bool) -> None:
+        self.path = path
+        if fetch:
+            run(["git", "-C", str(path), "fetch", "--prune", "--quiet", "origin"], timeout=FETCH_TIMEOUT_S)
+        self.base = default_ref(path)
+        self.pr_heads: Optional[Set[str]] = None
+
+    def merged(self, sha: str) -> bool:
+        if self.base and git_ok(self.path, "merge-base", "--is-ancestor", sha, self.base):
+            return True
+        if self.pr_heads is None:
+            self.pr_heads = merged_pr_heads(self.path)
+        return sha in self.pr_heads
+
+    def unpushed(self, sha: str) -> int:
+        out = git(self.path, "rev-list", "--count", sha, "--not", "--remotes")
+        return int(out or 0)
+
+
+def worktrees(repo: Path) -> List[Dict[str, str]]:
+    items, cur = [], {}
+    for line in git(repo, "worktree", "list", "--porcelain").splitlines() + [""]:
+        if not line:
+            if cur:
+                items.append(cur)
+            cur = {}
+            continue
+        key, _, value = line.partition(" ")
+        cur[key] = value or "1"
+    return items
+
+
+def last_activity(wt: Path) -> float:
+    gitdir = Path(git(wt, "rev-parse", "--path-format=absolute", "--git-dir") or wt)
+    stamps = [float(git(wt, "log", "-1", "--format=%ct") or 0)]
+    # Not the index: `git status` rewrites it, so it says nothing about agent activity.
+    for p in (gitdir / "HEAD", gitdir / "logs" / "HEAD"):
+        if p.exists():
+            stamps.append(p.stat().st_mtime)
+    return max(stamps)
+
+
+def sweep(roots: List[Path], apply: bool, days: int, fetch: bool, out=sys.stdout) -> Dict[str, int]:
+    cwds = process_cwds()
+    me = str(Path.cwd().resolve())
+    cutoff = time.time() - days * 86400
+    totals = {"worktrees": 0, "branches": 0, "node_modules": 0, "kept": 0, "freed_kb": 0, "reclaimable_kb": 0}
+
+    def emit(kind: str, verdict: str, path: str, why: str, kb: int = 0) -> None:
+        print(f"{kind}\t{verdict}\t{human(kb) if kb else '-'}\t{path}\t{why}", file=out)
+
+    for path in sorted(find_repos(roots)):
+        repo = Repo(path, fetch)
+        trees = worktrees(path)
+        checked_out = {t.get("branch", "") for t in trees}
+        base_name = (repo.base or "").removeprefix("refs/remotes/origin/")
+        for t in trees[1:]:  # trees[0] is the main checkout
+            wt = Path(t["worktree"])
+            busy = cwds is None or me.startswith(str(wt)) or any(c == str(wt) or c.startswith(str(wt) + "/") for c in cwds)
+            inside = any(str(wt) == str(r) or str(wt).startswith(str(r) + "/") for r in roots)
+            if ("prunable" in t or not wt.exists()) and inside and "locked" not in t:
+                emit("worktree", "remove", str(wt), "folder already gone")
+                if apply:
+                    git(path, "worktree", "prune")
+                totals["worktrees"] += 1
+                continue
+            sha, branch = t.get("HEAD", ""), t.get("branch", "").removeprefix("refs/heads/")
+            idle = last_activity(wt) < cutoff
+            state = worktree_state(wt)
+            if not inside:
+                reason = "outside the scanned folders"
+            elif "locked" in t:
+                reason = "locked"
+            elif busy:
+                reason = "a process may be working in it" if cwds is not None else "running processes could not be checked"
+            elif state is None:
+                reason = "git status failed"
+            elif state:
+                reason = state
+            elif branch == base_name:
+                reason = "default branch"
+            elif not idle:
+                reason = f"active in the last {days} days"
+            elif not repo.merged(sha):
+                n = repo.unpushed(sha)
+                reason = f"{n} unpushed commit(s)" if n else "not merged yet"
+            else:
+                reason = ""
+            kb = size_kb(wt)
+            if reason:
+                totals["kept"] += 1
+                emit("worktree", "keep", str(wt), reason, kb)
+                stale = wt / "node_modules"
+                if inside and idle and not busy and "locked" not in t and stale.is_dir() and not stale.is_symlink():
+                    nkb = size_kb(stale)
+                    totals["node_modules"] += 1
+                    emit("node_modules", "remove", str(stale), f"idle {days}+ days, reinstallable", nkb)
+                    if apply:
+                        try:
+                            shutil.rmtree(stale)
+                            totals["freed_kb"] += nkb
+                        except OSError as err:
+                            emit("node_modules", "error", str(stale), str(err))
+                    else:
+                        totals["reclaimable_kb"] += nkb
+                continue
+            emit("worktree", "remove", str(wt), f"clean and merged ({branch or 'detached'})", kb)
+            totals["worktrees"] += 1
+            if not apply:
+                totals["reclaimable_kb"] += kb
+                continue
+            if git_ok(path, "worktree", "remove", str(wt)):
+                totals["freed_kb"] += kb
+                if branch:
+                    git(path, "branch", "-D", branch)
+            else:
+                emit("worktree", "error", str(wt), "git worktree remove refused")
+        current = git(path, "branch", "--show-current")
+        for line in git(path, "for-each-ref", "--format=%(refname:short) %(objectname)", "refs/heads").splitlines():
+            name, sha = line.split()
+            if name in (current, base_name) or f"refs/heads/{name}" in checked_out or not repo.merged(sha):
+                continue
+            emit("branch", "remove", f"{path.name}:{name}", "merged")
+            totals["branches"] += 1
+            if apply:
+                git(path, "branch", "-D", name)
+
+    if shutil.which("xcrun") and not os.environ.get("AGENT_SWEEP_SKIP_SIMULATORS"):
+        sims = run(["xcrun", "simctl", "list", "devices", "unavailable"], timeout=120).stdout
+        count = sum(1 for l in sims.splitlines() if "(unavailable" in l)
+        emit("simulators", "remove" if count else "keep", "unavailable", f"{count} unavailable")
+        if apply and count:
+            run(["xcrun", "simctl", "delete", "unavailable"], timeout=600)
+    return totals
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    p.add_argument("roots", nargs="*", help=f"folders to scan (default: {' '.join(DEFAULT_ROOTS)})")
+    p.add_argument("--apply", action="store_true", help="remove what the report marks 'remove'")
+    p.add_argument("--days", type=int, default=14, help="idle days before a worktree or its node_modules can be removed")
+    p.add_argument("--no-fetch", action="store_true", help="skip 'git fetch --prune' before judging merges")
+    a = p.parse_args(argv)
+    roots = [Path(r).expanduser().resolve() for r in (a.roots or DEFAULT_ROOTS)]
+    t = sweep(roots, a.apply, a.days, not a.no_fetch)
+    done = f"freed {human(t['freed_kb'])}" if a.apply else f"reclaimable {human(t['reclaimable_kb'])}"
+    print(f"summary\tworktrees={t['worktrees']} branches={t['branches']} node_modules={t['node_modules']} "
+          f"kept={t['kept']} {done}{'' if a.apply else ' (report only; rerun with --apply)'}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
