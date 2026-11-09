@@ -6,6 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Added five `AGENTS.MD` rules so agents stop leaving clutter: reuse simulators, share one pnpm or bun store across worktrees, keep read-only subagents from installing or creating worktrees, remove task worktrees and branches once merged or abandoned, and never leave the task's changes uncommitted.
 - Added `scripts/agent-sweep`, which reports leftover agent worktrees, merged branches, idle `node_modules` folders and unavailable simulators, and with `--apply` removes only worktrees and branches that are clean, merged and idle, `node_modules` idle for 14 days, and unavailable simulators.
 - Added two `AGENTS.MD` rules: every PR body and GitHub issue ends with a short ELI5 section, and agents add no attribution to commits, PRs, issues or comments.
 - Updated the vendored tstack skills to `1085050`: `council` now fixes known issues and outstanding PR comments before bringing in reviewers, and `full-stop` also triggers on a closing "Full stop." that reads like emphasis.

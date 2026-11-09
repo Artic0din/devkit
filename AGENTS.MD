@@ -42,6 +42,11 @@ Home Assistant power user: Tesla solar/Powerwall/EVs, GloBird Energy, Daikin HVA
 - Isolate every parallel subagent from the main worktree and staged changes: persistent worktrees belong in `/Users/ryanfoyle/Metisary/Enviroment/worktrees/`; throwaway audits may use a temporary directory.
 - Never let agents write to a shared inventory file or to staged files. Each returns its result; the parent merges.
 - Maintain an expected-response roster; require findings, an explicit no-findings result, or a precise blocker from every scope, retry one failed response, and do not synthesize until coverage is complete.
+- Reuse an existing simulator; create one only when none fits, and delete it when the task ends.
+- When the repo already uses pnpm or bun, install through its shared store so worktrees share one copy on disk.
+- Subagents that only read code install nothing and work in place or a temporary directory, never a new persistent worktree.
+- Remove your task's worktrees and branches once merged, or once their work is pushed or abandoned.
+- Commit or report your own task's changes before finishing; never leave them uncommitted, and never discard edits you did not make.
 
 ## Engineering standards
 
