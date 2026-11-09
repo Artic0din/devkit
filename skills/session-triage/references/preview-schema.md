@@ -25,7 +25,6 @@ Coverage contains:
 - unreadable_threads
 - archive_candidates
 - new_task_candidates
-- verified_knowledge_candidates
 
 Validation contains status (pending or validated) and true values for:
 
@@ -43,7 +42,6 @@ Each thread contains:
 - archive_candidate
 - unresolved_outcomes
 - task_candidates
-- knowledge_candidates
 
 Project mapping_status is mapped or unmapped.
 Project apply_support is supported or unsupported.
@@ -63,13 +61,5 @@ Every new task also includes the exact proposed issue body, with Context, Goal, 
 Each section has non-empty content apart from the marker, and Acceptance criteria lists at least one `-` or `*` item with text, not only an empty checkbox.
 Task markers must be unique across all new candidates in the preview.
 The task repository must match the mapped project's repository, ignoring letter case.
-Unreadable threads cannot contain new task candidates or verified knowledge candidates.
+Unreadable threads cannot contain new task candidates.
 An unreadable thread's proposed_title equals its current_title, so it is never renamed.
-
-Knowledge status is verified or rejected.
-Verified candidates include target_note, proposed_content, edit_operation, non-empty primary_sources, and reason.
-edit_operation is `create`, `append`, or `replace_section`.
-`create` writes proposed_content as a new note and requires that target_note does not exist yet.
-`append` adds proposed_content to the end of the existing target_note.
-`replace_section` also names target_section, the exact existing heading whose content proposed_content replaces.
-Rejected candidates use a null target_note and precise rejection reason.

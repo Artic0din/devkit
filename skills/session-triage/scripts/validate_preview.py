@@ -15,8 +15,6 @@ from zoneinfo import ZoneInfo
 
 OUTCOMES = {"verified_complete", "partial", "blocked", "active", "unclear"}
 TASK_STATUSES = {"new", "duplicate", "completed", "blocked"}
-KNOWLEDGE_STATUSES = {"verified", "rejected"}
-KNOWLEDGE_OPERATIONS = {"create", "append", "replace_section"}
 ISSUE_SECTIONS = ("Context", "Goal", "Acceptance criteria", "Technical notes")
 REPOSITORY_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 MARKER_PATTERN = re.compile(r"^<!-- session-triage:[A-Za-z0-9-]+:[A-Za-z0-9._-]+ -->$")
@@ -144,65 +142,6 @@ def _validate_task(
             )
 
 
-def _validate_knowledge(candidate: Any, path: str, errors: list[str]) -> None:
-    _require(isinstance(candidate, dict), f"{path} must be an object", errors)
-    if not isinstance(candidate, dict):
-        return
-
-    status = candidate.get("status")
-    sources = candidate.get("primary_sources")
-    _require(
-        isinstance(status, str) and status in KNOWLEDGE_STATUSES,
-        f"{path}.status is invalid",
-        errors,
-    )
-    _require(
-        _has_text(candidate.get("reason")),
-        f"{path}.reason is required",
-        errors,
-    )
-    _require(
-        isinstance(sources, list),
-        f"{path}.primary_sources must be a list",
-        errors,
-    )
-    if status == "verified":
-        _require(
-            _has_text(candidate.get("target_note")),
-            f"{path}.target_note is required",
-            errors,
-        )
-        _require(
-            _has_text(candidate.get("proposed_content")),
-            f"{path}.proposed_content is required",
-            errors,
-        )
-        operation = candidate.get("edit_operation")
-        _require(
-            isinstance(operation, str) and operation in KNOWLEDGE_OPERATIONS,
-            f"{path}.edit_operation is invalid",
-            errors,
-        )
-        _require(
-            operation != "replace_section" or _has_text(candidate.get("target_section")),
-            f"{path}.target_section is required for replace_section",
-            errors,
-        )
-        _require(
-            isinstance(sources, list)
-            and bool(sources)
-            and all(_has_text(item) for item in sources),
-            f"{path}.primary_sources must contain current primary evidence",
-            errors,
-        )
-    elif status == "rejected":
-        _require(
-            candidate.get("target_note") is None,
-            f"{path}.target_note must be null when rejected",
-            errors,
-        )
-
-
 def validate_preview(preview: Any) -> list[str]:
     """Return all validation failures without mutating the preview."""
     errors: list[str] = []
@@ -282,7 +221,6 @@ def validate_preview(preview: Any) -> list[str]:
     unreadable_count = 0
     archive_count = 0
     new_task_count = 0
-    verified_knowledge_count = 0
 
     for index, thread in enumerate(threads):
         path = f"threads[{index}]"
@@ -418,7 +356,6 @@ def validate_preview(preview: Any) -> list[str]:
 
         unresolved = thread.get("unresolved_outcomes")
         tasks = thread.get("task_candidates")
-        knowledge = thread.get("knowledge_candidates")
         _require(
             isinstance(unresolved, list),
             f"{path}.unresolved_outcomes must be a list",
@@ -427,11 +364,6 @@ def validate_preview(preview: Any) -> list[str]:
         _require(
             isinstance(tasks, list),
             f"{path}.task_candidates must be a list",
-            errors,
-        )
-        _require(
-            isinstance(knowledge, list),
-            f"{path}.knowledge_candidates must be a list",
             errors,
         )
 
@@ -452,20 +384,6 @@ def validate_preview(preview: Any) -> list[str]:
                         _require(marker not in seen_markers, f"duplicate task marker: {marker}", errors)
                         seen_markers.add(marker)
                     _require(not unreadable, f"{path} unreadable thread cannot propose new tasks", errors)
-
-        if isinstance(knowledge, list):
-            for candidate_index, candidate in enumerate(knowledge):
-                _validate_knowledge(
-                    candidate,
-                    f"{path}.knowledge_candidates[{candidate_index}]",
-                    errors,
-                )
-                if (
-                    isinstance(candidate, dict)
-                    and candidate.get("status") == "verified"
-                ):
-                    verified_knowledge_count += 1
-                    _require(not unreadable, f"{path} unreadable thread cannot propose verified knowledge", errors)
 
         if thread.get("archive_candidate") is True:
             archive_count += 1
@@ -506,7 +424,6 @@ def validate_preview(preview: Any) -> list[str]:
             "unreadable_threads": unreadable_count,
             "archive_candidates": archive_count,
             "new_task_candidates": new_task_count,
-            "verified_knowledge_candidates": verified_knowledge_count,
         }
         for field, expected in expected_counts.items():
             _require(

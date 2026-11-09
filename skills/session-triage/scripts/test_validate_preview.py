@@ -17,7 +17,6 @@ def preview() -> dict:
         "coverage": {
             "eligible_threads": 1, "audited_threads": 1, "unreadable_threads": 0,
             "archive_candidates": 1, "new_task_candidates": 0,
-            "verified_knowledge_candidates": 0,
         },
         "validation": {
             "status": "pending", "eligible_roster_complete": True,
@@ -34,7 +33,7 @@ def preview() -> dict:
                 "mapping_status": "unmapped", "apply_support": "unsupported",
             },
             "unreadable": False, "blocker": None, "archive_candidate": True,
-            "unresolved_outcomes": [], "task_candidates": [], "knowledge_candidates": [],
+            "unresolved_outcomes": [], "task_candidates": [],
         }],
     }
 
@@ -111,23 +110,13 @@ def test_task_repository() -> None:
 
 
 def test_unreadable_mutations() -> None:
-    for candidate_type in ("task", "knowledge"):
-        value = task_preview()
-        thread = value["threads"][0]
-        thread.update(unreadable=True, blocker="Cannot read source", outcome="blocked")
-        thread["proposed_title"] = thread["current_title"]
-        value["coverage"].update(audited_threads=0, unreadable_threads=1)
-        expected = "threads[0] unreadable thread cannot propose new tasks"
-        if candidate_type == "knowledge":
-            thread["task_candidates"] = []
-            thread["knowledge_candidates"] = [{
-                "status": "verified", "target_note": "Example", "proposed_content": "Example fact",
-                "primary_sources": ["Synthetic source"], "reason": "Verified fixture",
-                "edit_operation": "append",
-            }]
-            value["coverage"].update(new_task_candidates=0, verified_knowledge_candidates=1)
-            expected = "threads[0] unreadable thread cannot propose verified knowledge"
-        assert validate_preview(value) == [expected], (candidate_type, validate_preview(value))
+    value = task_preview()
+    thread = value["threads"][0]
+    thread.update(unreadable=True, blocker="Cannot read source", outcome="blocked")
+    thread["proposed_title"] = thread["current_title"]
+    value["coverage"].update(audited_threads=0, unreadable_threads=1)
+    expected = "threads[0] unreadable thread cannot propose new tasks"
+    assert validate_preview(value) == [expected], validate_preview(value)
 
 
 def test_task_publication_payload() -> None:
@@ -186,26 +175,6 @@ def test_existing_url() -> None:
         assert not validate_preview(value), validate_preview(value)
 
 
-def test_knowledge_edit_operation() -> None:
-    value = preview()
-    value["threads"][0]["knowledge_candidates"] = [{
-        "status": "verified", "target_note": "Example", "proposed_content": "Example fact",
-        "primary_sources": ["Synthetic source"], "reason": "Verified fixture",
-    }]
-    value["coverage"]["verified_knowledge_candidates"] = 1
-    candidate = value["threads"][0]["knowledge_candidates"][0]
-    for operation in (None, "", "edit", []):
-        candidate["edit_operation"] = operation
-        assert any("edit_operation" in error for error in validate_preview(value)), operation
-    candidate["edit_operation"] = "replace_section"
-    assert any("target_section" in error for error in validate_preview(value))
-    candidate["target_section"] = "Facts"
-    assert not validate_preview(value), validate_preview(value)
-    for operation in ("create", "append"):
-        candidate["edit_operation"] = operation
-        assert not validate_preview(value), validate_preview(value)
-
-
 if __name__ == "__main__":
     test_host_identity()
     test_project_metadata()
@@ -216,7 +185,6 @@ if __name__ == "__main__":
     test_unreadable_title_unchanged()
     test_empty_issue_sections()
     test_existing_url()
-    test_knowledge_edit_operation()
     valid = preview()
     assert not validate_preview(valid)
     invalid = deepcopy(valid)
@@ -264,10 +232,9 @@ if __name__ == "__main__":
     invalid = deepcopy(valid)
     invalid["cutoff"] = "2026-09-01T00:00:00+10:00"
     assert validate_preview(invalid), "Declared window and cutoff disagree"
-    for field in ("task_candidates", "knowledge_candidates"):
-        invalid = deepcopy(valid)
-        invalid["threads"][0][field] = [{"status": []}]
-        assert validate_preview(invalid)
+    invalid = deepcopy(valid)
+    invalid["threads"][0]["task_candidates"] = [{"status": []}]
+    assert validate_preview(invalid)
     for evidence in ([None], [""], [{}]):
         invalid = deepcopy(valid)
         invalid["threads"][0]["evidence"] = evidence

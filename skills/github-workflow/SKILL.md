@@ -5,7 +5,7 @@ description: Manage repository work through GitHub Issues, feature branches, pul
 
 # GitHub Workflow
 
-Use GitHub Issues for planned work, pull requests and CI for implementation truth, and Basic Memory for reusable verified knowledge only.
+Use GitHub Issues for planned work and pull requests and CI for implementation truth.
 The user-level `Development` Project is closed and must not be used.
 
 ## Route the request
@@ -60,7 +60,6 @@ The user-level `Development` Project is closed and must not be used.
 - Let the merged pull request close the issue through `Fixes #123`.
 - Confirm required checks passed, the pull request merged, and its linked issue closed.
 - If a pull request closes without merge, keep or reopen the issue and return it to the appropriate active or backlog state.
-- Store only reusable verified knowledge in Basic Memory; never mirror task status there.
 
 ## Safety
 
