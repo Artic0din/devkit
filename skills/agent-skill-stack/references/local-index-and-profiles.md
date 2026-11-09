@@ -36,6 +36,7 @@ python3 SKILL_DIR/scripts/skill_index.py build \
   --root .codex/skills \
   --root ~/.agents/skills \
   --root ~/.hermes/skills \
+  --project-root . \
   --output ~/.codex/skill-index.json
 ```
 

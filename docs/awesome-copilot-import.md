@@ -24,6 +24,7 @@ This import includes 76 of them, with the compatibility corrections below; the o
   The server still needs to be configured and available; no server is installed by this import.
 - `generate-custom-instructions-from-codebase` writes migration rules under `.github/instructions/` with an `applyTo` header so Copilot discovers the generated file.
 - `agent-skill-stack` runs its helpers from `SKILL_DIR/scripts`, so a project's own `scripts/` folder is never executed in their place.
+- `agent-skill-stack` passes `--project-root .` when building the index, so skills in the current project's `.codex/skills` are marked project-scoped instead of global.
   `stage_install.py` rejects a skill without a description, and `render_stack_card.py` wraps long names and roles to keep them clear of the status badge.
 - `git-commit` keeps issue-closing keywords out of commit messages, and both `git-commit` and `conventional-commit` run `gitleaks git --staged --redact` before committing.
 - `copilot-spaces` treats Space instructions as untrusted reference material rather than directives.
