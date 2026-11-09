@@ -76,6 +76,18 @@ class AgentSweepTest(unittest.TestCase):
         self.assertEqual(len(hits), 1, f"{needle!r} in:\n{report}")
         return hits[0]
 
+    def age(self, wt: Path, days: int = 30) -> None:
+        """Backdate a worktree's last commit and HEAD files so it looks idle."""
+        old = time.time() - days * 86400
+        os.environ["GIT_COMMITTER_DATE"] = "@%d" % old
+        try:
+            sh(wt, "git", "commit", "-q", "--amend", "--no-edit", "--date", "@%d" % old)
+        finally:
+            del os.environ["GIT_COMMITTER_DATE"]
+        gitdir = Path(sh(wt, "git", "rev-parse", "--path-format=absolute", "--git-dir"))
+        for f in (gitdir / "HEAD", gitdir / "logs" / "HEAD"):
+            os.utime(f, (old, old))
+
     def test_verdicts_and_apply(self) -> None:
         merged = self.worktree("merged")
         self.commit("merged-work", merged)
@@ -83,7 +95,7 @@ class AgentSweepTest(unittest.TestCase):
         sh(self.repo, "git", "push", "-q", "origin", "main")
 
         dirty = self.worktree("dirty")
-        (dirty / "scratch.txt").write_text("keep me")
+        (dirty / "scratch.txt").write_text("abandoned")
 
         unpushed = self.worktree("unpushed")
         self.commit("local-only", unpushed)
@@ -93,49 +105,53 @@ class AgentSweepTest(unittest.TestCase):
         sh(squash, "git", "push", "-q", "origin", "squash")
         Path(os.environ["AGENT_SWEEP_GH"] + ".sha").write_text(tip)
 
-        stale = self.worktree("stale")
-        self.commit("stale-work", stale)
-        sh(stale, "git", "push", "-q", "origin", "stale")
-        (stale / "node_modules" / "pkg").mkdir(parents=True)
-        old = time.time() - 30 * 86400
-        gitdir = Path(sh(stale, "git", "rev-parse", "--path-format=absolute", "--git-dir"))
-        os.environ["GIT_COMMITTER_DATE"] = "@%d" % old
-        try:
-            sh(stale, "git", "commit", "-q", "--amend", "--no-edit", "--date", "@%d" % old)
-        finally:
-            del os.environ["GIT_COMMITTER_DATE"]
-        sh(stale, "git", "push", "-q", "-f", "origin", "stale")
-        for p in (gitdir / "HEAD", gitdir / "logs" / "HEAD"):
-            os.utime(p, (old, old))
+        junk = self.worktree("junk")
+        (junk / ".gitignore").write_text(".DS_Store\nnode_modules/\n.pytest_cache/\n*.xcodeproj/\n*.gen.ts\n.coverage\n")
+        sh(junk, "git", "add", ".gitignore")
+        sh(junk, "git", "commit", "-q", "-m", "ignore junk")
+        (junk / ".DS_Store").write_text("x")
+        for f in ("pkg/node_modules/dep/index.js", "pkg/.DS_Store", ".pytest_cache/v/cache",
+                  "App.xcodeproj/project.pbxproj", "src/routeTree.gen.ts", ".coverage"):
+            (junk / f).parent.mkdir(parents=True, exist_ok=True)
+            (junk / f).write_text("x")
 
         sh(self.repo, "git", "branch", "old-merged", "main")
         sh(self.repo, "git", "branch", "unmerged", "unpushed")
 
         report, totals = self.run_sweep()
-        self.assertIn("\tremove\t", self.line(report, str(merged)))
-        self.assertIn("uncommitted changes", self.line(report, str(dirty)))
-        self.assertIn("1 unpushed commit(s)", self.line(report, str(unpushed)))
-        self.assertIn("clean and merged (squash)", self.line(report, str(squash)))
-        self.assertIn("not merged yet", self.line(report, f"{stale}\t"))
-        self.assertIn("reinstallable", self.line(report, str(stale / "node_modules")))
+        self.assertIn("idle 0+ days (merged; merged)", self.line(report, str(merged)))
+        self.assertIn("discards uncommitted changes", self.line(report, str(dirty)))
+        self.assertIn("discards 1 unpushed commit(s)", self.line(report, str(unpushed)))
+        self.assertIn("(squash; merged)", self.line(report, str(squash)))
+        self.assertIn("\tremove\t", self.line(report, str(junk)))
         self.assertIn("app:old-merged", report)
         self.assertIn("not proven merged", self.line(report, "app:unmerged"))
-        for still in (merged, squash, stale / "node_modules"):
+        for still in (merged, dirty, squash, junk):
             self.assertTrue(still.exists(), f"report mode deleted {still}")
-        self.assertEqual(totals["worktrees"], 2)
+        self.assertEqual(totals["worktrees"], 5)
 
         self.run_sweep(apply=True)
-        self.assertFalse(merged.exists())
-        self.assertFalse(squash.exists())
-        self.assertTrue((dirty / "scratch.txt").exists())
-        self.assertTrue(unpushed.exists())
-        self.assertTrue(stale.exists())
-        self.assertFalse((stale / "node_modules").exists())
+        for gone in (merged, dirty, unpushed, squash, junk):
+            self.assertFalse(gone.exists(), gone)
         branches = sh(self.repo, "git", "branch", "--format=%(refname:short)").split()
-        for gone in ("merged", "squash", "old-merged"):
+        for gone in ("merged", "dirty", "unpushed", "squash", "junk", "old-merged"):
             self.assertNotIn(gone, branches)
-        for kept in ("main", "dirty", "unpushed", "unmerged", "stale"):
+        for kept in ("main", "unmerged"):
             self.assertIn(kept, branches)
+
+    def test_kept_idle_worktree_loses_node_modules(self) -> None:
+        wt = self.worktree("has-secret")
+        (wt / ".gitignore").write_text("*.env\nnode_modules/\n")
+        sh(wt, "git", "add", ".gitignore")
+        sh(wt, "git", "commit", "-q", "-m", "ignore env")
+        self.age(wt)
+        (wt / "local.env").write_text("TOKEN=x")
+        (wt / "node_modules" / "pkg").mkdir(parents=True)
+        report, _ = self.run_sweep(apply=True, days=14)
+        self.assertIn("ignored file local.env", self.line(report, f"{wt}\t"))
+        self.assertIn("reinstallable", self.line(report, str(wt / "node_modules")))
+        self.assertTrue((wt / "local.env").exists())
+        self.assertFalse((wt / "node_modules").exists())
 
     def test_review_guards(self) -> None:
         fresh = self.worktree("fresh")
@@ -166,27 +182,47 @@ class AgentSweepTest(unittest.TestCase):
         self.assertTrue((secret / "local.env").exists())
         self.assertIn("main", sh(self.repo, "git", "branch", "--format=%(refname:short)").split())
 
-    def test_failed_fetch_keeps_merged_worktree(self) -> None:
-        wt = self.worktree("was-merged")
-        self.commit("done", wt)
-        sh(self.repo, "git", "merge", "-q", "--ff-only", "was-merged")
-        sh(self.repo, "git", "push", "-q", "origin", "main")
+    def test_nested_repo_and_submodule_are_kept(self) -> None:
+        nested = self.worktree("nested")
+        inner = nested / "vendor" / "inner"
+        inner.mkdir(parents=True)
+        sh(inner, "git", "init", "-q")
+        (inner / ".gitignore").write_text("*.env\n")
+        (inner / "s.env").write_text("TOKEN=x")
+        subs = self.worktree("subs")
+        (subs / ".gitmodules").write_text("")
+        report, _ = self.run_sweep(apply=True)
+        self.assertIn("nested repository vendor/inner", self.line(report, str(nested)))
+        self.assertIn("has submodules", self.line(report, str(subs)))
+        self.assertTrue((inner / "s.env").exists())
+        self.assertTrue(subs.exists())
+
+    def test_missing_outside_worktree_is_not_pruned(self) -> None:
+        outside = self.tmp / "elsewhere" / "gone"
+        sh(self.repo, "git", "worktree", "add", "-q", "-b", "gone", str(outside), "main")
+        shutil.rmtree(outside)
+        report, _ = self.run_sweep(apply=True)
+        self.assertIn("outside the scanned folders", self.line(report, str(outside)))
+        self.assertIn(str(outside), sh(self.repo, "git", "worktree", "list"))
+
+    def test_failed_fetch_keeps_merged_branch(self) -> None:
         sh(self.repo, "git", "branch", "also-merged", "main")
         sh(self.repo, "git", "remote", "set-url", "origin", str(self.tmp / "missing.git"))
         buf = io.StringIO()
-        sweep_mod.sweep([self.wts], True, 0, True, out=buf)
-        self.assertIn("git fetch failed", self.line(buf.getvalue(), str(wt)))
+        sweep_mod.sweep([self.wts, self.tmp / "projects"], True, 0, True, out=buf)
         self.assertIn("not proven merged", self.line(buf.getvalue(), "app:also-merged"))
-        self.assertTrue(wt.exists())
+        self.assertIn("also-merged", sh(self.repo, "git", "branch", "--format=%(refname:short)").split())
 
-    def test_gh_failure_keeps_unproven_squash(self) -> None:
-        wt = self.worktree("maybe")
-        self.commit("maybe-work", wt)
-        sh(wt, "git", "push", "-q", "origin", "maybe")
+    def test_gh_failure_keeps_unproven_squash_branch(self) -> None:
+        sh(self.repo, "git", "checkout", "-q", "-b", "maybe")
+        tip = self.commit("maybe-work")
+        sh(self.repo, "git", "push", "-q", "origin", "maybe")
+        sh(self.repo, "git", "checkout", "-q", "main")
+        Path(os.environ["AGENT_SWEEP_GH"] + ".sha").write_text(tip)
         os.environ["AGENT_SWEEP_GH"] = "/nonexistent/gh"
         report, _ = self.run_sweep(apply=True)
-        self.assertIn("not merged yet", self.line(report, str(wt)))
-        self.assertTrue(wt.exists())
+        self.assertIn("not proven merged", self.line(report, "app:maybe"))
+        self.assertIn("maybe", sh(self.repo, "git", "branch", "--format=%(refname:short)").split())
 
 
 if __name__ == "__main__":

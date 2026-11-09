@@ -4,10 +4,10 @@
 #   agent-sweep-schedule install    write and load the LaunchAgent (daily at 03:30)
 #   agent-sweep-schedule uninstall  unload and remove it
 #   agent-sweep-schedule status     show whether it is loaded and the latest summary
-#   agent-sweep-schedule run        one report run (what the LaunchAgent calls)
+#   agent-sweep-schedule run        one cleanup run with --apply (what the LaunchAgent calls)
 #
 # Reports go to ~/Library/Logs/agent-sweep/YYYY-MM-DD.tsv; the newest 14 are kept
-# and latest.tsv points at the newest. The schedule never passes --apply.
+# and latest.tsv points at the newest. For a report without removing anything, run agent-sweep.
 set -euo pipefail
 
 label=com.metisary.agent-sweep
@@ -20,7 +20,7 @@ keep_reports=14
 run_report() {
   mkdir -p "$logs"
   local out="$logs/$(date +%F).tsv"
-  python3 -I "$sweep" "$@" > "$out.tmp" 2> "$logs/last-error.txt"
+  python3 -I "$sweep" --apply "$@" > "$out.tmp" 2> "$logs/last-error.txt"
   mv "$out.tmp" "$out"
   ln -sfn "$(basename "$out")" "$logs/latest.tsv"
   # Newest first; drop everything past the newest $keep_reports reports.
@@ -58,7 +58,7 @@ EOF
     [[ -n "${AGENT_SWEEP_NO_LAUNCHCTL:-}" ]] && { echo "wrote $plist"; exit 0; }
     launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
     launchctl bootstrap "gui/$(id -u)" "$plist"
-    echo "installed $label: daily at 03:30, report only, logs in $logs"
+    echo "installed $label: daily cleanup at 03:30, logs in $logs"
     ;;
   uninstall)
     launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
@@ -71,7 +71,6 @@ EOF
     ;;
   run)
     shift
-    for a in "$@"; do [[ "$a" == --apply ]] && { echo "run is report-only; call agent-sweep --apply directly" >&2; exit 2; }; done
     run_report "$@"
     ;;
   *)

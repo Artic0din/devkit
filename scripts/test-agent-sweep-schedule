@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Offline test for scripts/agent-sweep-schedule: install writes a valid report-only
-# LaunchAgent, run writes a dated report and latest.tsv, and old reports rotate out.
+# Offline test for scripts/agent-sweep-schedule: install writes a valid LaunchAgent,
+# run applies the sweep and writes a dated report and latest.tsv, and old reports rotate out.
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd -P)
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
@@ -11,16 +11,14 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 plist="$tmp/agents/com.metisary.agent-sweep.plist"
 if command -v plutil >/dev/null; then plutil -lint "$plist" >/dev/null || fail "plist invalid"; fi
 grep -q '<string>run</string>' "$plist" || fail "plist does not call run"
-! grep -q -- '--apply' "$plist" || fail "schedule must never pass --apply"
 
 mkdir -p "$tmp/logs" "$tmp/empty"
 for d in $(seq -w 1 16); do touch -t 202601${d}0000 "$tmp/logs/2026-01-$d.tsv"; done
-"$here/agent-sweep-schedule" run --no-fetch "$tmp/empty" | grep -q '^summary' || fail "run printed no summary"
+"$here/agent-sweep-schedule" run --no-fetch "$tmp/empty" | grep -q '^summary.*freed' || fail "run did not apply the sweep"
 today="$tmp/logs/$(date +%F).tsv"
 [[ -s "$today" ]] || fail "no dated report"
 [[ "$(readlink "$tmp/logs/latest.tsv")" == "$(basename "$today")" ]] || fail "latest.tsv not updated"
 n=$(ls -1 "$tmp/logs"/????-??-??.tsv | wc -l | tr -d ' ')
 [[ "$n" == 14 ]] || fail "expected 14 reports after rotation, got $n"
 [[ ! -e "$tmp/logs/2026-01-01.tsv" ]] || fail "oldest report not rotated out"
-! "$here/agent-sweep-schedule" run --apply --no-fetch "$tmp/empty" 2>/dev/null || fail "run accepted --apply"
-echo "PASS: install, report-only run, latest link, rotation"
+echo "PASS: install, applied run, latest link, rotation"

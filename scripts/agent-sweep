@@ -2,11 +2,13 @@
 """Report agent leftovers (worktrees, branches, stale node_modules, unavailable
 simulators) and, with --apply, remove only what is provably safe.
 
-A worktree is removable only when it sits inside the scanned folders, is idle
-for --days, is not on the default branch, has no uncommitted changes and no
-ignored files beyond rebuildable folders, and is merged: its tip is an ancestor
-of origin's default branch, or a merged PR on GitHub has exactly that tip as its
-head (squash merges). Locked worktrees and ones a process works in are kept.
+A worktree idle for --days is dead: it is removed with its branch, uncommitted
+and unmerged work included, when it sits inside the scanned folders, is not on
+the default branch, and has no ignored files beyond rebuildable folders and junk
+such as .DS_Store (any other ignored file could be a secret). Locked worktrees
+and ones a process works in are kept. A branch with no worktree is removed only
+when it is merged: its tip is an ancestor of origin's default branch, or a merged
+PR on GitHub has exactly that tip as its head (squash merges).
 """
 
 from __future__ import annotations
@@ -19,12 +21,27 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Tuple
 
-DEFAULT_ROOTS = ["~/Metisary/Enviroment/worktrees", "~/Metisary/Projects"]
+# The shared worktree folder and project checkouts, plus older places agents and apps left worktrees.
+DEFAULT_ROOTS = ["~/Metisary/Enviroment/worktrees", "~/Metisary/Projects", "~/Development", "~/.cursor/worktrees",
+                 "~/.codex/worktrees", "~/.t3/worktrees", "~/conductor", "~/orca", "~/emdash", "/private/tmp"]
 SKIP_DIRS = {"node_modules", ".build", "DerivedData", "Pods", ".venv"}
 # Ignored folders that rebuild themselves; any other ignored file (such as .env) keeps a worktree.
-REBUILDABLE = SKIP_DIRS | {"dist", "build", ".next", ".turbo", ".cache", "coverage", "__pycache__"}
+REBUILDABLE = SKIP_DIRS | {"dist", "build", ".next", ".turbo", ".cache", "coverage", "__pycache__", ".ruff_cache",
+                           ".pytest_cache", ".mypy_cache", "test-results", ".deriveddata", ".vite-hooks"}
+JUNK_FILES = {".DS_Store", ".coverage"}
+# Ignored generated output: XcodeGen projects and code generators' *.gen.ts files.
+REBUILDABLE_SUFFIXES = (".xcodeproj",)
+JUNK_SUFFIXES = (".gen.ts",)
+
+
+def rebuildable(name: str) -> bool:
+    return name in REBUILDABLE or name.endswith(REBUILDABLE_SUFFIXES)
+
+
+def junk_file(name: str) -> bool:
+    return name in JUNK_FILES or name.endswith(JUNK_SUFFIXES)
 FETCH_TIMEOUT_S = 60
 
 
@@ -84,18 +101,53 @@ def process_cwds() -> Optional[List[str]]:
     return paths if out.returncode == 0 and paths else None
 
 
-def worktree_state(wt: Path) -> Optional[str]:
-    """Why a worktree's files must be kept, '' if none, or None if git couldn't tell."""
-    out = run(["git", "-C", str(wt), "status", "--porcelain", "--ignored"])
+def is_junk(wt: Path, entry: str) -> bool:
+    """True for ignored junk files and anything inside a rebuildable folder at any depth."""
+    parts = entry.rstrip("/").split("/")
+    if junk_file(parts[-1]):
+        return True
+    return any(rebuildable(name) and (wt.joinpath(*parts[: i + 1])).is_dir() for i, name in enumerate(parts))
+
+
+def walk_blocker(wt: Path, entry: str, need_junk: bool) -> str:
+    """Why a folder git reports as one entry must be kept: a nested repository (git can't see its
+    ignored files), or with need_junk a file that is not junk. '' if neither."""
+    top = wt / entry.rstrip("/")
+    if not top.is_dir() or top.is_symlink():
+        return "" if not need_junk else f"ignored file {entry} (could be secrets)"
+    for root, dirs, files in os.walk(top):
+        if ".git" in dirs or ".git" in files:
+            return f"nested repository {Path(root).relative_to(wt)}"
+        dirs[:] = [d for d in dirs if not rebuildable(d)]
+        odd = next((f for f in files if not junk_file(f)), None)
+        if need_junk and odd:
+            return f"ignored file {(Path(root) / odd).relative_to(wt)} (could be secrets)"
+    return ""
+
+
+def worktree_state(wt: Path) -> Optional[Tuple[bool, str]]:
+    """(has uncommitted changes, why its files must be kept or ''), or None if git couldn't tell."""
+    out = run(["git", "-C", str(wt), "status", "--porcelain", "-z", "--ignored"])
     if out.returncode != 0:
         return None
-    for line in out.stdout.splitlines():
-        if not line.startswith("!! "):
-            return "uncommitted changes"
-        top = line[3:].split("/", 1)[0]
-        if top not in REBUILDABLE or not (wt / top).is_dir():
-            return f"ignored file {line[3:]} (could be secrets)"
-    return ""
+    if (wt / ".gitmodules").exists():
+        return True, "has submodules (git can't see their ignored files)"
+    dirty = False
+    tokens = iter(out.stdout.split("\0"))
+    for tok in tokens:
+        if not tok:
+            continue
+        code, entry = tok[:2], tok[3:]
+        if code[0] in "RC":
+            next(tokens, None)  # -z puts a rename's original path in its own field
+        if code == "!!":
+            why = "" if is_junk(wt, entry) else walk_blocker(wt, entry, need_junk=True)
+        else:
+            dirty = True
+            why = walk_blocker(wt, entry, need_junk=False) if entry.endswith("/") else ""
+        if why:
+            return dirty, why
+    return dirty, ""
 
 
 def default_ref(repo: Path) -> Optional[str]:
@@ -209,19 +261,12 @@ def sweep(roots: List[Path], apply: bool, days: int, fetch: bool, out=sys.stdout
                 reason = "a process may be working in it" if cwds is not None else "running processes could not be checked"
             elif state is None:
                 reason = "git status failed"
-            elif state:
-                reason = state
             elif branch == base_name:
                 reason = "default branch"
             elif not idle:
                 reason = f"active in the last {days} days"
-            elif repo.fetch_failed:
-                reason = "git fetch failed, merge state unknown"
-            elif not repo.base:
-                reason = "default branch unknown"
-            elif not repo.merged(sha):
-                n = repo.unpushed(sha)
-                reason = f"{n} unpushed commit(s)" if n else "not merged yet"
+            elif state[1]:
+                reason = state[1]
             else:
                 reason = ""
             kb = size_kb(wt)
@@ -242,12 +287,19 @@ def sweep(roots: List[Path], apply: bool, days: int, fetch: bool, out=sys.stdout
                     else:
                         totals["reclaimable_kb"] += nkb
                 continue
-            emit("worktree", "remove", str(wt), f"clean and merged ({branch or 'detached'})", kb)
+            lost = ["uncommitted changes"] if state and state[0] else []
+            if repo.fetch_failed or not repo.base:
+                lost.append("commits of unknown merge state")
+            elif not repo.merged(sha):
+                n = repo.unpushed(sha)
+                lost.append(f"{n} unpushed commit(s)" if n else "unmerged commits")
+            emit("worktree", "remove", str(wt), f"idle {days}+ days ({branch or 'detached'}; "
+                 f"{'discards ' + ', '.join(lost) if lost else 'merged'})", kb)
             totals["worktrees"] += 1
             if not apply:
                 totals["reclaimable_kb"] += kb
                 continue
-            if git_ok(path, "worktree", "remove", str(wt)):
+            if git_ok(path, "worktree", "remove", "--force", str(wt)):
                 totals["freed_kb"] += kb
                 if branch:
                     git(path, "branch", "-D", branch)
@@ -280,7 +332,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("roots", nargs="*", help=f"folders to scan (default: {' '.join(DEFAULT_ROOTS)})")
     p.add_argument("--apply", action="store_true", help="remove what the report marks 'remove'")
-    p.add_argument("--days", type=int, default=14, help="idle days before a worktree or its node_modules can be removed")
+    p.add_argument("--days", type=int, default=14, help="idle days before a worktree or its node_modules is removed")
     p.add_argument("--no-fetch", action="store_true", help="skip 'git fetch --prune' before judging merges")
     a = p.parse_args(argv)
     if a.days < 0:
