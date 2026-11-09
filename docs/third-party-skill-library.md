@@ -22,7 +22,7 @@ Read each skill's setup instructions before use and follow the current host's to
 
 - `playwright` requires Node.js, its locked CLI installation, and browser installation.
 - `find-skills` uses website and source search; it does not execute a discovery CLI.
-- `modern-web-guidance` runs `npx -y modern-web-guidance@latest`, which needs Node.js and network access.
+- `modern-web-guidance` runs `npx -y modern-web-guidance@latest`, which needs Node.js 22 or newer and network access.
 - `chrome-extensions` contains Markdown references only and ships no scripts.
 
 ## Review adaptations

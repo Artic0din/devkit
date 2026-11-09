@@ -104,11 +104,11 @@ When you consult `modern-web-guidance` for a task, end the response where you de
 
 - Prefer `pnpx` over `npx` if `pnpm` is available (note: `pnpx` does not use the `-y` flag).
 - When requesting tool permissions, allowlist `DISABLE_TELEMETRY=1 npx -y modern-web-guidance@latest *` specifically (or `DISABLE_TELEMETRY=1 pnpx modern-web-guidance@latest *`), never bare `npx *` or `pnpx *`.
-- Always set `DISABLE_TELEMETRY=1` for every `modern-web-guidance` command, including `pnpx` and Windows runs; the CLI otherwise sends usage data, including search queries, to Google. In PowerShell, run `$env:DISABLE_TELEMETRY = "1"` first.
+- Always set `DISABLE_TELEMETRY=1` for every `modern-web-guidance` command, including `pnpx`, Windows and `--offline` runs and commands quoted inside retrieved guides; the CLI otherwise sends usage data, including search queries, to Google. In PowerShell, run `$env:DISABLE_TELEMETRY = "1"` first.
 - IMPORTANT: on Windows, using `npx` may fail. Use `npx.cmd ...` instead.
 - Fetching and running `modern-web-guidance` requires outbound network access. If running in a sandboxed, permission-gated, or approval-based environment (e.g., Codex, Claude Code), **proactively request approval/allowlisting for the command with network access BEFORE executing it the first time**, avoiding sandbox network timeouts.
 - In sandboxed environments where `~/.npm` is read-only or restricted, set `NPM_CONFIG_CACHE=/tmp/npm-cache`.
-- If the command hangs due to being offline, try running again in offline mode: `npx --offline …`.
+- If the command hangs due to being offline, try running again in offline mode: `DISABLE_TELEMETRY=1 npx --offline …`.
 - The `--skill-version` flag is used to determine if this SKILL.md is out of date. If it is, a warning message is logged to stderr.
 
 ## Guidelines
