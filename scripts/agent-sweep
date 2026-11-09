@@ -285,9 +285,12 @@ def sweep(roots: List[Path], apply: bool, days: int, fetch: bool, out=sys.stdout
     def emit(kind: str, verdict: str, path: str, why: str, kb: int = 0) -> None:
         print(f"{kind}\t{verdict}\t{human(kb) if kb else '-'}\t{path}\t{why}", file=out)
 
-    for path in sorted(find_repos(roots)):
+    for found in sorted(find_repos(roots)):
+        trees = worktrees(found)
+        # Run from the main checkout: the folder the scan found may be a worktree this loop deletes.
+        main = Path(trees[0]["worktree"]) if trees else found
+        path = main if main.is_dir() else found
         repo = Repo(path, fetch)
-        trees = worktrees(path)
         checked_out = {t.get("branch", "") for t in trees}
         base_name = (repo.base or "").removeprefix("refs/remotes/origin/")
         for t in trees[1:]:  # trees[0] is the main checkout

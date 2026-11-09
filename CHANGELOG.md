@@ -6,6 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Fixed `scripts/agent-sweep` failing to remove a repository's remaining worktrees after deleting the worktree it found the repository through.
 - Added `scripts/agent-locations` and `hooks/claude-worktree.py`, which put every agent's worktrees in `~/Metisary/Enviroment/worktrees/<tool>/` and temp files in `~/Metisary/Enviroment/scratch/<tool>/`, and an `AGENTS.MD` rule that scratch files go there, never `/tmp`.
 - Changed `scripts/agent-sweep` to remove scratch entries idle for 14 days and to treat worktrees reached through an app's folder link as inside the shared folder.
 - Changed `scripts/agent-sweep` to treat a worktree idle for 14 days as dead: `--apply` now removes it and its branch even with uncommitted or unmerged work, ignores `.DS_Store`, test caches, coverage data, generated Xcode projects and `*.gen.ts` files, and nested `node_modules` or `.venv` folders, and also scans older agent worktree folders and `/private/tmp`.
