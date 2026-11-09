@@ -81,7 +81,7 @@ def process_cwds() -> Optional[List[str]]:
     except (OSError, subprocess.TimeoutExpired):
         return None
     paths = [line[1:] for line in out.stdout.splitlines() if line.startswith("n")]
-    return paths if paths else None
+    return paths if out.returncode == 0 and paths else None
 
 
 def worktree_state(wt: Path) -> Optional[str]:
@@ -92,7 +92,8 @@ def worktree_state(wt: Path) -> Optional[str]:
     for line in out.stdout.splitlines():
         if not line.startswith("!! "):
             return "uncommitted changes"
-        if line[3:].split("/", 1)[0] not in REBUILDABLE:
+        top = line[3:].split("/", 1)[0]
+        if top not in REBUILDABLE or not (wt / top).is_dir():
             return f"ignored file {line[3:]} (could be secrets)"
     return ""
 
@@ -125,13 +126,21 @@ def merged_pr_heads(repo: Path) -> Set[str]:
 class Repo:
     def __init__(self, path: Path, fetch: bool) -> None:
         self.path = path
+        self.fetch_failed = False
         if fetch:
-            run(["git", "-C", str(path), "fetch", "--prune", "--quiet", "origin"], timeout=FETCH_TIMEOUT_S)
+            try:
+                done = run(["git", "-C", str(path), "fetch", "--prune", "--quiet", "origin"], timeout=FETCH_TIMEOUT_S)
+                self.fetch_failed = done.returncode != 0
+            except subprocess.TimeoutExpired:
+                self.fetch_failed = True
         self.base = default_ref(path)
         self.pr_heads: Optional[Set[str]] = None
 
     def merged(self, sha: str) -> bool:
-        if self.base and git_ok(self.path, "merge-base", "--is-ancestor", sha, self.base):
+        # Stale refs or an unknown default branch can't prove anything is merged.
+        if self.fetch_failed or not self.base:
+            return False
+        if git_ok(self.path, "merge-base", "--is-ancestor", sha, self.base):
             return True
         if self.pr_heads is None:
             self.pr_heads = merged_pr_heads(self.path)
@@ -206,6 +215,10 @@ def sweep(roots: List[Path], apply: bool, days: int, fetch: bool, out=sys.stdout
                 reason = "default branch"
             elif not idle:
                 reason = f"active in the last {days} days"
+            elif repo.fetch_failed:
+                reason = "git fetch failed, merge state unknown"
+            elif not repo.base:
+                reason = "default branch unknown"
             elif not repo.merged(sha):
                 n = repo.unpushed(sha)
                 reason = f"{n} unpushed commit(s)" if n else "not merged yet"
@@ -216,7 +229,7 @@ def sweep(roots: List[Path], apply: bool, days: int, fetch: bool, out=sys.stdout
                 totals["kept"] += 1
                 emit("worktree", "keep", str(wt), reason, kb)
                 stale = wt / "node_modules"
-                if inside and idle and not busy and "locked" not in t and stale.is_dir() and not stale.is_symlink():
+                if inside and idle and not busy and state is not None and "locked" not in t and stale.is_dir() and not stale.is_symlink():
                     nkb = size_kb(stale)
                     totals["node_modules"] += 1
                     emit("node_modules", "remove", str(stale), f"idle {days}+ days, reinstallable", nkb)
@@ -241,11 +254,15 @@ def sweep(roots: List[Path], apply: bool, days: int, fetch: bool, out=sys.stdout
             else:
                 emit("worktree", "error", str(wt), "git worktree remove refused")
         current = git(path, "branch", "--show-current")
+        label = Path(trees[0]["worktree"]).name if trees else path.name
         for line in git(path, "for-each-ref", "--format=%(refname:short) %(objectname)", "refs/heads").splitlines():
             name, sha = line.split()
-            if name in (current, base_name) or f"refs/heads/{name}" in checked_out or not repo.merged(sha):
+            if name in (current, base_name) or f"refs/heads/{name}" in checked_out:
                 continue
-            emit("branch", "remove", f"{path.name}:{name}", "merged")
+            if not repo.merged(sha):
+                emit("branch", "keep", f"{label}:{name}", "not proven merged")
+                continue
+            emit("branch", "remove", f"{label}:{name}", "merged")
             totals["branches"] += 1
             if apply:
                 git(path, "branch", "-D", name)
@@ -254,8 +271,8 @@ def sweep(roots: List[Path], apply: bool, days: int, fetch: bool, out=sys.stdout
         sims = run(["xcrun", "simctl", "list", "devices", "unavailable"], timeout=120).stdout
         count = sum(1 for l in sims.splitlines() if "(unavailable" in l)
         emit("simulators", "remove" if count else "keep", "unavailable", f"{count} unavailable")
-        if apply and count:
-            run(["xcrun", "simctl", "delete", "unavailable"], timeout=600)
+        if apply and count and run(["xcrun", "simctl", "delete", "unavailable"], timeout=600).returncode != 0:
+            emit("simulators", "error", "unavailable", "xcrun simctl delete unavailable failed")
     return totals
 
 
@@ -266,6 +283,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     p.add_argument("--days", type=int, default=14, help="idle days before a worktree or its node_modules can be removed")
     p.add_argument("--no-fetch", action="store_true", help="skip 'git fetch --prune' before judging merges")
     a = p.parse_args(argv)
+    if a.days < 0:
+        p.error("--days must be 0 or more")
     roots = [Path(r).expanduser().resolve() for r in (a.roots or DEFAULT_ROOTS)]
     t = sweep(roots, a.apply, a.days, not a.no_fetch)
     done = f"freed {human(t['freed_kb'])}" if a.apply else f"reclaimable {human(t['reclaimable_kb'])}"

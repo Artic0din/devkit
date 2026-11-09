@@ -8,6 +8,7 @@ import importlib.util
 import io
 import os
 import subprocess
+import shutil
 import tempfile
 import time
 import unittest
@@ -29,6 +30,7 @@ def sh(cwd: Path, *args: str) -> str:
 class AgentSweepTest(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = Path(tempfile.mkdtemp()).resolve()
+        self.addCleanup(shutil.rmtree, self.tmp, True)
         os.environ["AGENT_SWEEP_SKIP_SIMULATORS"] = "1"
         self.remote = self.tmp / "remote.git"
         sh(self.tmp, "git", "init", "-q", "--bare", "-b", "main", str(self.remote))
@@ -44,7 +46,8 @@ class AgentSweepTest(unittest.TestCase):
         self.wts.mkdir()
         self.squashed = ""
         fake = self.tmp / "fake-gh"
-        fake.write_text('#!/bin/sh\nprintf \'[{"headRefOid":"%s"}]\' "$(cat "$0.sha" 2>/dev/null)"\n')
+        # Answers only a merged-PR query, so a sweep asking for other states would see nothing.
+        fake.write_text('#!/bin/sh\ncase "$*" in *"--state merged"*) printf \'[{"headRefOid":"%s"}]\' "$(cat "$0.sha" 2>/dev/null)";; *) echo "[]";; esac\n')
         fake.chmod(0o755)
         os.environ["AGENT_SWEEP_GH"] = str(fake)
         # GitHub-looking fetch URL so the PR lookup runs; pushes still go to the local bare repo.
@@ -116,8 +119,9 @@ class AgentSweepTest(unittest.TestCase):
         self.assertIn("not merged yet", self.line(report, f"{stale}\t"))
         self.assertIn("reinstallable", self.line(report, str(stale / "node_modules")))
         self.assertIn("app:old-merged", report)
-        self.assertNotIn("app:unmerged", report)
-        self.assertTrue(merged.exists(), "report mode must not delete")
+        self.assertIn("not proven merged", self.line(report, "app:unmerged"))
+        for still in (merged, squash, stale / "node_modules"):
+            self.assertTrue(still.exists(), f"report mode deleted {still}")
         self.assertEqual(totals["worktrees"], 2)
 
         self.run_sweep(apply=True)
@@ -136,12 +140,14 @@ class AgentSweepTest(unittest.TestCase):
     def test_review_guards(self) -> None:
         fresh = self.worktree("fresh")
         secret = self.worktree("secret")
-        (secret / ".gitignore").write_text("*.env\n")
+        (secret / ".gitignore").write_text("*.env\nbuild\n")
         sh(secret, "git", "add", ".gitignore")
         sh(secret, "git", "commit", "-q", "-m", "ignore env")
         sh(self.repo, "git", "merge", "-q", "--ff-only", "secret")
         sh(self.repo, "git", "push", "-q", "origin", "main")
         (secret / "local.env").write_text("TOKEN=x")
+        plain = self.worktree("plain-file")
+        (plain / "build").write_text("not a folder")
         outside = self.tmp / "elsewhere" / "wt"
         sh(self.repo, "git", "worktree", "add", "-q", "-b", "outside", str(outside), "main")
         sh(self.repo, "git", "checkout", "-q", "-b", "feature")
@@ -152,12 +158,26 @@ class AgentSweepTest(unittest.TestCase):
         self.assertIn("active in the last 14 days", self.line(report, str(fresh)))
         report, _ = self.run_sweep(apply=True)
         self.assertIn("ignored file local.env", self.line(report, str(secret)))
+        self.assertIn("ignored file build", self.line(report, str(plain)))
         self.assertIn("outside the scanned folders", self.line(report, str(outside)))
         self.assertIn("default branch", self.line(report, str(on_main)))
         for wt in (secret, outside, on_main):
             self.assertTrue(wt.exists(), wt)
         self.assertTrue((secret / "local.env").exists())
         self.assertIn("main", sh(self.repo, "git", "branch", "--format=%(refname:short)").split())
+
+    def test_failed_fetch_keeps_merged_worktree(self) -> None:
+        wt = self.worktree("was-merged")
+        self.commit("done", wt)
+        sh(self.repo, "git", "merge", "-q", "--ff-only", "was-merged")
+        sh(self.repo, "git", "push", "-q", "origin", "main")
+        sh(self.repo, "git", "branch", "also-merged", "main")
+        sh(self.repo, "git", "remote", "set-url", "origin", str(self.tmp / "missing.git"))
+        buf = io.StringIO()
+        sweep_mod.sweep([self.wts], True, 0, True, out=buf)
+        self.assertIn("git fetch failed", self.line(buf.getvalue(), str(wt)))
+        self.assertIn("not proven merged", self.line(buf.getvalue(), "app:also-merged"))
+        self.assertTrue(wt.exists())
 
     def test_gh_failure_keeps_unproven_squash(self) -> None:
         wt = self.worktree("maybe")
