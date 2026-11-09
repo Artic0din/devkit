@@ -110,6 +110,7 @@ description: "Short generic trigger phrase."
 - `scripts/sync-skills`: builds the mirror described above; idempotent; prints changes only. No arguments runs the ordinary sync; `--help` prints usage. Only the scoped `--repair-nested-self-links` mode accepts `--dry-run`.
 - `scripts/validate-skills`: checks every `skills/*/SKILL.md` for front matter, `name`, and `description`.
 - `scripts/agent-sweep`: reports agent worktrees, branches, idle `node_modules` and unavailable simulators under `~/Metisary`. `--apply` removes only clean, merged worktrees and branches, `node_modules` idle for `--days` (default 14), and unavailable simulators; anything with uncommitted or unpushed work is kept. Tested by `scripts/test-agent-sweep.py`.
+- `scripts/agent-sweep-schedule`: `install` adds a LaunchAgent that runs the sweep daily at 03:30 in report mode, writing `~/Library/Logs/agent-sweep/YYYY-MM-DD.tsv` and `latest.tsv` and keeping 14 reports; `status`, `run` and `uninstall` do what they say. It never passes `--apply`.
 - `scripts/docs-list.ts`: walks `docs/`, enforces `summary` and `read_when` front matter, prints onboarding summaries.
 - `scripts/browser-tools.ts`: standalone Chrome DevTools helper (`start --profile`, `nav`, `eval`, `screenshot`, `console`, `network`, `search --content`, `content`, `inspect`, `kill --all --force`); build a binary with `bun build scripts/browser-tools.ts --compile --target bun --outfile bin/browser-tools`.
 

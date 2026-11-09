@@ -50,6 +50,9 @@ jobs:
       - name: Test agent leftover sweep (offline, synthetic)
         run: python3 scripts/test-agent-sweep.py
 
+      - name: Test agent sweep schedule (offline, synthetic)
+        run: scripts/test-agent-sweep-schedule
+
       - name: Test reusable baseline (offline, consumer fixtures)
         run: python3 scripts/test-baseline.py
 

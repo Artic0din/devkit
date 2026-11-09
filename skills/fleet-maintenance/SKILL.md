@@ -85,6 +85,7 @@ its sibling on another host.
 6. Xcode through `$xcode-sync`.
 7. Empty Trash only when this run explicitly asked for it.
 8. Re-audit disk and report.
+   Include each host's `~/Library/Logs/agent-sweep/latest.tsv` summary line; run `scripts/agent-sweep-schedule install` on any host missing it.
 
 ## Health audit
 

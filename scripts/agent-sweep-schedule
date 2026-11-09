@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# agent-sweep-schedule: run scripts/agent-sweep daily in report mode on this Mac.
+#
+#   agent-sweep-schedule install    write and load the LaunchAgent (daily at 03:30)
+#   agent-sweep-schedule uninstall  unload and remove it
+#   agent-sweep-schedule status     show whether it is loaded and the latest summary
+#   agent-sweep-schedule run        one report run (what the LaunchAgent calls)
+#
+# Reports go to ~/Library/Logs/agent-sweep/YYYY-MM-DD.tsv; the newest 14 are kept
+# and latest.tsv points at the newest. The schedule never passes --apply.
+set -euo pipefail
+
+label=com.metisary.agent-sweep
+here=$(cd "$(dirname "$0")" && pwd -P)
+sweep="$here/agent-sweep"
+plist="${AGENT_SWEEP_LAUNCH_AGENTS:-$HOME/Library/LaunchAgents}/$label.plist"
+logs="${AGENT_SWEEP_LOG_DIR:-$HOME/Library/Logs/agent-sweep}"
+keep_reports=14
+
+run_report() {
+  mkdir -p "$logs"
+  local out="$logs/$(date +%F).tsv"
+  python3 -I "$sweep" "$@" > "$out.tmp" 2> "$logs/last-error.txt"
+  mv "$out.tmp" "$out"
+  ln -sfn "$(basename "$out")" "$logs/latest.tsv"
+  # Newest first; drop everything past the newest $keep_reports reports.
+  ls -1r "$logs"/????-??-??.tsv 2>/dev/null | tail -n +$((keep_reports + 1)) | while IFS= read -r old; do rm -f "$old"; done
+  tail -1 "$out"
+}
+
+case "${1:-}" in
+  install)
+    # The plist runs this file by path, so it must live in the long-lived checkout, not a worktree.
+    if [[ -z "${AGENT_SWEEP_NO_LAUNCHCTL:-}" && "$(git -C "$here" rev-parse --absolute-git-dir)" != "$(git -C "$here" rev-parse --path-format=absolute --git-common-dir)" ]]; then
+      echo "run install from the main config checkout, not a worktree: $here" >&2; exit 2
+    fi
+    mkdir -p "$(dirname "$plist")" "$logs"
+    cat > "$plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>$label</string>
+  <key>ProgramArguments</key>
+  <array><string>/bin/bash</string><string>$here/agent-sweep-schedule</string><string>run</string></array>
+  <key>EnvironmentVariables</key>
+  <dict><key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin</string></dict>
+  <key>StartCalendarInterval</key>
+  <dict><key>Hour</key><integer>3</integer><key>Minute</key><integer>30</integer></dict>
+  <key>LowPriorityIO</key><true/>
+  <key>Nice</key><integer>10</integer>
+  <key>StandardOutPath</key><string>$logs/launchd.log</string>
+  <key>StandardErrorPath</key><string>$logs/launchd.log</string>
+</dict>
+</plist>
+EOF
+    if command -v plutil >/dev/null; then plutil -lint "$plist" >/dev/null; fi
+    [[ -n "${AGENT_SWEEP_NO_LAUNCHCTL:-}" ]] && { echo "wrote $plist"; exit 0; }
+    launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
+    launchctl bootstrap "gui/$(id -u)" "$plist"
+    echo "installed $label: daily at 03:30, report only, logs in $logs"
+    ;;
+  uninstall)
+    launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
+    rm -f "$plist"
+    echo "removed $label"
+    ;;
+  status)
+    if launchctl print "gui/$(id -u)/$label" >/dev/null 2>&1; then echo "loaded: $label"; else echo "not loaded: $label"; fi
+    [[ -e "$logs/latest.tsv" ]] && { echo "latest: $(readlink "$logs/latest.tsv")"; tail -1 "$logs/latest.tsv"; } || echo "no report yet"
+    ;;
+  run)
+    shift
+    for a in "$@"; do [[ "$a" == --apply ]] && { echo "run is report-only; call agent-sweep --apply directly" >&2; exit 2; }; done
+    run_report "$@"
+    ;;
+  *)
+    sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'
+    exit 2
+    ;;
+esac
