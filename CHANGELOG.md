@@ -6,6 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Added `scripts/list-skills`: one page that shows every skill and installed Claude plugin skill with where it came from, its repository, its version and what it does, and recorded in `skills.lock.json` where 138 skills that live outside DevKit came from, plus the upstream repository of 34 DevKit skills that started as copies.
 - Fixed `scripts/agent-sweep` failing to remove a repository's remaining worktrees after deleting the worktree it found the repository through.
 - Added `scripts/agent-locations` and `hooks/claude-worktree.py`, which put every agent's worktrees in `~/Metisary/Enviroment/worktrees/<tool>/` and temp files in `~/Metisary/Enviroment/scratch/<tool>/`, and an `AGENTS.MD` rule that scratch files go there, never `/tmp`.
 - Changed `scripts/agent-sweep` to remove scratch entries idle for 14 days and to treat worktrees reached through an app's folder link as inside the shared folder.
