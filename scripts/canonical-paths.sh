@@ -13,6 +13,9 @@
 
 CANONICAL_CONFIG_ROOT="$HOME/Metisary/Enviroment/config"
 CANONICAL_MANAGER_ROOT="$HOME/Metisary/Enviroment/manager"
+# Every agent and app keeps worktrees in <worktrees>/<tool>/ and temp files in <scratch>/<tool>/.
+CANONICAL_WORKTREES_ROOT="$HOME/Metisary/Enviroment/worktrees"
+CANONICAL_SCRATCH_ROOT="$HOME/Metisary/Enviroment/scratch"
 
 CANONICAL_AGENT_SKILLS="$CANONICAL_CONFIG_ROOT/skills"
 CANONICAL_MANAGER_SKILLS="$CANONICAL_MANAGER_ROOT/skills"

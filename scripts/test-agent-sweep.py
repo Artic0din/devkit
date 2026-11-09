@@ -205,6 +205,39 @@ class AgentSweepTest(unittest.TestCase):
         self.assertIn("outside the scanned folders", self.line(report, str(outside)))
         self.assertIn(str(outside), sh(self.repo, "git", "worktree", "list"))
 
+    def test_scratch_idle_entries_removed(self) -> None:
+        scratch = self.tmp / "scratch"
+        old = time.time() - 30 * 86400
+        stale, fresh, nested = scratch / "t3" / "stale-job", scratch / "t3" / "fresh-job", scratch / "claude" / "claude-501" / "proj"
+        for f in (stale / "out.png", fresh / "out.png", nested / "old-session" / "x", nested / "new-session" / "y"):
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text("x")
+        for p in (stale / "out.png", stale, nested / "old-session" / "x", nested / "old-session"):
+            os.utime(p, (old, old))
+        buf = io.StringIO()
+        sweep_mod.sweep([self.wts], False, 14, False, out=buf, scratch=scratch)
+        self.assertIn("\tremove\t", self.line(buf.getvalue(), str(stale)))
+        self.assertIn("\tremove\t", self.line(buf.getvalue(), str(nested / "old-session")))
+        self.assertTrue(stale.exists(), "report mode deleted scratch")
+        sweep_mod.sweep([self.wts], True, 14, False, out=io.StringIO(), scratch=scratch)
+        self.assertFalse(stale.exists())
+        self.assertFalse((nested / "old-session").exists())
+        for kept in (fresh, nested / "new-session"):
+            self.assertTrue(kept.exists(), kept)
+
+    def test_worktree_reached_through_link_counts_as_inside(self) -> None:
+        # What agent-locations does: the app made a worktree in its own folder, which was then
+        # moved into the shared root and replaced by a link, so git still records the old path.
+        app_dir = self.tmp / "app-folder"
+        linked = app_dir / "via-link"
+        sh(self.repo, "git", "worktree", "add", "-q", "-b", "via-link", str(linked), "main")
+        shutil.move(str(linked), str(self.wts / "via-link"))
+        app_dir.rmdir()
+        app_dir.symlink_to(self.wts)
+        report, _ = self.run_sweep(apply=True)
+        self.assertIn("\tremove\t", self.line(report, str(linked)))
+        self.assertFalse((self.wts / "via-link").exists())
+
     def test_failed_fetch_keeps_merged_branch(self) -> None:
         sh(self.repo, "git", "branch", "also-merged", "main")
         sh(self.repo, "git", "remote", "set-url", "origin", str(self.tmp / "missing.git"))
