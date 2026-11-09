@@ -237,6 +237,18 @@ class AgentSweepTest(unittest.TestCase):
         report, _ = self.run_sweep(apply=True)
         self.assertIn("\tremove\t", self.line(report, str(linked)))
         self.assertFalse((self.wts / "via-link").exists())
+    def test_removes_worktrees_when_main_checkout_is_outside_roots(self) -> None:
+        # Only the worktree folder is scanned, so the sweep finds the repository through one of
+        # its linked worktrees; removal must still run from the main checkout.
+        first, second = self.worktree("first"), self.worktree("second")
+        real = sweep_mod.find_repos
+        sweep_mod.find_repos = lambda roots: [first]  # the scan reached the repo through "first"
+        self.addCleanup(setattr, sweep_mod, "find_repos", real)
+        buf = io.StringIO()
+        sweep_mod.sweep([self.wts], True, 0, False, out=buf)
+        self.assertNotIn("\terror\t", buf.getvalue())
+        self.assertFalse(first.exists())
+        self.assertFalse(second.exists())
 
     def test_failed_fetch_keeps_merged_branch(self) -> None:
         sh(self.repo, "git", "branch", "also-merged", "main")
