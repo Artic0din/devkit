@@ -21,7 +21,11 @@ if "$tmp/scripts/cursor-rule" 2>/dev/null; then echo "FAIL: missing source succe
 mv "$tmp/AGENTS.MD.away" "$tmp/AGENTS.MD"
 [ "$(cat "$rule")" = "$before" ] || { echo "FAIL: failed render changed the rule"; exit 1; }
 [ -z "$(ls "$tmp/config" | grep -v '^cursor.rules.mdc$')" ] || { echo "FAIL: temp file left behind"; exit 1; }
-"$tmp/scripts/cursor-rule"
-[ "$(stat -c %a "$rule" 2>/dev/null || stat -f %Lp "$rule")" = 644 ] || { echo "FAIL: rule is not mode 644"; exit 1; }
+mode() { stat -f %Lp "$1" 2>/dev/null || stat -c %a "$1"; }
+for m in 644 600; do
+  chmod "$m" "$tmp/AGENTS.MD"
+  "$tmp/scripts/cursor-rule"
+  [ "$(mode "$rule")" = "$m" ] || { echo "FAIL: rule mode is not $m"; exit 1; }
+done
 
 echo "cursor-rule tests passed"

@@ -16,6 +16,7 @@ else
   tmp="$(mktemp "$out.XXXXXX")"
   trap 'rm -f "$tmp"' EXIT
   render > "$tmp"
-  chmod 644 "$tmp"
+  # The copy is only as readable as its source.
+  chmod "$(stat -f %Lp "$root/AGENTS.MD" 2>/dev/null || stat -c %a "$root/AGENTS.MD")" "$tmp"
   mv "$tmp" "$out"
 fi
