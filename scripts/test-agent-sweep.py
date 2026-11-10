@@ -47,7 +47,7 @@ class AgentSweepTest(unittest.TestCase):
         self.squashed = ""
         fake = self.tmp / "fake-gh"
         # Answers only a merged-PR query, so a sweep asking for other states would see nothing.
-        fake.write_text('#!/bin/sh\ncase "$*" in *"--state merged"*) printf \'[{"headRefOid":"%s","headRefName":"%s","headRepositoryOwner":{"login":"o"}}]\' "$(cat "$0.sha" 2>/dev/null)" "$(cat "$0.name" 2>/dev/null)";; *) echo "[]";; esac\n')
+        fake.write_text('#!/bin/sh\ncase "$*" in *"--state merged"*) printf \'[{"headRefOid":"%s","headRefName":"%s","headRepository":{"name":"app"},"headRepositoryOwner":{"login":"o"}}]\' "$(cat "$0.sha" 2>/dev/null)" "$(cat "$0.name" 2>/dev/null)";; *) echo "[]";; esac\n')
         fake.chmod(0o755)
         os.environ["AGENT_SWEEP_GH"] = str(fake)
         # GitHub-looking fetch URL so the PR lookup runs; pushes still go to the local bare repo.

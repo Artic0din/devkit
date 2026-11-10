@@ -166,7 +166,7 @@ def default_ref(repo: Path) -> Optional[str]:
 
 
 def merged_pr_heads(repo: Path) -> Optional[Dict[str, Set[str]]]:
-    """Head SHA -> head branch names of merged PRs from this repository (not forks), so
+    """Head SHA -> head branch names of merged PRs whose head repository is this one (not a fork), so
     squash-merged branches can be recognised. None when the lookup failed."""
     url = git(repo, "remote", "get-url", "origin")
     if "github.com" not in url:
@@ -175,13 +175,13 @@ def merged_pr_heads(repo: Path) -> Optional[Dict[str, Set[str]]]:
     gh = os.environ.get("AGENT_SWEEP_GH", "gh")
     try:
         out = run([gh, "pr", "list", "-R", slug, "--state", "merged", "--limit", "1000",
-                   "--json", "headRefOid,headRefName,headRepositoryOwner"], timeout=120)
+                   "--json", "headRefOid,headRefName,headRepository,headRepositoryOwner"], timeout=120)
         if out.returncode != 0:
             return None
         heads: Dict[str, Set[str]] = {}
-        owner = slug.split("/", 1)[0].lower()
         for pr in json.loads(out.stdout or "[]"):
-            if str((pr.get("headRepositoryOwner") or {}).get("login", "")).lower() == owner:
+            head = f'{(pr.get("headRepositoryOwner") or {}).get("login", "")}/{(pr.get("headRepository") or {}).get("name", "")}'
+            if head.lower() == slug.lower():
                 heads.setdefault(pr["headRefOid"], set()).add(pr.get("headRefName", ""))
         return heads
     except (OSError, ValueError, subprocess.TimeoutExpired):
