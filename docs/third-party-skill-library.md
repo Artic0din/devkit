@@ -8,11 +8,11 @@ Review adaptations described below make the source work with this repository's a
 | --- | --- | ---: | --- |
 | `playwright` | [openai/skills](https://github.com/openai/skills/tree/49f948faa9258a0c61caceaf225e179651397431/skills/.curated/playwright) | 9 | Apache 2.0, license and notice included |
 | `find-skills` | [vercel-labs/skills](https://github.com/vercel-labs/skills/tree/7407f3893ad4dceab546ac002c3ef806e4000c73/skills/find-skills) | 1 | MIT, upstream notice added |
-| `modern-web-guidance` | [GoogleChrome/modern-web-guidance](https://github.com/GoogleChrome/modern-web-guidance/tree/4f2b13e25c5815b3f080ca0d983e828d96561a0f/skills/modern-web-guidance) | 194 | Apache 2.0, upstream license added |
-| `chrome-extensions` | [GoogleChrome/modern-web-guidance](https://github.com/GoogleChrome/modern-web-guidance/tree/4f2b13e25c5815b3f080ca0d983e828d96561a0f/skills/chrome-extensions) | 24 | Apache 2.0, upstream license added |
+| `modern-web-guidance` | [GoogleChrome/modern-web-guidance](https://github.com/GoogleChrome/modern-web-guidance/tree/4dd968349e54ca45a05dd5c818fb035c9054b022/skills/modern-web-guidance) | 210 | Apache 2.0, upstream license added |
+| `chrome-extensions` | [GoogleChrome/modern-web-guidance](https://github.com/GoogleChrome/modern-web-guidance/tree/4dd968349e54ca45a05dd5c818fb035c9054b022/skills/chrome-extensions) | 24 | Apache 2.0, upstream license added |
 
 The initial import contained 10 existing source files and one additional upstream license notice.
-The Google Chrome import contained 218 source files, matched by Git tree hash, and adds the upstream Apache 2.0 license to each directory.
+The Google Chrome import contained 234 source files, matched by Git tree hash, and adds the upstream Apache 2.0 license to each directory.
 Each directory retains its own license; the repository's license does not replace the upstream terms.
 
 ## Runtime requirements
