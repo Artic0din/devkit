@@ -36,7 +36,9 @@ jobs:
             done
 
       - name: Check the Cursor rule matches AGENTS.MD
-        run: scripts/cursor-rule --check
+        run: |
+          scripts/test-cursor-rule
+          scripts/cursor-rule --check
 
       - name: Test skill link sync and audit
         run: |

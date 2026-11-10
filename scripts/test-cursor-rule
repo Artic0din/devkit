@@ -1,0 +1,25 @@
+#!/bin/bash
+# Offline checks for scripts/cursor-rule in a throwaway copy of the repo layout.
+set -euo pipefail
+src="$(cd "$(dirname "$0")" && pwd)/cursor-rule"
+tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+mkdir -p "$tmp/scripts" "$tmp/config"
+cp "$src" "$tmp/scripts/cursor-rule"
+rule="$tmp/config/cursor.rules.mdc"
+printf '# Rules\nfirst\n' > "$tmp/AGENTS.MD"
+
+"$tmp/scripts/cursor-rule"
+grep -q '^alwaysApply: true$' "$rule" && grep -q '^first$' "$rule" || { echo "FAIL: write"; exit 1; }
+"$tmp/scripts/cursor-rule" --check >/dev/null || { echo "FAIL: check on current copy"; exit 1; }
+
+printf 'second\n' >> "$tmp/AGENTS.MD"
+if "$tmp/scripts/cursor-rule" --check 2>/dev/null; then echo "FAIL: stale copy passed"; exit 1; fi
+
+before="$(cat "$rule")"
+chmod 000 "$tmp/AGENTS.MD"
+if "$tmp/scripts/cursor-rule" 2>/dev/null; then echo "FAIL: unreadable source succeeded"; exit 1; fi
+chmod 644 "$tmp/AGENTS.MD"
+[ "$(cat "$rule")" = "$before" ] || { echo "FAIL: failed render changed the rule"; exit 1; }
+[ -z "$(ls "$tmp/config" | grep -v '^cursor.rules.mdc$')" ] || { echo "FAIL: temp file left behind"; exit 1; }
+
+echo "cursor-rule tests passed"

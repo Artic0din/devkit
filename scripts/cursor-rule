@@ -13,5 +13,8 @@ if [ "${1:-}" = "--check" ]; then
   render | cmp -s - "$out" || { echo "config/cursor.rules.mdc is out of date; run scripts/cursor-rule" >&2; exit 1; }
   echo "config/cursor.rules.mdc matches AGENTS.MD"
 else
-  render > "$out"
+  tmp="$(mktemp "$out.XXXXXX")"
+  trap 'rm -f "$tmp"' EXIT
+  render > "$tmp"
+  mv "$tmp" "$out"
 fi
