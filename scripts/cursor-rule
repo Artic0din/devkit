@@ -17,6 +17,7 @@ else
   trap 'rm -f "$tmp"' EXIT
   # cp -p gives the copy the source's mode, so it is only as readable as AGENTS.MD.
   cp -p "$root/AGENTS.MD" "$tmp"
+  chmod u+w "$tmp"
   render > "$tmp"
   mv "$tmp" "$out"
 fi
