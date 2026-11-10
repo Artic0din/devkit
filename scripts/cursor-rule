@@ -15,8 +15,8 @@ if [ "${1:-}" = "--check" ]; then
 else
   tmp="$(mktemp "$out.XXXXXX")"
   trap 'rm -f "$tmp"' EXIT
+  # cp -p gives the copy the source's mode, so it is only as readable as AGENTS.MD.
+  cp -p "$root/AGENTS.MD" "$tmp"
   render > "$tmp"
-  # The copy is only as readable as its source.
-  chmod "$(stat -f %Lp "$root/AGENTS.MD" 2>/dev/null || stat -c %a "$root/AGENTS.MD")" "$tmp"
   mv "$tmp" "$out"
 fi
