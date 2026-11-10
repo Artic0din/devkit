@@ -47,7 +47,7 @@ class AgentSweepTest(unittest.TestCase):
         self.squashed = ""
         fake = self.tmp / "fake-gh"
         # Answers only a merged-PR query, so a sweep asking for other states would see nothing.
-        fake.write_text('#!/bin/sh\ncase "$*" in *"--state merged"*) printf \'[{"headRefOid":"%s","headRefName":"%s"}]\' "$(cat "$0.sha" 2>/dev/null)" "$(cat "$0.name" 2>/dev/null)";; *) echo "[]";; esac\n')
+        fake.write_text('#!/bin/sh\ncase "$*" in *"--state merged"*) printf \'[{"headRefOid":"%s","headRefName":"%s","headRepositoryOwner":{"login":"o"}}]\' "$(cat "$0.sha" 2>/dev/null)" "$(cat "$0.name" 2>/dev/null)";; *) echo "[]";; esac\n')
         fake.chmod(0o755)
         os.environ["AGENT_SWEEP_GH"] = str(fake)
         # GitHub-looking fetch URL so the PR lookup runs; pushes still go to the local bare repo.
@@ -275,10 +275,14 @@ class AgentSweepTest(unittest.TestCase):
         sh(self.repo, "git", "fetch", "-q", "--prune", str(self.remote), "+refs/heads/*:refs/remotes/origin/*")
         (dirty / "notes.txt").write_text("wip")
         fresh = self.worktree("just-started")  # tip still on main, but no work has landed
+        fresh_gone = self.worktree("pushed-then-deleted")  # own upstream gone, but no commits of its own
+        sh(fresh_gone, "git", "push", "-q", "-u", "origin", "pushed-then-deleted")
+        sh(self.repo, "git", "push", "-q", "origin", ":pushed-then-deleted")
+        sh(self.repo, "git", "fetch", "-q", "--prune", str(self.remote), "+refs/heads/*:refs/remotes/origin/*")
         report, _ = self.run_sweep(apply=True, days=5)
         self.assertIn("merged (done-today; merged)", self.line(report, str(done)))
         self.assertIn("merged (branch-deleted; merged)", self.line(report, str(gone)))
-        for kept in (fresh, dirty, stacked, inherited):
+        for kept in (fresh, fresh_gone, dirty, stacked, inherited):
             self.assertIn("active in the last 5 days", self.line(report, f"{kept}\t"))
             self.assertTrue(kept.exists(), kept)
         self.assertFalse(done.exists())
@@ -300,6 +304,7 @@ class AgentSweepTest(unittest.TestCase):
         Path(os.environ["AGENT_SWEEP_GH"] + ".sha").write_text(tip)
         os.environ["AGENT_SWEEP_GH"] = "/nonexistent/gh"
         report, _ = self.run_sweep(apply=True)
+        self.assertIn("merged-PR lookup failed", self.line(report, "github\twarning"))
         self.assertIn("not proven merged", self.line(report, "app:maybe"))
         self.assertIn("maybe", sh(self.repo, "git", "branch", "--format=%(refname:short)").split())
 
