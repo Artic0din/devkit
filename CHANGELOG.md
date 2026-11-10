@@ -6,6 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Updated 43 third-party skills to their current upstream versions, including the Firecrawl, Depot, Matt Pocock, awesome-copilot and Google Chrome web guidance skills; `git-commit` keeps its secret scan and closing-keyword rule, and `modern-web-guidance` keeps its telemetry opt-out.
 - Changed `scripts/agent-sweep` to remove finished worktrees at any age and to treat other worktrees and scratch as dead after 5 idle days instead of 14; it now warns when the merged-PR lookup fails.
 - Preserved 32 reviewed Awesome Copilot skills, ten agents, two instructions, and local label-governance context with pinned provenance, compatible helpers, and upstream licenses.
 - Preserved build planning and session organisation workflows with approved previews, current evidence checks, and consistent GitHub publication safeguards.
