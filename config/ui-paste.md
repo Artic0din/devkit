@@ -1,6 +1,7 @@
 # Global instruction entrypoints
 
 Cursor reads `~/.cursor/rules/metisary.mdc`, linked to this repository's `config/cursor.rules.mdc`.
+That file holds the full text of `AGENTS.MD`, because Cursor does not open a file a rule only names; after editing `AGENTS.MD`, run `scripts/cursor-rule`.
 GitHub Copilot CLI reads `~/.copilot/copilot-instructions.md`, linked to the canonical `AGENTS.MD`.
 These local integrations do not require copying the rules into a settings field.
 

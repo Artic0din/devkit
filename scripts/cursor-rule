@@ -1,0 +1,17 @@
+#!/bin/bash
+# cursor-rule: write config/cursor.rules.mdc from AGENTS.MD, or check it is current.
+# Cursor does not open files a rule only names, so the rule has to carry the full text.
+# Usage: scripts/cursor-rule [--check]
+set -euo pipefail
+root="$(cd "$(dirname "$0")/.." && pwd)"
+out="$root/config/cursor.rules.mdc"
+render() {
+  printf -- '---\ndescription: Shared Metisary agent instructions, generated from AGENTS.MD by scripts/cursor-rule\nalwaysApply: true\n---\n\n'
+  cat "$root/AGENTS.MD"
+}
+if [ "${1:-}" = "--check" ]; then
+  render | cmp -s - "$out" || { echo "config/cursor.rules.mdc is out of date; run scripts/cursor-rule" >&2; exit 1; }
+  echo "config/cursor.rules.mdc matches AGENTS.MD"
+else
+  render > "$out"
+fi

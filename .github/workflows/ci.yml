@@ -35,6 +35,9 @@ jobs:
               fi
             done
 
+      - name: Check the Cursor rule matches AGENTS.MD
+        run: scripts/cursor-rule --check
+
       - name: Test skill link sync and audit
         run: |
           sudo apt-get update
