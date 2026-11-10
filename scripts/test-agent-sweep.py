@@ -47,7 +47,7 @@ class AgentSweepTest(unittest.TestCase):
         self.squashed = ""
         fake = self.tmp / "fake-gh"
         # Answers only a merged-PR query, so a sweep asking for other states would see nothing.
-        fake.write_text('#!/bin/sh\ncase "$*" in *"--state merged"*) printf \'[{"headRefOid":"%s"}]\' "$(cat "$0.sha" 2>/dev/null)";; *) echo "[]";; esac\n')
+        fake.write_text('#!/bin/sh\ncase "$*" in *"--state merged"*) printf \'[{"headRefOid":"%s","headRefName":"%s"}]\' "$(cat "$0.sha" 2>/dev/null)" "$(cat "$0.name" 2>/dev/null)";; *) echo "[]";; esac\n')
         fake.chmod(0o755)
         os.environ["AGENT_SWEEP_GH"] = str(fake)
         # GitHub-looking fetch URL so the PR lookup runs; pushes still go to the local bare repo.
@@ -104,6 +104,7 @@ class AgentSweepTest(unittest.TestCase):
         tip = self.commit("squash-work", squash)
         sh(squash, "git", "push", "-q", "origin", "squash")
         Path(os.environ["AGENT_SWEEP_GH"] + ".sha").write_text(tip)
+        Path(os.environ["AGENT_SWEEP_GH"] + ".name").write_text("squash")
 
         junk = self.worktree("junk")
         (junk / ".gitignore").write_text(".DS_Store\nnode_modules/\n.pytest_cache/\n*.xcodeproj/\n*.gen.ts\n.coverage\n")
@@ -171,7 +172,7 @@ class AgentSweepTest(unittest.TestCase):
         sh(self.repo, "git", "worktree", "add", "-q", str(on_main), "main")
 
         report, _ = self.run_sweep(apply=True, days=14)
-        self.assertIn("active in the last 14 days", self.line(report, str(fresh)))
+        self.assertIn("active in the last 14 days", self.line(report, str(fresh)))  # a fresh worktree is not finished
         report, _ = self.run_sweep(apply=True)
         self.assertIn("ignored file local.env", self.line(report, str(secret)))
         self.assertIn("ignored file build", self.line(report, str(plain)))
@@ -249,6 +250,39 @@ class AgentSweepTest(unittest.TestCase):
         self.assertNotIn("\terror\t", buf.getvalue())
         self.assertFalse(first.exists())
         self.assertFalse(second.exists())
+
+    def test_merged_worktree_removed_even_when_fresh(self) -> None:
+        done = self.worktree("done-today")  # squash-merged PR from this branch
+        tip = self.commit("finished", done)
+        Path(os.environ["AGENT_SWEEP_GH"] + ".sha").write_text(tip)
+        Path(os.environ["AGENT_SWEEP_GH"] + ".name").write_text("done-today")
+        stacked = self.wts / "stacked"  # new branch on that merged tip, nothing committed
+        sh(self.repo, "git", "worktree", "add", "-q", "-b", "stacked", str(stacked), tip)
+        gone = self.worktree("branch-deleted")  # merged, then its own remote branch was deleted
+        self.commit("landed", gone)
+        sh(gone, "git", "push", "-q", "-u", str(self.remote), "branch-deleted")
+        sh(gone, "git", "branch", "-q", "--set-upstream-to=origin/branch-deleted")
+        sh(self.repo, "git", "merge", "-q", "--ff-only", "branch-deleted")
+        inherited = self.wts / "inherited"  # tracks another branch that is gone
+        sh(self.repo, "git", "worktree", "add", "-q", "--track", "-b", "inherited", str(inherited), "origin/branch-deleted")
+        dirty = self.worktree("finished-but-editing")
+        self.commit("pr-work", dirty)
+        sh(dirty, "git", "push", "-q", str(self.remote), "finished-but-editing:finished-but-editing")
+        sh(self.repo, "git", "fetch", "-q", str(self.remote), "+refs/heads/*:refs/remotes/origin/*")
+        sh(dirty, "git", "branch", "-q", "--set-upstream-to=origin/finished-but-editing")
+        sh(self.repo, "git", "merge", "-q", "--ff-only", "finished-but-editing")
+        sh(self.repo, "git", "push", "-q", "origin", "main", ":branch-deleted", ":finished-but-editing")
+        sh(self.repo, "git", "fetch", "-q", "--prune", str(self.remote), "+refs/heads/*:refs/remotes/origin/*")
+        (dirty / "notes.txt").write_text("wip")
+        fresh = self.worktree("just-started")  # tip still on main, but no work has landed
+        report, _ = self.run_sweep(apply=True, days=5)
+        self.assertIn("merged (done-today; merged)", self.line(report, str(done)))
+        self.assertIn("merged (branch-deleted; merged)", self.line(report, str(gone)))
+        for kept in (fresh, dirty, stacked, inherited):
+            self.assertIn("active in the last 5 days", self.line(report, f"{kept}\t"))
+            self.assertTrue(kept.exists(), kept)
+        self.assertFalse(done.exists())
+        self.assertFalse(gone.exists())
 
     def test_failed_fetch_keeps_merged_branch(self) -> None:
         sh(self.repo, "git", "branch", "also-merged", "main")

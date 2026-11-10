@@ -2,8 +2,10 @@
 """Report agent leftovers (worktrees, branches, stale node_modules, unavailable
 simulators) and, with --apply, remove only what is provably safe.
 
-A worktree idle for --days is dead: it is removed with its branch, uncommitted
-and unmerged work included, when it sits inside the scanned folders, is not on
+A finished worktree (clean, and its tip is a merged PR's head or its branch's
+remote was deleted after merging) is removed at any age; any worktree idle for
+--days (default 5) is dead and removed with its branch, uncommitted and unmerged
+work included. Either way it must sit inside the scanned folders, is not on
 the default branch, and has no ignored files beyond rebuildable folders and junk
 such as .DS_Store (any other ignored file could be a secret). Locked worktrees
 and ones a process works in are kept. A branch with no worktree is removed only
@@ -163,19 +165,20 @@ def default_ref(repo: Path) -> Optional[str]:
     return None
 
 
-def merged_pr_heads(repo: Path) -> Set[str]:
-    """Head SHAs of merged PRs, so squash-merged branches can be recognised."""
+def merged_pr_heads(repo: Path) -> Dict[str, str]:
+    """Head SHA -> head branch name of merged PRs, so squash-merged branches can be recognised."""
     url = git(repo, "remote", "get-url", "origin")
     if "github.com" not in url:
-        return set()
+        return {}
     slug = url.split("github.com")[-1].lstrip(":/").removesuffix(".git")
     gh = os.environ.get("AGENT_SWEEP_GH", "gh")
     try:
         out = run([gh, "pr", "list", "-R", slug, "--state", "merged", "--limit", "1000",
-                   "--json", "headRefOid"], timeout=120)
-        return {pr["headRefOid"] for pr in json.loads(out.stdout or "[]")} if out.returncode == 0 else set()
+                   "--json", "headRefOid,headRefName"], timeout=120)
+        prs = json.loads(out.stdout or "[]") if out.returncode == 0 else []
+        return {pr["headRefOid"]: pr.get("headRefName", "") for pr in prs}
     except (OSError, ValueError, subprocess.TimeoutExpired):
-        return set()
+        return {}
 
 
 class Repo:
@@ -189,7 +192,7 @@ class Repo:
             except subprocess.TimeoutExpired:
                 self.fetch_failed = True
         self.base = default_ref(path)
-        self.pr_heads: Optional[Set[str]] = None
+        self.pr_heads: Optional[Dict[str, str]] = None
 
     def merged(self, sha: str) -> bool:
         # Stale refs or an unknown default branch can't prove anything is merged.
@@ -200,6 +203,19 @@ class Repo:
         if self.pr_heads is None:
             self.pr_heads = merged_pr_heads(self.path)
         return sha in self.pr_heads
+
+    def finished(self, sha: str, branch: str) -> bool:
+        """This branch's own work landed: its merged PR, or its own remote branch deleted after
+        merging. A fresh worktree on the default branch, or a new branch started from another
+        branch's merged tip, is not finished."""
+        if not branch or not self.merged(sha):
+            return False
+        if self.pr_heads is None:
+            self.pr_heads = merged_pr_heads(self.path)
+        if self.pr_heads.get(sha) == branch:
+            return True
+        upstream = git(self.path, "for-each-ref", "--format=%(upstream:short) %(upstream:track)", f"refs/heads/{branch}")
+        return upstream == f"origin/{branch} [gone]"
 
     def unpushed(self, sha: str) -> int:
         out = git(self.path, "rev-list", "--count", sha, "--not", "--remotes")
@@ -318,7 +334,7 @@ def sweep(roots: List[Path], apply: bool, days: int, fetch: bool, out=sys.stdout
                 reason = "git status failed"
             elif branch == base_name:
                 reason = "default branch"
-            elif not idle:
+            elif not idle and not (state and not state[0] and repo.finished(sha, branch)):
                 reason = f"active in the last {days} days"
             elif state[1]:
                 reason = state[1]
@@ -348,7 +364,7 @@ def sweep(roots: List[Path], apply: bool, days: int, fetch: bool, out=sys.stdout
             elif not repo.merged(sha):
                 n = repo.unpushed(sha)
                 lost.append(f"{n} unpushed commit(s)" if n else "unmerged commits")
-            emit("worktree", "remove", str(wt), f"idle {days}+ days ({branch or 'detached'}; "
+            emit("worktree", "remove", str(wt), f"{f'idle {days}+ days' if idle else 'merged'} ({branch or 'detached'}; "
                  f"{'discards ' + ', '.join(lost) if lost else 'merged'})", kb)
             totals["worktrees"] += 1
             if not apply:
@@ -389,7 +405,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("roots", nargs="*", help=f"folders to scan (default: {' '.join(DEFAULT_ROOTS)})")
     p.add_argument("--apply", action="store_true", help="remove what the report marks 'remove'")
-    p.add_argument("--days", type=int, default=14, help="idle days before a worktree or its node_modules is removed")
+    p.add_argument("--days", type=int, default=5, help="idle days before an unmerged worktree, its node_modules or scratch is removed")
     p.add_argument("--no-fetch", action="store_true", help="skip 'git fetch --prune' before judging merges")
     a = p.parse_args(argv)
     if a.days < 0:
