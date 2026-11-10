@@ -6,6 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Changed `scripts/agent-sweep` to remove finished worktrees at any age and to treat other worktrees and scratch as dead after 5 idle days instead of 14; it now warns when the merged-PR lookup fails.
 - Preserved 32 reviewed Awesome Copilot skills, ten agents, two instructions, and local label-governance context with pinned provenance, compatible helpers, and upstream licenses.
 - Preserved build planning and session organisation workflows with approved previews, current evidence checks, and consistent GitHub publication safeguards.
 - Added Google Chrome's `modern-web-guidance` and `chrome-extensions` skills: agents can look up current HTML, CSS and browser JavaScript practices and build Manifest V3 Chrome extensions, and the guidance lookups no longer send usage data to Google.
