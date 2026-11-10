@@ -16,10 +16,12 @@ printf 'second\n' >> "$tmp/AGENTS.MD"
 if "$tmp/scripts/cursor-rule" --check 2>/dev/null; then echo "FAIL: stale copy passed"; exit 1; fi
 
 before="$(cat "$rule")"
-chmod 000 "$tmp/AGENTS.MD"
-if "$tmp/scripts/cursor-rule" 2>/dev/null; then echo "FAIL: unreadable source succeeded"; exit 1; fi
-chmod 644 "$tmp/AGENTS.MD"
+mv "$tmp/AGENTS.MD" "$tmp/AGENTS.MD.away"
+if "$tmp/scripts/cursor-rule" 2>/dev/null; then echo "FAIL: missing source succeeded"; exit 1; fi
+mv "$tmp/AGENTS.MD.away" "$tmp/AGENTS.MD"
 [ "$(cat "$rule")" = "$before" ] || { echo "FAIL: failed render changed the rule"; exit 1; }
 [ -z "$(ls "$tmp/config" | grep -v '^cursor.rules.mdc$')" ] || { echo "FAIL: temp file left behind"; exit 1; }
+"$tmp/scripts/cursor-rule"
+[ "$(stat -c %a "$rule" 2>/dev/null || stat -f %Lp "$rule")" = 644 ] || { echo "FAIL: rule is not mode 644"; exit 1; }
 
 echo "cursor-rule tests passed"

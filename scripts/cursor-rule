@@ -16,5 +16,6 @@ else
   tmp="$(mktemp "$out.XXXXXX")"
   trap 'rm -f "$tmp"' EXIT
   render > "$tmp"
+  chmod 644 "$tmp"
   mv "$tmp" "$out"
 fi
