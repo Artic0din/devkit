@@ -44,8 +44,8 @@ Home Assistant power user: Tesla solar/Powerwall/EVs, GloBird Energy, Daikin HVA
 ## Workspace hygiene
 
 - Reuse an existing simulator; create one when none fits, and delete the ones you created when the task ends.
-- When the repo uses pnpm or bun, install through its shared store worktrees share one copy on disk.
-- Subagents that read code install nothing and work in a temporary directory, never a new persistent worktree.
+- When the repo uses pnpm or bun, install through its shared store so worktrees share one copy on disk.
+- Subagents that only read code install nothing and work in a temporary directory, never a new persistent worktree.
 - Remove your task's worktrees and branches once merged, or once their work is pushed or abandoned.
 - Commit or report your own task's changes before finishing; never leave them uncommitted, and never discard edits you did not make.
 
@@ -102,7 +102,7 @@ Full standard: [engineering-constitution.md](/Users/ryanfoyle/Metisary/Enviromen
 - PR checkboxes: tick only what was verified this session; leave human-judgment boxes unchecked and flag them.
 - Repos: read their PR template + contributing doc from the repo at PR time (never from memory); with none, use the global defaults in [github-intake.md](/Users/ryanfoyle/Metisary/Enviroment/config/docs/github-intake.md); follow their AI-disclosure/trailer policy — strip AI co-author trailers where banned.
 - Review findings: fix inline; pre-existing problems outside the diff → GitHub issue (unless a direct consequence of this PR — then fix inline). Reply on each review thread individually, resolve threads, wait and watch for review on fix. Never push fixes silently.
-- Reviewing as agent: verify each finding against code before reporting; `[CRITICAL|PROBLEM|SUGGESTION] file:line` + verdict; review never pushes.
+- Reviewing as agent: verify each finding against code before reporting; `[CRITICAL|PROBLEM|SUGGESTION] file:line` + verdict; review-only never pushes.
 - Autoreview is required before every commit and landing; no single provider is required (Claude stands in when Codex is unavailable). Verify findings before accepting them; record rejections. If no provider is reachable, commit with the gap stated and review before landing.
 - Use a normal GitHub pull request for isolated changes. 
 - Full playbook: [pr-standards.md](/Users/ryanfoyle/Metisary/Enviroment/config/docs/pr-standards.md) — pipeline order, dep-bump protocol, squash rules, release notes.
@@ -114,7 +114,7 @@ Full standard: [engineering-constitution.md](/Users/ryanfoyle/Metisary/Enviromen
 - GitHub is the source of truth for branches, pull requests, reviews, and CI.
 - Small fixes that fit in one focused pull request do not require an issue.
 - For a multi-phase build, plan GitHub-first: before writing code, create or update the fewest independently deliverable issues, then present the breakdown to the /Council for review.
-- After approval, implement one issue per feature branch and pull request; issue-backed branches include the number, such as `fix/123 short description` or `cursor/123 short description`.
+- After approval, implement one issue per feature branch and pull request; issue-backed branches include the number, such as `fix/123-short-description` or `cursor/123-short-description`.
 - Every issue-backed pull request body must include `Fixes #123`; direct-fix branches and pull requests use the normal conventional naming without a fabricated issue.
 - Update issue checklists for verified work, but never use checklist completion as a merge gate; pull requests and required CI are implementation truth.
 - Keep issue and pull request state aligned with reality; close issues after implementation merges or deliberate abandonment.
