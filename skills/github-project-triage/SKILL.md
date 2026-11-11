@@ -266,7 +266,11 @@ Use this when the task mentions local project state, dirty repos, or "what do I 
 ```bash
 find "$HOME/Metisary/Projects" -maxdepth 3 -name .git -prune | while read -r g; do
   repo="$(dirname "$g")"
-  printf '%s\t%s\t%s changed\n' "${repo#$HOME/}" "$(git -C "$repo" status -sb | head -1)" "$(git -C "$repo" status --porcelain | wc -l | tr -d ' ')"
+  if s="$(git -C "$repo" status -sb 2>/dev/null)"; then
+    printf '%s\t%s\t%s changed\n' "${repo#$HOME/}" "${s%%$'\n'*}" "$(($(printf '%s\n' "$s" | wc -l) - 1))"
+  else
+    printf '%s\tstatus unavailable\n' "${repo#$HOME/}"
+  fi
 done
 ```
 
