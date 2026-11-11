@@ -224,14 +224,15 @@ PR queue, the primary triage order:
 
 ```bash
 for owner in Artic0din Plaintext-Lab; do
-  gh repo list "$owner" --limit 200 --no-archived --json nameWithOwner,issues,pullRequests,updatedAt
+  gh repo list "$owner" --limit 200 --source --no-archived --json nameWithOwner,issues,pullRequests,updatedAt ||
+    echo "repo list failed for $owner; report it before ranking" >&2
 done | jq -s -r 'add | map(select(.pullRequests.totalCount + .issues.totalCount > 0))
   | sort_by(-.pullRequests.totalCount, -.issues.totalCount)[]
   | [.nameWithOwner, .pullRequests.totalCount, .issues.totalCount, .updatedAt] | @tsv'
 ```
 
 For issue pressure as a second pass, sort by `-.issues.totalCount` first.
-Add `--archived` or `--fork` only when the user asks for everything or wants archaeology.
+`--source` skips forks and `--no-archived` skips archived repos; drop both flags when the user asks for everything or wants archaeology.
 A repo with zero issues but open PRs is still triage-relevant.
 
 Preserve the count order when summarising: do not surface a lower-PR repo while omitting a
@@ -264,7 +265,8 @@ Use this when the task mentions local project state, dirty repos, or "what do I 
 
 ```bash
 find "$HOME/Metisary/Projects" -maxdepth 3 -name .git -prune | while read -r g; do
-  repo="$(dirname "$g")"; printf '%s\t%s\n' "${repo#$HOME/}" "$(git -C "$repo" status -sb | head -1)"
+  repo="$(dirname "$g")"
+  printf '%s\t%s\t%s changed\n' "${repo#$HOME/}" "$(git -C "$repo" status -sb | head -1)" "$(git -C "$repo" status --porcelain | wc -l | tr -d ' ')"
 done
 ```
 
