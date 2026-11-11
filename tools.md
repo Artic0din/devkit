@@ -19,18 +19,15 @@ Workflows: `$github-deep-review`, `$github-project-triage`, `$github-author-cont
 
 ---
 
-## repobar
-Repository activity, issue and PR counts, and local checkout state across `Artic0din` and
-`Plaintext-Lab`. On PATH via Homebrew, backed by the RepoBar app.
+## codexbar
+Usage and remaining limits for Codex, Claude, Cursor and other AI providers, backed by the CodexBar app. On PATH via Homebrew.
 
-**Usage**: `repobar --help`
-
-Workflow: `$github-project-triage` (broad queue discovery).
+**Usage**: `codexbar usage --provider codex --json`
 
 ---
 
 ## mcporter
-MCP server launcher for browser automation and web scraping. On PATH via Homebrew.
+Calls any MCP server configured for Claude, Codex or Cursor from the shell, for example `mcporter call ha-mcp.ha_eval_template ...` for Home Assistant. On PATH via Homebrew.
 
 **Usage**: `mcporter --help`
 
@@ -49,7 +46,7 @@ gitleaks git --redact --log-opts="origin/<branch>..HEAD"
 ---
 
 ## xcodes
-Xcode version manager. Full Xcode is not always present; check before assuming Instruments,
+Xcode version manager, installed on every fleet Mac. Full Xcode is not always present; check before assuming Instruments,
 `xctrace`, or `simctl` exist.
 
 ```bash
