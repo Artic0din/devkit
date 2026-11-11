@@ -114,7 +114,7 @@ hard rules and links here; tool-specific items migrate into the owning skill ove
 ## Git
 
 - Use feature branches and PRs for repository changes; never commit directly to main. Local-only creative assets do not require Git workflow ceremony unless integration or publication is requested.
-- Never commit secrets. Before committing, run `gitleaks git --staged --redact`; before pushing, run `gitleaks git --redact` over the exact outgoing commit range. Scanner findings block the action; security vocabulary alone does not.
+- Never commit secrets.
 - Never push with failing local checks.
 - Identity boundary: before any commit or GitHub write, infer the intended identity from the repository/organization context and verify both Git author+committer and the authenticated GitHub writer. Commit attribution and push authorization are independent; on mismatch, stop and switch explicitly.
 - Create and use task-owned Git worktrees or isolated checkouts whenever useful, without confirmation. Preserve user-managed checkouts, branches, and unrelated edits.

@@ -35,16 +35,6 @@ Preferred relay for Chrome work; see the routing in `AGENTS.MD`.
 
 ---
 
-## gitleaks
-Secret scanner. Required before every commit and push; see the Git rules in `AGENTS.MD`.
-
-```bash
-gitleaks git --staged --redact
-gitleaks git --redact --log-opts="origin/<branch>..HEAD"
-```
-
----
-
 ## xcodes
 Xcode version manager, installed on every fleet Mac. Full Xcode is not always present; check before assuming Instruments,
 `xctrace`, or `simctl` exist.

@@ -194,7 +194,6 @@ function collectTools() {
     "codexbar",
     "gh",
     "git",
-    "gitleaks",
     "jq",
     "mcporter",
     "node",
