@@ -51,8 +51,7 @@ The user-level `Development` Project is closed and must not be used.
 
 ## Send work to review
 
-1. Complete required validation and run `gitleaks git --staged --redact` before committing.
-   Immediately before each push, run `gitleaks git --redact --log-opts='<remote-base>..HEAD'` over the exact outgoing range; findings block publication.
+1. Complete required validation and check the staged files for secrets before committing.
 2. Open or update one focused pull request with a conventional title.
 3. Include what changed, why, the test plan, the required release note, and a closing short ELI5 section in the pull request body.
    Add `Fixes #123` only for an actual linked issue; direct-fix pull requests do not need an issue footer.

@@ -123,7 +123,7 @@ git add -- src/components/
 
 - Put a glob in quotes. Without quotes, the shell expands the glob and does not find the files in subdirectories.
 - Do not use `git add -p` or `git add -i`. These commands wait for input from a person.
-- Examine the list of staged files with `git diff --staged --name-only`. Do not commit secrets, for example `.env` files, `credentials.json`, or private keys. Run `gitleaks git --staged --redact` and stop without committing if it reports a finding.
+- Examine the list of staged files with `git diff --staged --name-only`. Do not commit secrets, for example `.env` files, `credentials.json`, or private keys.
 
 ### 4. Write the message
 

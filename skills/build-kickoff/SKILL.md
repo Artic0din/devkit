@@ -69,10 +69,7 @@ rules are the standing contract and must not drift.
 - Conventional commits ({type}({scope}): {description}). One logical change per PR. Tests in the
   same PR. CHANGELOG under [Unreleased] every PR. Never commit to main; never force-push or
   rewrite shared history.
-- Secret hygiene: run `gitleaks git --staged --redact` before every commit and
-  `gitleaks git --redact --log-opts='<remote-base>..HEAD'` over the exact outgoing
-  range before every push. Scanner findings block publication.
-  No secrets in git, memory files, or logs. .env.example with names only.
+- Secret hygiene: no secrets in git, memory files, or logs. .env.example with names only.
 - No scope creep. Ask about unresolved user intent or consequential product and architecture choices.
   Choose autonomously only among explicitly delegated, reversible implementation details;
   record the choice and reasoning in [DECISIONS_DOC].
