@@ -218,64 +218,34 @@ local repro, failing test, end-to-end, or missing), `Blocker`, and `Next` action
 
 ## Broad queue map
 
-Only when the scope is broad. RepoBar is the first pass: it is faster than hand-rolled `gh` loops and
-already understands repo activity, issue and PR counts, local checkouts, auth, and filters.
-
-`repobar` is on `PATH` via `/opt/homebrew/bin/repobar`, a symlink into the installed app bundle.
-
-```bash
-repobar_cmd() {
-  if command -v repobar >/dev/null 2>&1; then
-    repobar "$@"
-  else
-    /Applications/RepoBar.app/Contents/MacOS/repobarcli "$@"
-  fi
-}
-
-repobar_cmd status --json
-```
+Only when the scope is broad. `gh repo list` gives each repo's open issue and PR totals in one call per owner.
 
 PR queue, the primary triage order:
 
 ```bash
-repobar_cmd repos --scope all --only-with work \
-  --owner Artic0din --owner Plaintext-Lab --sort prs --json
+for owner in Artic0din Plaintext-Lab; do
+  gh repo list "$owner" --limit 200 --source --no-archived --json nameWithOwner,issues,pullRequests,updatedAt ||
+    echo "repo list failed for $owner; report it before ranking" >&2
+done | jq -s -r 'add | map(select(.pullRequests.totalCount + .issues.totalCount > 0))
+  | sort_by(-.pullRequests.totalCount, -.issues.totalCount)[]
+  | [.nameWithOwner, .pullRequests.totalCount, .issues.totalCount, .updatedAt] | @tsv'
 ```
 
-Issue pressure, as a second pass:
+For issue pressure as a second pass, sort by `-.issues.totalCount` first.
+`--source` skips forks and `--no-archived` skips archived repos; drop both flags when the user asks for everything or wants archaeology.
+A repo with zero issues but open PRs is still triage-relevant.
 
-```bash
-repobar_cmd repos --scope all --only-with work \
-  --owner Artic0din --owner Plaintext-Lab --sort issues --json
-```
-
-Use `--plain` for a compact terminal view, and `--forks` or `--archived` only when the user asks for
-everything or wants archaeology. A repo with zero issues but open PRs is still triage-relevant.
-
-```bash
-repobar_cmd repos --scope all --only-with work --owner Plaintext-Lab --sort prs --json |
-  jq -r '.[] | [.fullName, .openIssues, .openPulls, .activityTitle, .activityActor] | @tsv'
-```
-
-Preserve RepoBar's count order when summarising: do not surface a lower-PR repo while omitting a
+Preserve the count order when summarising: do not surface a lower-PR repo while omitting a
 higher-PR one from the same owner scope.
-
-`gh repo list` is the fallback if RepoBar is unavailable. Its `issues` and `pullRequests` totals are
-open items only:
-
-```bash
-gh repo list <owner> --limit 100 --no-archived --json name,issues,pullRequests,updatedAt
-```
 
 ## Detail pass
 
 After the queue map, inspect only the top repos unless the user wants exhaustive detail.
 
 ```bash
-repobar_cmd issues <owner/name> --limit 50 --json
-repobar_cmd pulls <owner/name> --limit 50 --json
-repobar_cmd ci <owner/name> --limit 20 --json
-repobar_cmd activity <owner/name> --limit 20 --json
+gh issue list --repo <owner/name> --limit 50 --json number,title,labels,updatedAt,url
+gh pr list --repo <owner/name> --limit 50 --json number,title,author,isDraft,reviewDecision,updatedAt,url
+gh run list --repo <owner/name> --limit 20
 ```
 
 For PRs that look mergeable or suspicious, switch to `gh` for maintainer-grade state:
@@ -291,16 +261,20 @@ or closing.
 
 ## Local cross-check
 
-Use this when the task mentions local project state, dirty repos, or "what do I own here". Ryan's
-checkouts are under `~/Developer` and `~/Development/projects`; `~/Metisary/Projects` is the migration
-target. Scan the roots that hold repos.
+Use this when the task mentions local project state, dirty repos, or "what do I own here". Ryan's checkouts are under `~/Metisary/Projects`, one or two folders deep.
 
 ```bash
-repobar_cmd local --root "$HOME/Developer" --depth 2 --limit 200 --plain
-repobar_cmd local --root "$HOME/Developer" --depth 2 --sync --limit 200 --json
+find "$HOME/Metisary/Projects" -maxdepth 3 -name .git -prune | while read -r g; do
+  repo="$(dirname "$g")"
+  if s="$(git -C "$repo" status -sb 2>/dev/null)"; then
+    printf '%s\t%s\t%s changed\n' "${repo#$HOME/}" "${s%%$'\n'*}" "$(($(printf '%s\n' "$s" | wc -l) - 1))"
+  else
+    printf '%s\tstatus unavailable\n' "${repo#$HOME/}"
+  fi
+done
 ```
 
-Do not run destructive local actions (`local reset`, branch deletes, checkout moves) unless the user
+Do not run destructive local actions (resets, branch deletes, checkout moves) unless the user
 explicitly asks.
 
 ## Triage heuristics
@@ -353,7 +327,7 @@ For a broad scan:
 
 ```text
 Owners scanned: Artic0din, Plaintext-Lab
-Source: RepoBar <command summary>, plus gh for selected PRs/issues
+Source: gh <command summary>
 
 Top queues:
 - owner/repo: X issues, Y PRs; why it matters; next action
