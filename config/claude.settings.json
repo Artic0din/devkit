@@ -6,8 +6,7 @@
       "Bash(git diff:*)",
       "Bash(git log:*)",
       "Bash(gh pr view:*)",
-      "Bash(gh issue view:*)",
-      "Bash(gitleaks:*)"
+      "Bash(gh issue view:*)"
     ]
   }
 }

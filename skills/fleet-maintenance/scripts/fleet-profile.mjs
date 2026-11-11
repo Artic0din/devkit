@@ -193,7 +193,6 @@ function collectTools() {
     "codex",
     "gh",
     "git",
-    "gitleaks",
     "jq",
     "mcporter",
     "node",
