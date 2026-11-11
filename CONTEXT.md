@@ -29,7 +29,7 @@ An issue labelled `ready-for-agent` or `ready-for-human`.
 `triaged` is not itself a label.
 
 **Issue-backed pull request**:
-A pull request linked to an issue that was already triaged before implementation began.
+A pull request linked to an issue that was triaged before implementation began.
 Its issue retains the readiness and work-rank labels; the pull request does not duplicate them.
 
 **Standalone pull request**:
