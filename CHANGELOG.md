@@ -6,6 +6,12 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+### Added
+
+- Added Obscura as the fleet's default agent MCP browser, with a pinned macOS launcher and a profile protecting personal files; kept Chrome for explicit compatibility and logged-in workflows ([#93](https://github.com/Artic0din/devkit/pull/93)).
+
+### Changed
+
 - Updated `AGENTS.MD`: work tracking now uses user-level GitHub Projects, multi-phase issue breakdowns go to Council for review, UI copy must meet the Apple Human Interface Guidelines, repository rules can override the engineering constitution, and the secret-scan commands, three-failed-fixes stop rule, Graphite note, Spec Kit note and several copy rules are removed; removed `docs/awesome-copilot-import.md` and its README link.
 - Removed gitleaks: the staged-secret hook and its test, `.gitleaksignore`, the scan steps in `git-commit`, `conventional-commit`, `github-workflow`, `build-kickoff` and `docs/agent-operations.md`, its `tools.md` entry, fleet profile check and Claude permission; `hooks/pre-commit` now only validates skills.
 - Replaced RepoBar with CodexBar in the tool list and fleet profile, and switched `github-project-triage` to `gh` for its repo, issue and PR queues and a `git` loop over `~/Metisary/Projects` for local state; corrected the `mcporter` description and noted that `xcodes` is on every fleet Mac.

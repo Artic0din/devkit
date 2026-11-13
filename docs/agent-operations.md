@@ -46,6 +46,7 @@ hard rules and links here; tool-specific items migrate into the owning skill ove
 - Codex worker model, reasoning, and service tier follow the current `$codex-first` launch recipe unless the user requests an override. Use `$codex-config` for Codex settings and its direct-API preflight, and `$autoreview` for isolated reviews; preserve its reviewer isolation.
 - Claude Code parallel/background work (Codex workers, monitors, long jobs): each = own harness-tracked task (`run_in_background: true`), labeled for target, one sidebar chip each. Never `&`-detach durable work — hides it, only agent sees. Quick foreground cmds inline. Other harnesses: ignore.
 - Screenshot/live-UI bugs and computer use: use the available browser or computer-use tools and their applicable skills; verify capabilities before acting.
+- Agent page reading, extraction and DOM interaction: prefer the installed `obscura` MCP tools; see `tools.md#obscura`. Use Chrome for existing logins, local apps, visual acceptance and Chrome-specific compatibility. T3's managed browser is unchanged.
 - Ryan's Chrome: use available browser or computer-use tools; when mcporter is available, prefer its daemon-backed `chrome-devtools` relay and reuse one long-lived connection per task. Never open raw CDP/WebSocket connections or ad-hoc Puppeteer/CDP clients.
 - Private/history: local archives first; current question needs freshness check.
 - Secrets/API keys/live creds: `$keychain`.

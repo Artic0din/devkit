@@ -64,6 +64,9 @@ from the Keychain via `$keychain`, and if it is unset the GitHub server starts w
 
 Run `scripts/test-sync-skills` for isolated fixture coverage of the sync and audit.
 
+For headless agent browsing on Apple Silicon Macs, install [Obscura](tools.md#obscura) before enabling its MCP entry.
+The setup verifies the pinned release, installs the filesystem profile, and keeps Chrome available for compatibility work.
+
 ## See your skills
 
 `scripts/list-skills` writes one page listing every skill in `skills/` and every installed Claude plugin skill, with where it came from, its repository, its version and what it does, then opens it.
