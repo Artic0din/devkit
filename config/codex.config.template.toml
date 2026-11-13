@@ -4,6 +4,10 @@ approval_policy = "on-request"
 [features]
 hooks = true
 
+[mcp_servers.obscura]
+command = "/Users/ryanfoyle/.local/bin/obscura"
+args = ["mcp"]
+
 [mcp_servers.github]
 command = "npx"
 args = ["-y", "@modelcontextprotocol/server-github"]

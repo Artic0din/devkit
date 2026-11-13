@@ -71,3 +71,19 @@ Screenshot, screen inspection, and click automation.
 
 Use the available browser or computer-use tools and their applicable skills, following the
 routing in `docs/agent-operations.md`.
+
+## Obscura
+
+Default MCP browser for agent page reading, extraction and DOM interaction on the fleet Macs.
+The `obscura` entry in Claude, Codex and Cursor starts `~/.local/bin/obscura mcp` on demand.
+The launcher in `scripts/obscura` uses version 0.2.6 from `~/.local/share/obscura/0.2.6/` and the profile in `config/obscura.sb`, installed as `~/.local/share/obscura/browser.sb`.
+Keep both release executables together and verify the release archive's SHA-256 before installation.
+Run `python3 scripts/test-obscura.py` to check the profile.
+
+The profile denies access to home directories and external volumes, denies writes to the browser installation, and prevents launching other executables.
+This is a filesystem and executable boundary, not Chrome-equivalent site isolation or a complete network sandbox.
+Sessions have no imported Chrome cookies or profiles.
+Private-network navigation remains blocked by Obscura's default; use a real browser for local apps, existing logins, downloads into personal folders, extensions, visual acceptance and Chrome-specific debugging.
+Codex's `chrome-devtools` server is disabled by default but retained for an explicit fallback session.
+Use the active host's browser tools when that workflow requires them; T3's browser and bundled Chrome are managed by T3 and are not replaced by this integration.
+Existing sessions keep their loaded tools until restarted after their work finishes.

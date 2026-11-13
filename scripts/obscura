@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+
+root="$HOME/.local/share/obscura"
+binary="$root/0.2.6/obscura"
+if [ ! -x "$binary" ] || [ ! -r "$root/browser.sb" ]; then
+  echo 'Obscura 0.2.6 and its browser profile must be installed first.' >&2
+  exit 1
+fi
+exec /usr/bin/sandbox-exec -D "OBSCURA_ROOT=$root/0.2.6" \
+  -D "OBSCURA_EXEC=$binary" -f "$root/browser.sb" "$binary" "$@"

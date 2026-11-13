@@ -1,0 +1,7 @@
+(version 1)
+(allow default)
+; Web content must not inherit access to personal files or launch other programs.
+(deny file-read* file-write* (subpath "/Users") (subpath "/Volumes"))
+(allow file-read* (subpath (param "OBSCURA_ROOT")))
+(deny process-exec)
+(allow process-exec (literal (param "OBSCURA_EXEC")))

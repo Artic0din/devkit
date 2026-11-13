@@ -1,5 +1,9 @@
 {
   "mcpServers": {
+    "obscura": {
+      "command": "/Users/ryanfoyle/.local/bin/obscura",
+      "args": ["mcp"]
+    },
     "github": {
       "command": "npx",
       "args": [
