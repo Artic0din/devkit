@@ -27,12 +27,24 @@ class BrowserProfileTests(unittest.TestCase):
             refused = subprocess.run(command + [str(private)], capture_output=True, text=True)
             self.assertNotEqual(refused.returncode, 0)
             self.assertNotIn("private fixture", refused.stdout)
+            with tempfile.TemporaryDirectory() as temporary:
+                secret = Path(temporary) / "private"
+                secret.write_text("temporary private fixture")
+                refused = subprocess.run(command + [str(secret)], capture_output=True, text=True)
+                self.assertNotEqual(refused.returncode, 0)
+                self.assertNotIn("temporary private fixture", refused.stdout)
             shell = ["/usr/bin/sandbox-exec", "-D", f"OBSCURA_ROOT={allowed}",
                      "-D", "OBSCURA_EXEC=/bin/sh", "-f", str(PROFILE), "/bin/sh", "-c"]
             write = subprocess.run(shell + ['printf blocked > "$1"', "sh", str(allowed / "new")],
                                    capture_output=True, text=True)
             self.assertNotEqual(write.returncode, 0)
             self.assertFalse((allowed / "new").exists())
+            with tempfile.TemporaryDirectory() as temporary:
+                target = Path(temporary) / "new"
+                write = subprocess.run(shell + ['printf blocked > "$1"', "sh", str(target)],
+                                       capture_output=True, text=True)
+                self.assertNotEqual(write.returncode, 0)
+                self.assertFalse(target.exists())
             child = subprocess.run(shell + ["exec /usr/bin/true"], capture_output=True, text=True)
             self.assertNotEqual(child.returncode, 0)
 

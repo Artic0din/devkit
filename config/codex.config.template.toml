@@ -5,8 +5,14 @@ approval_policy = "on-request"
 hooks = true
 
 [mcp_servers.obscura]
-command = "/Users/ryanfoyle/.local/bin/obscura"
-args = ["mcp"]
+command = "/bin/sh"
+args = ["-c", "exec \"$HOME/.local/bin/obscura\" mcp"]
+enabled_tools = ["browser_navigate", "browser_snapshot", "browser_click", "browser_fill", "browser_type", "browser_press_key", "browser_select_option", "browser_evaluate", "browser_wait_for_function", "browser_wait_for", "browser_close", "browser_markdown", "browser_links", "browser_interactive_elements", "browser_back", "browser_forward", "browser_reload", "browser_wait_for_text", "browser_scroll", "browser_get_attribute", "browser_count", "browser_extract"]
+
+[mcp_servers.chrome-devtools]
+command = "npx"
+args = ["chrome-devtools-mcp@latest"]
+enabled = false
 
 [mcp_servers.github]
 command = "npx"
