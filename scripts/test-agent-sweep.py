@@ -260,8 +260,8 @@ class AgentSweepTest(unittest.TestCase):
         sh(self.repo, "git", "worktree", "add", "-q", "-b", "stacked", str(stacked), tip)
         gone = self.worktree("branch-deleted")  # merged, then its own remote branch was deleted
         self.commit("landed", gone)
-        sh(gone, "git", "push", "-q", "-u", str(self.remote), "branch-deleted")
-        sh(gone, "git", "branch", "-q", "--set-upstream-to=origin/branch-deleted")
+        # Push by remote name: before Git 2.56, a push to a URL never creates origin/<branch>.
+        sh(gone, "git", "push", "-q", "-u", "origin", "branch-deleted")
         sh(self.repo, "git", "merge", "-q", "--ff-only", "branch-deleted")
         inherited = self.wts / "inherited"  # tracks another branch that is gone
         sh(self.repo, "git", "worktree", "add", "-q", "--track", "-b", "inherited", str(inherited), "origin/branch-deleted")
