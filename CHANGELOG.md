@@ -8,6 +8,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ### Added
 
+- Added `scripts/t3-settings-sync`, which keeps T3 Code settings and keybindings the same on every fleet Mac by copying them from the master Mac over SSH, on change and every 15 minutes, without overwriting per-Mac paths, provider instances or microphones.
 - Added Obscura as the fleet's default agent MCP browser, with a pinned macOS launcher and a profile protecting personal files; kept Chrome for explicit compatibility and logged-in workflows ([#93](https://github.com/Artic0din/devkit/pull/93)).
 
 ### Changed
