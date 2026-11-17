@@ -45,12 +45,19 @@ class MergeTest(unittest.TestCase):
         self.assertEqual(merged["defaultModelSelection"], {"instanceId": "codex", "model": "t"})
         self.assertEqual(merged["textGenerationModelSelection"], {"instanceId": "codex", "model": "c"})
 
+    def test_target_text_generators_are_kept_with_selections_that_use_them(self):
+        master = {"textGenerators": {"m": {}}, "textGenerationModelSelection": {"instanceId": "m"}}
+        target = {"textGenerators": {"t": {}}, "textGenerationModelSelection": {"instanceId": "t"}}
+        self.assertEqual(sync.merge("settings.json", master, target), target)
+
     def test_keybindings_array_is_copied_whole(self):
         self.assertEqual(sync.merge("keybindings.json", [{"key": "mod+k"}], [{"key": "x"}]), [{"key": "mod+k"}])
 
     def test_changed_keys_lists_only_differences(self):
         self.assertEqual(sync.changed_keys({"a": 1, "b": 2}, {"a": 1, "b": 3, "c": 4}), ["b", "c"])
         self.assertEqual(sync.changed_keys(None, {"a": 1}), ["(whole file)"])
+        self.assertEqual(sync.changed_keys({}, {"a": None}), ["a"])
+        self.assertEqual(sync.changed_keys({"a": None}, {}), ["a"])
 
 
 class InstallTest(unittest.TestCase):

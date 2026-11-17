@@ -14,6 +14,7 @@ client-settings.json at launch, so those changes show after T3 Code restarts.
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import plistlib
@@ -45,6 +46,7 @@ LOCAL_KEYS: dict[str, frozenset[str]] = {
         "enableDeviceSupport",
         "deviceOnboardingCompleted",
         "sourceControlHosts",
+        "textGenerators",
     }),
     "client-settings.json": frozenset({
         "voiceMicrophone",
@@ -111,13 +113,16 @@ def read_remote(host: str, name: str) -> object | None:
 def write_remote(host: str, name: str, value: object) -> None:
     body = json.dumps(value, indent=2) + "\n"
     size = len(body.encode())
-    # Resolve a symlinked file so the link survives; rename keeps the swap atomic for the watching
-    # server; the size check stops a cut-off upload from replacing the file; the first backup is kept.
+    # Resolve a symlinked file so the link survives. The first backup is kept, and a failed backup
+    # aborts the write. A per-upload temp file, size check and rename stop a cut-off or overlapping
+    # upload from replacing the file; the original file mode is kept.
     command = (
         f"p={REMOTE_USERDATA}/{name}; [ -L \"$p\" ] && p=$(readlink -f \"$p\"); "
-        f"[ -e \"$p\" ] && [ ! -e \"$p.bak-fleet-sync\" ] && cp -p \"$p\" \"$p.bak-fleet-sync\"; "
-        f"cat > \"$p.sync-tmp\" && [ \"$(wc -c < \"$p.sync-tmp\" | tr -d ' ')\" = {size} ] "
-        f"&& mv \"$p.sync-tmp\" \"$p\" || {{ rm -f \"$p.sync-tmp\"; exit 1; }}"
+        f"if [ -e \"$p\" ] && [ ! -e \"$p.bak-fleet-sync\" ]; then "
+        f"cp -p \"$p\" \"$p.bak-tmp\" && mv \"$p.bak-tmp\" \"$p.bak-fleet-sync\" || {{ rm -f \"$p.bak-tmp\"; exit 1; }}; fi; "
+        f"t=$(mktemp \"$p.sync-XXXXXX\") || exit 1; "
+        f"{{ cat > \"$t\" && [ \"$(wc -c < \"$t\" | tr -d ' ')\" = {size} ] "
+        f"&& {{ [ ! -e \"$p\" ] || chmod \"$(stat -f %Lp \"$p\")\" \"$t\"; }} && mv \"$t\" \"$p\"; }} || {{ rm -f \"$t\"; exit 1; }}"
     )
     out = ssh(host, command, body)
     if out.returncode != 0:
@@ -128,10 +133,18 @@ def changed_keys(before: object | None, after: object) -> list[str]:
     if not isinstance(after, dict) or not isinstance(before, dict):
         return [] if before == after else ["(whole file)"]
     keys = set(before) | set(after)
-    return sorted(k for k in keys if before.get(k) != after.get(k))
+    return sorted(k for k in keys if k not in before or k not in after or before[k] != after[k])
 
 
 def sync(hosts: list[str], apply: bool) -> int:
+    # One run at a time, so a manual --apply and the LaunchAgent never merge from stale reads.
+    LOGS.mkdir(parents=True, exist_ok=True)
+    with open(LOGS / "sync.lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        return sync_locked(hosts, apply)
+
+
+def sync_locked(hosts: list[str], apply: bool) -> int:
     masters = {name: json.loads((USERDATA / name).read_text()) for name in FILES if (USERDATA / name).exists()}
     failures = 0
     lines: list[str] = []
