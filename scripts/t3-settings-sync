@@ -1,0 +1,242 @@
+#!/usr/bin/env python3
+"""t3-settings-sync: copy this Mac's T3 Code settings to the other fleet Macs over SSH.
+
+  t3-settings-sync [--apply] [HOST ...]   report what differs; --apply writes it (default hosts: ace rex)
+  t3-settings-sync install [HOST ...]     LaunchAgent: run --apply when a settings file changes and every 15 minutes
+  t3-settings-sync uninstall              unload and remove the LaunchAgent
+  t3-settings-sync status                 show whether it is loaded and the last run
+
+This Mac is the master copy. Keys that only make sense on one Mac (provider binaries,
+project-ID overrides, microphones) keep each target's own value. A running T3 server
+reloads settings.json and keybindings.json when they change; the desktop app reads
+client-settings.json at launch, so those changes show after T3 Code restarts.
+"""
+
+from __future__ import annotations
+
+import fcntl
+import json
+import os
+import plistlib
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
+
+LABEL = "com.metisary.t3-settings-sync"
+DEFAULT_HOSTS = ("ace", "rex")
+USERDATA = Path.home() / ".t3" / "userdata"
+REMOTE_USERDATA = ".t3/userdata"
+LOGS = Path(os.environ.get("T3_SETTINGS_SYNC_LOG_DIR", Path.home() / "Library/Logs/t3-settings-sync"))
+INTERVAL_SECONDS = 900
+MISSING = "__T3_SETTINGS_SYNC_MISSING__"
+SSH = ("ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8")
+
+# Keys whose values are tied to one Mac: IDs, paths, or hardware that differ per machine.
+LOCAL_KEYS: dict[str, frozenset[str]] = {
+    "settings.json": frozenset({
+        "providerInstances",
+        "projectScriptOverrides",
+        "projectSettingsOverrides",
+        "projectSettingsFolded",
+        "worktreesDirectory",
+        "previousWorktreesDirectories",
+        "addProjectBaseDirectory",
+        "enableAgentDeviceAccess",
+        "enableDeviceSupport",
+        "deviceOnboardingCompleted",
+        "sourceControlHosts",
+        "textGenerators",
+    }),
+    "client-settings.json": frozenset({
+        "voiceMicrophone",
+        "voiceMicrophones",
+        "onboardingCompletedAt",
+        "dismissedProviderUpdateNotificationKeys",
+        "loadBalancingWeights",
+        "environmentIdentificationMode",
+        "browserProfiles",
+        "browserDefaultProfileId",
+    }),
+}
+FILES = ("settings.json", "client-settings.json", "keybindings.json")
+
+
+def merge(name: str, master: object, target: object | None) -> object:
+    """Master's shared keys win; the target keeps its local keys and any model
+    selection pointing at a provider instance the target does not have."""
+    if not isinstance(master, dict):
+        return master
+    target = target if isinstance(target, dict) else {}
+    local = LOCAL_KEYS.get(name, frozenset())
+    result = {k: v for k, v in master.items() if k not in local}
+    if name == "settings.json":
+        for key, value in master.items():
+            if key.endswith("ModelSelection") and isinstance(value, dict) and not portable(value.get("instanceId"), master, target):
+                if key in target:
+                    result[key] = target[key]
+                else:
+                    result.pop(key, None)
+    for key in local:
+        if key in target:
+            result[key] = target[key]
+    return result
+
+
+def portable(instance_id: object, master: dict, target: dict) -> bool:
+    """A selection works on the target if the target defines its instance, or it is a
+    built-in default instance (its id is its driver name), which every Mac has."""
+    def defined(settings: dict, group: str) -> dict:
+        value = settings.get(group)
+        return value if isinstance(value, dict) else {}
+    if any(instance_id in defined(target, g) for g in ("providerInstances", "textGenerators")):
+        return True
+    if instance_id in defined(master, "textGenerators"):
+        return False
+    master_instance = defined(master, "providerInstances").get(instance_id)
+    return master_instance is None or (isinstance(master_instance, dict) and master_instance.get("driver", instance_id) == instance_id)
+
+
+def ssh(host: str, command: str, stdin: str | None = None) -> subprocess.CompletedProcess[str]:
+    return subprocess.run([*SSH, host, command], input=stdin, capture_output=True, text=True, timeout=60)
+
+
+def read_remote(host: str, name: str) -> object | None:
+    path = f"{REMOTE_USERDATA}/{name}"
+    out = ssh(host, f"if [ -e {path} ]; then cat {path}; else echo {MISSING}; fi")
+    if out.returncode != 0:
+        raise ConnectionError(out.stderr.strip() or f"ssh exit {out.returncode}")
+    # An existing but empty or cut-off file fails to parse, so the host is skipped rather than overwritten.
+    return None if out.stdout.strip() == MISSING else json.loads(out.stdout)
+
+
+def write_remote(host: str, name: str, value: object) -> None:
+    body = json.dumps(value, indent=2) + "\n"
+    size = len(body.encode())
+    # Resolve a symlinked file so the link survives. The first backup is kept, and a failed backup
+    # aborts the write. A per-upload temp file, size check and rename stop a cut-off or overlapping
+    # upload from replacing the file; the original file mode is kept.
+    command = (
+        f"p={REMOTE_USERDATA}/{name}; [ -L \"$p\" ] && p=$(readlink -f \"$p\"); "
+        f"if [ -e \"$p\" ] && [ ! -e \"$p.bak-fleet-sync\" ]; then "
+        f"cp -p \"$p\" \"$p.bak-tmp\" && mv \"$p.bak-tmp\" \"$p.bak-fleet-sync\" || {{ rm -f \"$p.bak-tmp\"; exit 1; }}; fi; "
+        f"t=$(mktemp \"$p.sync-XXXXXX\") || exit 1; "
+        f"{{ cat > \"$t\" && [ \"$(wc -c < \"$t\" | tr -d ' ')\" = {size} ] "
+        f"&& {{ [ ! -e \"$p\" ] || chmod \"$(stat -f %Lp \"$p\")\" \"$t\"; }} && mv \"$t\" \"$p\"; }} || {{ rm -f \"$t\"; exit 1; }}"
+    )
+    out = ssh(host, command, body)
+    if out.returncode != 0:
+        raise OSError(out.stderr.strip() or f"write failed: ssh exit {out.returncode}")
+
+
+def changed_keys(before: object | None, after: object) -> list[str]:
+    if not isinstance(after, dict) or not isinstance(before, dict):
+        return [] if before == after else ["(whole file)"]
+    keys = set(before) | set(after)
+    return sorted(k for k in keys if k not in before or k not in after or before[k] != after[k])
+
+
+def sync(hosts: list[str], apply: bool) -> int:
+    # One run at a time, so a manual --apply and the LaunchAgent never merge from stale reads.
+    LOGS.mkdir(parents=True, exist_ok=True)
+    with open(LOGS / "sync.lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        return sync_locked(hosts, apply)
+
+
+def sync_locked(hosts: list[str], apply: bool) -> int:
+    masters = {name: json.loads((USERDATA / name).read_text()) for name in FILES if (USERDATA / name).exists()}
+    failures = 0
+    lines: list[str] = []
+    for host in hosts:
+        try:
+            for name, master in masters.items():
+                current = read_remote(host, name)
+                wanted = merge(name, master, current)
+                diff = changed_keys(current, wanted)
+                if not diff:
+                    if not apply:
+                        lines.append(f"{host}\t{name}\tin sync")
+                    continue
+                if apply:
+                    write_remote(host, name, wanted)
+                verb = "updated" if apply else "would update"
+                lines.append(f"{host}\t{name}\t{verb} {len(diff)}: {', '.join(diff)}")
+        except (ConnectionError, OSError, subprocess.TimeoutExpired, json.JSONDecodeError) as error:
+            failures += 1
+            lines.append(f"{host}\tunreachable or failed: {error}")
+    # Quiet when nothing changed so the LaunchAgent log only grows on real syncs.
+    if lines:
+        print(f"--- {datetime.now():%F %T} {'apply' if apply else 'report'}")
+        print("\n".join(lines))
+    return 1 if failures else 0
+
+
+def plist_path() -> Path:
+    return Path(os.environ.get("T3_SETTINGS_SYNC_LAUNCH_AGENTS", Path.home() / "Library/LaunchAgents")) / f"{LABEL}.plist"
+
+
+def install(hosts: list[str]) -> int:
+    script = Path(__file__).resolve()
+    LOGS.mkdir(parents=True, exist_ok=True)
+    log = str(LOGS / "launchd.log")
+    plist = plist_path()
+    plist.parent.mkdir(parents=True, exist_ok=True)
+    with plist.open("wb") as handle:
+        plistlib.dump({
+            "Label": LABEL,
+            "ProgramArguments": ["/usr/bin/python3", "-I", str(script), "--apply", *hosts],
+            "WatchPaths": [str(USERDATA / name) for name in FILES],
+            "StartInterval": INTERVAL_SECONDS,
+            "RunAtLoad": True,
+            "LowPriorityIO": True,
+            "Nice": 10,
+            "StandardOutPath": log,
+            "StandardErrorPath": log,
+        }, handle)
+    if os.environ.get("T3_SETTINGS_SYNC_NO_LAUNCHCTL"):
+        print(f"wrote {plist}")
+        return 0
+    domain = f"gui/{os.getuid()}"
+    subprocess.run(["launchctl", "bootout", f"{domain}/{LABEL}"], capture_output=True)
+    subprocess.run(["launchctl", "bootstrap", domain, str(plist)], check=True)
+    print(f"installed {LABEL}: syncs to {' '.join(hosts)} on change and every {INTERVAL_SECONDS // 60} min, log {log}")
+    return 0
+
+
+def main(argv: list[str]) -> int:
+    command = argv[0] if argv else ""
+    if command == "install":
+        script = Path(__file__).resolve().parent
+        common = subprocess.run(["git", "-C", str(script), "rev-parse", "--path-format=absolute", "--git-common-dir"], capture_output=True, text=True).stdout.strip()
+        gitdir = subprocess.run(["git", "-C", str(script), "rev-parse", "--absolute-git-dir"], capture_output=True, text=True).stdout.strip()
+        if gitdir != common and not os.environ.get("T3_SETTINGS_SYNC_NO_LAUNCHCTL"):
+            print(f"run install from the main config checkout, not a worktree: {script}", file=sys.stderr)
+            return 2
+        return install(argv[1:] or list(DEFAULT_HOSTS))
+    if command == "uninstall":
+        subprocess.run(["launchctl", "bootout", f"gui/{os.getuid()}/{LABEL}"], capture_output=True)
+        plist_path().unlink(missing_ok=True)
+        print(f"removed {LABEL}")
+        return 0
+    if command == "status":
+        loaded = subprocess.run(["launchctl", "print", f"gui/{os.getuid()}/{LABEL}"], capture_output=True).returncode == 0
+        print(f"{'loaded' if loaded else 'not loaded'}: {LABEL}")
+        log = LOGS / "launchd.log"
+        if log.exists():
+            print(f"last log lines ({datetime.fromtimestamp(log.stat().st_mtime):%F %T}):")
+            print("".join(log.read_text().splitlines(keepends=True)[-6:]), end="")
+        return 0
+    if command in ("-h", "--help"):
+        print(__doc__)
+        return 0
+    apply = "--apply" in argv
+    hosts = [a for a in argv if a != "--apply"] or list(DEFAULT_HOSTS)
+    if any(h.startswith("-") for h in hosts):
+        print(__doc__, file=sys.stderr)
+        return 2
+    return sync(hosts, apply)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
