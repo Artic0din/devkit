@@ -6,6 +6,10 @@ on:
         description: Comma-separated repository-relative files required by this project
         type: string
         default: README.md, LICENSE, .gitignore, AGENTS.md
+      forbidden-paths:
+        description: Comma-separated paths a pull request must not add or change; a name without a slash matches at any depth
+        type: string
+        default: node_modules
 permissions:
   contents: read
 jobs:
@@ -53,4 +57,156 @@ jobs:
           if errors:
               raise SystemExit("\n".join(errors))
           print(f"Validated {len(paths)} required paths")
+          PY
+  pr-hygiene:
+    name: Pull request hygiene
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    # Listing a pull request's commits needs this; callers must grant it too, or the workflow cannot start.
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check out caller
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: List the pull request's commits
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: >-
+          gh api --paginate "repos/$REPOSITORY/pulls/$NUMBER/commits"
+          --jq '.[] | {sha, login: (.author.login // ""), parents: (.parents | length), message: .commit.message}'
+          > "$RUNNER_TEMP/commits.jsonl"
+      - name: Check title, commits, attribution and paths
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+          BODY: ${{ github.event.pull_request.body }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          FORBIDDEN: ${{ inputs.forbidden-paths }}
+          COMMITS_FILE: ${{ runner.temp }}/commits.jsonl
+          TOTAL_COMMITS: ${{ github.event.pull_request.commits }}
+        run: |
+          python3 -I - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+          from pathlib import Path
+
+          env = os.environ
+          conventional = re.compile(r"^(feat|fix|test|refactor|perf|docs|style|chore|ci|build|revert)(\([^)]+\))?!?: \S")
+          # Human co-author trailers stay allowed; only agent identities and agent footers count.
+          agent = re.compile(
+              r"Co-Authored-By:[^\n<]*<(noreply@anthropic\.com|cursoragent@cursor\.com|codex@openai\.com|[^>\n]*\+Copilot@users\.noreply\.github\.com|[^>\n]*\[bot\]@users\.noreply\.github\.com)>"
+              r"|Co-Authored-By:[^\n]*\b(Claude (Opus|Sonnet|Haiku|Fable)|GPT-\d|Kimi K\d|Gemini \d)"
+              r"|Generated with \[|^Created with |^Made with \[|responding on behalf of",
+              re.IGNORECASE | re.MULTILINE,
+          )
+          disclosure = re.compile(
+              r"\b(AI|LLM|agent|model|Copilot|machine[- ]generated)\b[^\n]{0,80}\b(disclos|assist|generat|attribut|co-author)"
+              r"|\bdisclos\w*[^\n]{0,80}\b(AI|LLM|agent|model|tool)",
+              re.IGNORECASE,
+          )
+
+          # A negation within a few words before the attribution subject is a ban, not a request.
+          ban = re.compile(
+              r"\b(no|not|never|without|don't|ban\w*|forbid\w*)\b(?!\W+(omit|forget|skip|leave)\b)"
+              r"\W+(\w+\W+){0,4}?(AI|LLM|agent|model|attribution|co-author)",
+              re.IGNORECASE,
+          )
+
+          def requires_disclosure(text):
+              # A template that bans attribution must not unlock it.
+              clauses = re.split(r"[.;:!?\n]+", text)
+              return any(disclosure.search(clause) and not ban.search(clause) for clause in clauses)
+
+          def prose(text):
+              # Text that quotes the patterns, in code or quotation marks, describes them rather than signs with them.
+              text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+              text = re.sub(r"`[^`\n]*`", "", text)
+              return re.sub(r'"[^"\n]{0,80}"', "", text)
+
+          def git(*arguments):
+              return subprocess.run(["git", *arguments], capture_output=True, text=True, check=True).stdout
+
+          def templates():
+              # Read the base commit's templates, so a pull request cannot exempt itself by editing one.
+              found = {}
+              for path in git("ls-tree", "-r", "-z", "--name-only", env["BASE"]).split("\0"):
+                  parts = path.lower().split("/")
+                  if parts[0] in (".github", "docs"):
+                      parts = parts[1:]
+                  if parts == ["pull_request_template.md"] or (
+                          len(parts) == 2 and parts[0] == "pull_request_template" and parts[1].endswith(".md")):
+                      found[path] = git("show", f"{env['BASE']}:{path}")
+              return found
+
+          errors = []
+          bot = env["AUTHOR"].endswith("[bot]")
+          commits = [json.loads(line) for line in Path(env["COMMITS_FILE"]).read_text().splitlines() if line.strip()]
+          # Synced upstream commits keep their own style; only the pull request author's commits are checked.
+          own = [c for c in commits if c["login"] == env["AUTHOR"] and c.get("parents", 1) < 2]
+          if len(commits) < int(env.get("TOTAL_COMMITS") or 0):
+              # GitHub lists at most 250 commits; match the rest by the author's emails from the listed ones.
+              history = {}
+              for record in git("log", "--format=%H%x00%ae%x00%P%x00%B%x1e", f"{env['BASE']}..{env['HEAD']}").split("\x1e"):
+                  if record.strip():
+                      sha, email, parents, message = record.lstrip("\n").split("\0", 3)
+                      history[sha] = (email, len(parents.split()), message)
+              emails = {history[c["sha"]][0] for c in own if c["sha"] in history}
+              if not emails:
+                  print(f"::warning::Only the first {len(commits)} of {env['TOTAL_COMMITS']} commits could be listed, and none "
+                        "of them is by the pull request author, so later commits were not checked.")
+              listed = {c["sha"] for c in commits}
+              own += [{"sha": sha, "message": message} for sha, (email, parents, message) in history.items()
+                      if sha not in listed and email in emails and parents < 2]
+          if not bot:
+              if not conventional.match(env["TITLE"]):
+                  errors.append(f"Title is not a conventional commit: {env['TITLE']!r}")
+              for commit in own:
+                  headline = commit["message"].splitlines()[0] if commit["message"] else ""
+                  if not conventional.match(headline) and not headline.startswith('Revert "'):
+                      errors.append(f"Commit {commit['sha'][:8]} is not a conventional commit: {headline!r}")
+              required_by = [path for path, text in templates().items() if requires_disclosure(text)]
+              if required_by:
+                  print(f"Agent attribution allowed: AI disclosure is required by {', '.join(required_by)}")
+              else:
+                  texts = [("Pull request body", env.get("BODY") or "")]
+                  texts += [(f"Commit {c['sha'][:8]}", c["message"]) for c in own]
+                  for label, text in texts:
+                      match = agent.search(prose(text))
+                      if match:
+                          errors.append(f"{label} carries agent attribution: {match.group(0)!r}")
+          changed = []
+          # NUL-separated output avoids Git's quoting of unusual filenames; R and C records carry two paths.
+          fields = iter(git("diff", "-z", "--name-status", f"{env['BASE']}...{env['HEAD']}").split("\0"))
+          for status in fields:
+              if not status:
+                  continue
+              path = next(fields)
+              if status[:1] in "RC":
+                  path = next(fields)
+              if status[:1] in "AMRCT":
+                  changed.append(path)
+          for entry in env["FORBIDDEN"].split(","):
+              forbidden = entry.strip().strip("/")
+              if not forbidden:
+                  continue
+              hits = [
+                  path for path in changed
+                  if path == forbidden or path.startswith(forbidden + "/")
+                  or ("/" not in forbidden and f"/{forbidden}/" in f"/{path}/")
+              ]
+              if hits:
+                  errors.append(f"Changes forbidden path {forbidden}: {hits[:3]}")
+          if errors:
+              raise SystemExit("\n".join(errors))
+          print("Pull request hygiene passed")
           PY
