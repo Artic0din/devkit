@@ -222,6 +222,13 @@ class PullRequestHygieneTests(unittest.TestCase):
                 result = self.run_step(commits=[{"sha": "b" * 40, "login": "author", "message": f"fix(x): y\n\n{trailer}"}])
                 self.assertIn("Commit bbbbbbbb carries agent attribution", result.stderr)
 
+    def test_accepts_bodies_that_quote_the_patterns(self) -> None:
+        body = 'Rejects a `Generated with [` footer or a "responding on behalf of" note.\n```\nCreated with Codex.\n```'
+        result = self.run_step(BODY=body)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        result = self.run_step(BODY="Fixes #1\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)")
+        self.assertIn("Pull request body carries agent attribution: 'Generated with ['", result.stderr)
+
     def test_allows_attribution_when_the_template_requires_ai_disclosure(self) -> None:
         (self.root / ".github").mkdir()
         (self.root / ".github/PULL_REQUEST_TEMPLATE.md").write_text("## AI disclosure\nState which AI tools assisted with this change.\n")

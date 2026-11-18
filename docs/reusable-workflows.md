@@ -30,7 +30,7 @@ On pull requests, the `pr-hygiene` job fails when:
 
 - the title is not a Conventional Commit;
 - a commit authored by the pull request's author has a non-conventional headline (merge commits and `Revert "…"` are skipped, and synced upstream commits by other authors are not checked; past GitHub's 250-commit listing limit, commits are matched by the author's email);
-- the body, or one of those commits, carries agent attribution: an agent `Co-Authored-By` trailer, a `Generated with [`, `Created with` or `Made with [` footer, or a "responding on behalf of" note (human co-author trailers pass);
+- the body, or one of those commits, carries agent attribution: an agent `Co-Authored-By` trailer, a `Generated with [`, `Created with` or `Made with [` footer, or a "responding on behalf of" note (human co-author trailers pass, and text inside code spans, code blocks or quotation marks is ignored, so a PR can describe the patterns);
 - the diff adds or changes a path listed in `forbidden-paths`.
 
 Bot authors skip every check except forbidden paths.
