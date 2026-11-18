@@ -52,6 +52,11 @@ jobs:
       - name: Test session preview validation (offline, synthetic)
         run: python3 skills/session-triage/scripts/test_validate_preview.py
 
+      - name: Validate skills and test the validator (offline, synthetic)
+        run: |
+          scripts/validate-skills
+          python3 scripts/test-validate-skills.py
+
       - name: Test issue triage (offline, synthetic)
         run: python3 scripts/test-issue-triage.py
 
