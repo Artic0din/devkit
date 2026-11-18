@@ -252,6 +252,27 @@ class PullRequestHygieneTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Agent attribution allowed: AI disclosure is required by .github/PULL_REQUEST_TEMPLATE.md", result.stdout)
 
+    def test_finds_templates_in_every_supported_location(self) -> None:
+        cases = {"pull_request_template.md": True, "docs/PULL_REQUEST_TEMPLATE.md": True,
+                 ".github/PULL_REQUEST_TEMPLATE/ai.md": True, ".github/PULL_REQUEST_TEMPLATE/ai.txt": False,
+                 "notes/pull_request_template.md": False}
+        for path, found in cases.items():
+            with self.subTest(path=path):
+                self.git("rm", "-rq", "--ignore-unmatch", ".")
+                (self.root / "README.md").write_text("fixture\n")
+                (self.root / path).parent.mkdir(parents=True, exist_ok=True)
+                (self.root / path).write_text("Disclose which AI tools assisted.\n")
+                self.git("add", "-A")
+                self.git("commit", "-q", "-m", f"docs: template at {path}")
+                self.base = self.git("rev-parse", "HEAD")
+                result = self.run_step(head=self.base, BODY="Created with Codex.")
+                self.assertEqual(result.returncode == 0, found, result.stdout + result.stderr)
+        (self.root / "pull_request_template.md").write_text("## Summary\nWhat changed.\n")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "docs: plain template")
+        self.base = self.git("rev-parse", "HEAD")
+        self.assertIn("carries agent attribution", self.run_step(head=self.base, BODY="Created with Codex.").stderr)
+
     def test_a_template_that_bans_attribution_does_not_unlock_it(self) -> None:
         self.change(".github/pull_request_template.md")
         (self.root / ".github/pull_request_template.md").write_text("Do not include AI attribution or co-author trailers.\n")
