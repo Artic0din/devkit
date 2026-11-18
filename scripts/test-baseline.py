@@ -182,7 +182,8 @@ class PullRequestHygieneTests(unittest.TestCase):
                               env=environment, capture_output=True, text=True, timeout=15, check=False)
 
     def test_accepts_a_clean_pull_request(self) -> None:
-        human = "fix(core): x\n\nCo-authored-by: Sam <sam@example.com>\nCo-authored-by: Claude Martin <claude@example.org>"
+        human = ("fix(core): x\n\nCo-authored-by: Sam <sam@example.com>\nCo-authored-by: Claude Martin <claude@example.org>"
+                 "\nCo-authored-by: Sam Lee <sam@openai.com>")
         result = self.run_step(commits=[{"sha": "a" * 40, "login": "author", "message": human}])
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Pull request hygiene passed", result.stdout)
@@ -251,6 +252,28 @@ class PullRequestHygieneTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Agent attribution allowed: AI disclosure is required by .github/PULL_REQUEST_TEMPLATE.md", result.stdout)
 
+    def test_a_template_that_bans_attribution_does_not_unlock_it(self) -> None:
+        self.change(".github/pull_request_template.md")
+        (self.root / ".github/pull_request_template.md").write_text("Do not include AI attribution or co-author trailers.\n")
+        self.git("commit", "-q", "-am", "docs: ban attribution")
+        self.base = self.git("rev-parse", "HEAD")
+        result = self.run_step(head=self.base, BODY="Created with Kimi K3 in T3 Code.")
+        self.assertIn("Pull request body carries agent attribution", result.stderr)
+        (self.root / ".github/pull_request_template.md").write_text(
+            'Disclose AI assistance; otherwise write "not applicable"; do not include agent co-author trailers.\n'
+            "Do not forget to disclose AI assistance.\n")
+        self.git("commit", "-q", "-am", "docs: ask for AI disclosure")
+        self.base = self.git("rev-parse", "HEAD")
+        result = self.run_step(head=self.base, BODY="Created with Kimi K3 in T3 Code.")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_warns_when_no_listed_commit_is_the_authors(self) -> None:
+        listed = self.change("a.txt")
+        result = self.run_step(head=listed, TOTAL_COMMITS="300",
+                               commits=[{"sha": listed, "login": "upstream", "parents": 1, "message": "Upstream"}])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("::warning::Only the first 1 of 300 commits could be listed", result.stdout)
+
     def test_skips_title_commit_and_attribution_checks_for_bots(self) -> None:
         result = self.run_step(AUTHOR="dependabot[bot]", TITLE="Bump x from 1 to 2", BODY="Generated with [tool](x)")
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -263,6 +286,22 @@ class PullRequestHygieneTests(unittest.TestCase):
         self.assertIn("Changes forbidden path README.md: ['README.md']", result.stderr)
         result = self.run_step(head=self.change("dist/app.html"), FORBIDDEN="node_modules, dist")
         self.assertIn("Changes forbidden path dist", result.stderr)
+        self.base = self.git("rev-parse", "HEAD")
+        self.change("vendor/lib.js")
+        start = self.base
+        self.base = self.git("rev-parse", "HEAD")
+        (self.root / "node_modules").mkdir(exist_ok=True)
+        self.git("mv", "vendor/lib.js", "node_modules/lib.js")
+        self.git("commit", "-q", "-m", "chore: move into node_modules")
+        result = self.run_step(head=self.git("rev-parse", "HEAD"))
+        self.assertIn("Changes forbidden path node_modules: ['node_modules/lib.js']", result.stderr)
+        moved_in = self.git("rev-parse", "HEAD")
+        self.base = moved_in
+        self.git("mv", "node_modules/lib.js", "lib.js")
+        self.git("commit", "-q", "-m", "chore: move out of node_modules")
+        result = self.run_step(head=self.git("rev-parse", "HEAD"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.base = start
         result = self.run_step(head=self.change("node_modules/café.js"))
         self.assertIn("'node_modules/café.js'", result.stderr)
         (self.root / "LICENSE").write_text("text\n")

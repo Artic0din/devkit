@@ -104,7 +104,7 @@ jobs:
           conventional = re.compile(r"^(feat|fix|test|refactor|perf|docs|style|chore|ci|build|revert)(\([^)]+\))?!?: \S")
           # Human co-author trailers stay allowed; only agent identities and agent footers count.
           agent = re.compile(
-              r"Co-Authored-By:[^\n<]*<[^>\n]*(@anthropic\.com|@openai\.com|@cursor\.com|Copilot@users\.noreply\.github\.com|\[bot\]@users\.noreply\.github\.com)>"
+              r"Co-Authored-By:[^\n<]*<(noreply@anthropic\.com|cursoragent@cursor\.com|codex@openai\.com|[^>\n]*\+Copilot@users\.noreply\.github\.com|[^>\n]*\[bot\]@users\.noreply\.github\.com)>"
               r"|Co-Authored-By:[^\n]*\b(Claude (Opus|Sonnet|Haiku|Fable)|GPT-\d|Kimi K\d|Gemini \d)"
               r"|Generated with \[|^Created with |^Made with \[|responding on behalf of",
               re.IGNORECASE | re.MULTILINE,
@@ -114,6 +114,18 @@ jobs:
               r"|\bdisclos\w*[^\n]{0,80}\b(AI|LLM|agent|model|tool)",
               re.IGNORECASE,
           )
+
+          # A negation within a few words before the attribution subject is a ban, not a request.
+          ban = re.compile(
+              r"\b(no|not|never|without|don't|ban\w*|forbid\w*)\b(?!\W+(omit|forget|skip|leave)\b)"
+              r"\W+(\w+\W+){0,4}?(AI|LLM|agent|model|attribution|co-author)",
+              re.IGNORECASE,
+          )
+
+          def requires_disclosure(text):
+              # A template that bans attribution must not unlock it.
+              clauses = re.split(r"[.;:!?\n]+", text)
+              return any(disclosure.search(clause) and not ban.search(clause) for clause in clauses)
 
           def prose(text):
               # Text that quotes the patterns, in code or quotation marks, describes them rather than signs with them.
@@ -149,6 +161,9 @@ jobs:
                       sha, email, parents, message = record.lstrip("\n").split("\0", 3)
                       history[sha] = (email, len(parents.split()), message)
               emails = {history[c["sha"]][0] for c in own if c["sha"] in history}
+              if not emails:
+                  print(f"::warning::Only the first {len(commits)} of {env['TOTAL_COMMITS']} commits could be listed, and none "
+                        "of them is by the pull request author, so later commits were not checked.")
               listed = {c["sha"] for c in commits}
               own += [{"sha": sha, "message": message} for sha, (email, parents, message) in history.items()
                       if sha not in listed and email in emails and parents < 2]
@@ -159,7 +174,7 @@ jobs:
                   headline = commit["message"].splitlines()[0] if commit["message"] else ""
                   if not conventional.match(headline) and not headline.startswith('Revert "'):
                       errors.append(f"Commit {commit['sha'][:8]} is not a conventional commit: {headline!r}")
-              required_by = [path for path, text in templates().items() if disclosure.search(text)]
+              required_by = [path for path, text in templates().items() if requires_disclosure(text)]
               if required_by:
                   print(f"Agent attribution allowed: AI disclosure is required by {', '.join(required_by)}")
               else:
