@@ -57,6 +57,10 @@ def gh_secret_body_dash_line(text)
   nil
 end
 
+# Vendored skills are re-synced from upstream; this stops an attribution instruction coming back.
+ATTRIBUTION = /responding on behalf of|Created with <model>|Generated with \[/i
+NEGATION = /\b(no|not|never|without|ban|bans|banned|strip|drop|drops|unless)\b/i
+
 skill_files = Dir.glob("skills/*/SKILL.md").sort
 errors = []
 names = {}
@@ -69,6 +73,11 @@ skill_files.each do |path|
       path,
       "line #{bad_secret_line}: `gh secret set` must read stdin by omitting `--body`; never use `--body -`",
     ]
+  end
+
+  attribution_index = text.lines.index { |line| ATTRIBUTION.match?(line) && !NEGATION.match?(line) }
+  if attribution_index
+    errors << [path, "line #{attribution_index + 1}: skills must not instruct agent attribution"]
   end
 
   data, error = load_front_matter(path, text)
