@@ -216,6 +216,15 @@ class PullRequestHygieneTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Pull request body carries agent attribution: 'Created with '", result.stderr)
         self.assertIn("Commit aaaaaaaa carries agent attribution", result.stderr)
+        for footer in ("🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+                       "Made with [Cursor](https://cursor.com)",
+                       "> 🤖 **kimi-k3 responding on behalf of author**",
+                       "Created with Composer in T3 Code."):
+            with self.subTest(footer=footer):
+                result = self.run_step(BODY=f"Fixes #1\n\n{footer}")
+                self.assertIn("Pull request body carries agent attribution", result.stderr)
+                result = self.run_step(commits=[{"sha": "d" * 40, "login": "author", "message": f"fix(x): y\n\n{footer}"}])
+                self.assertIn("Commit dddddddd carries agent attribution", result.stderr)
         for trailer in ("Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>",
                         "Co-authored-by: Copilot <198982749+Copilot@users.noreply.github.com>"):
             with self.subTest(trailer=trailer):
@@ -230,11 +239,17 @@ class PullRequestHygieneTests(unittest.TestCase):
         self.assertIn("Pull request body carries agent attribution: 'Generated with ['", result.stderr)
 
     def test_allows_attribution_when_the_template_requires_ai_disclosure(self) -> None:
-        (self.root / ".github").mkdir()
+        signed = "> 🤖 **Codex responding on behalf of author**"
+        head = self.change(".github/PULL_REQUEST_TEMPLATE.md")
         (self.root / ".github/PULL_REQUEST_TEMPLATE.md").write_text("## AI disclosure\nState which AI tools assisted with this change.\n")
-        result = self.run_step(BODY="> 🤖 **Codex responding on behalf of author**")
+        self.git("commit", "-q", "-am", "docs: ask for AI disclosure")
+        head = self.git("rev-parse", "HEAD")
+        result = self.run_step(head=head, BODY=signed)
+        self.assertIn("carries agent attribution", result.stderr, "a pull request must not exempt itself")
+        self.base = head
+        result = self.run_step(head=head, BODY=signed)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("Agent attribution allowed", result.stdout)
+        self.assertIn("Agent attribution allowed: AI disclosure is required by .github/PULL_REQUEST_TEMPLATE.md", result.stdout)
 
     def test_skips_title_commit_and_attribution_checks_for_bots(self) -> None:
         result = self.run_step(AUTHOR="dependabot[bot]", TITLE="Bump x from 1 to 2", BODY="Generated with [tool](x)")

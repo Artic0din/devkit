@@ -22,7 +22,7 @@ Other workflows and existing external callers remain in the old repository until
 | Execution | Ubuntu 24.04, five-minute timeout; isolated Python prevents imports from caller files or `PYTHONPATH` |
 | Check identity | Job `baseline`, named `Repository baseline`; keep the caller job ID to preserve the existing composed check name |
 | `forbidden-paths` | Optional string of comma-separated paths a pull request must not add, modify or rename into; a name without a slash matches at any depth; default: `node_modules` |
-| Pull request hygiene | Job `pr-hygiene`, named `Pull request hygiene`, on `pull_request` events only; needs `pull-requests: read` from the caller |
+| Pull request hygiene | Job `pr-hygiene`, named `Pull request hygiene`, on `pull_request` events only; callers must grant `pull-requests: read` |
 
 ## Pull request hygiene
 
@@ -34,8 +34,9 @@ On pull requests, the `pr-hygiene` job fails when:
 - the diff adds or changes a path listed in `forbidden-paths`.
 
 Bot authors skip every check except forbidden paths.
-Attribution is allowed when the caller's pull request template (`pull_request_template.md` at the root, in `.github/` or `docs/`, or a `PULL_REQUEST_TEMPLATE/` folder) asks for AI disclosure; the job prints which template allowed it.
+Attribution is allowed when the base branch's pull request template (`pull_request_template.md` at the root, in `.github/` or `docs/`, or a `PULL_REQUEST_TEMPLATE/` folder) asks for AI disclosure; the job prints which template allowed it.
 Callers add `types: [opened, edited, synchronize, reopened]` to `pull_request` so a title or body edit re-runs the check, and grant `pull-requests: read` so the job can list the pull request's commits.
+Grant it in the same caller change that bumps the pin: a called workflow cannot exceed its caller's permissions, so without it the whole baseline workflow fails to start, `Repository baseline` included.
 
 This checks path presence, not file contents, agent behavior, builds, or platform-specific requirements.
 DevKit overrides the list with `README.md, .gitignore, AGENTS.MD` to preserve its existing contract.

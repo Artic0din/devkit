@@ -62,10 +62,11 @@ jobs:
     name: Pull request hygiene
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    # Listing a pull request's commits needs this; callers must grant it too, or the workflow cannot start.
     permissions:
       contents: read
       pull-requests: read
-    timeout-minutes: 5
     steps:
       - name: Check out caller
         uses: actions/checkout@v7
@@ -124,16 +125,15 @@ jobs:
               return subprocess.run(["git", *arguments], capture_output=True, text=True, check=True).stdout
 
           def templates():
-              found = []
-              for directory in (Path("."), Path(".github"), Path("docs")):
-                  if not directory.is_dir():
-                      continue
-                  for entry in directory.iterdir():
-                      name = entry.name.lower()
-                      if entry.is_file() and name == "pull_request_template.md":
-                          found.append(entry)
-                      elif entry.is_dir() and name == "pull_request_template":
-                          found.extend(child for child in entry.iterdir() if child.suffix.lower() == ".md")
+              # Read the base commit's templates, so a pull request cannot exempt itself by editing one.
+              found = {}
+              for path in git("ls-tree", "-r", "-z", "--name-only", env["BASE"]).split("\0"):
+                  parts = path.lower().split("/")
+                  if parts[0] in (".github", "docs"):
+                      parts = parts[1:]
+                  if parts == ["pull_request_template.md"] or (
+                          len(parts) == 2 and parts[0] == "pull_request_template" and parts[1].endswith(".md")):
+                      found[path] = git("show", f"{env['BASE']}:{path}")
               return found
 
           errors = []
@@ -159,7 +159,7 @@ jobs:
                   headline = commit["message"].splitlines()[0] if commit["message"] else ""
                   if not conventional.match(headline) and not headline.startswith('Revert "'):
                       errors.append(f"Commit {commit['sha'][:8]} is not a conventional commit: {headline!r}")
-              required_by = [str(path) for path in templates() if disclosure.search(path.read_text(errors="replace"))]
+              required_by = [path for path, text in templates().items() if disclosure.search(text)]
               if required_by:
                   print(f"Agent attribution allowed: AI disclosure is required by {', '.join(required_by)}")
               else:
