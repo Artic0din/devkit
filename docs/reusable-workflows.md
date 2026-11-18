@@ -21,6 +21,21 @@ Other workflows and existing external callers remain in the old repository until
 | Permissions and secrets | `contents: read`; no secrets; caller checkout credentials are not persisted |
 | Execution | Ubuntu 24.04, five-minute timeout; isolated Python prevents imports from caller files or `PYTHONPATH` |
 | Check identity | Job `baseline`, named `Repository baseline`; keep the caller job ID to preserve the existing composed check name |
+| `forbidden-paths` | Optional string of comma-separated paths a pull request must not add, modify or rename into; a name without a slash matches at any depth; default: `node_modules` |
+| Pull request hygiene | Job `pr-hygiene`, named `Pull request hygiene`, on `pull_request` events only; needs `pull-requests: read` from the caller |
+
+## Pull request hygiene
+
+On pull requests, the `pr-hygiene` job fails when:
+
+- the title is not a Conventional Commit;
+- a commit authored by the pull request's author has a non-conventional headline (merge commits and `Revert "…"` are skipped, and synced upstream commits by other authors are not checked; past GitHub's 250-commit listing limit, commits are matched by the author's email);
+- the body, or one of those commits, carries agent attribution: an agent `Co-Authored-By` trailer, a `Generated with [`, `Created with` or `Made with [` footer, or a "responding on behalf of" note (human co-author trailers pass);
+- the diff adds or changes a path listed in `forbidden-paths`.
+
+Bot authors skip every check except forbidden paths.
+Attribution is allowed when the caller's pull request template (`pull_request_template.md` at the root, in `.github/` or `docs/`, or a `PULL_REQUEST_TEMPLATE/` folder) asks for AI disclosure; the job prints which template allowed it.
+Callers add `types: [opened, edited, synchronize, reopened]` to `pull_request` so a title or body edit re-runs the check, and grant `pull-requests: read` so the job can list the pull request's commits.
 
 This checks path presence, not file contents, agent behavior, builds, or platform-specific requirements.
 DevKit overrides the list with `README.md, .gitignore, AGENTS.MD` to preserve its existing contract.
@@ -42,5 +57,5 @@ Paths remain case-sensitive on Linux.
 4. Roll back by restoring that caller's exact previous `uses` reference and rerunning its checks.
    Revert DevKit's local caller to its previous reference if the DevKit migration itself must be rolled back.
 
-`python3 scripts/test-baseline.py` executes the workflow's actual shell step in temporary caller fixtures.
+`python3 scripts/test-baseline.py` executes both jobs' actual shell steps in temporary caller fixtures.
 It covers empty lists, literal and normalized relative paths, missing paths, internal and dangling links, absolute paths, traversal and symlink escapes, sibling-directory prefixes, and caller-module isolation without new dependencies.

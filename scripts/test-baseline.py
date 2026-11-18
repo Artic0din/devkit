@@ -1,5 +1,6 @@
 """Execute the baseline workflow's actual shell step in consumer fixtures."""
 
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -18,10 +19,10 @@ class BaselineTests(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name) / "checkout"
         self.root.mkdir()
-        workflow = (ROOT / ".github/workflows/baseline.yml").read_text()
-        # This workflow has one shell step, at the end; fail if extraction becomes ambiguous.
-        self.assertEqual(workflow.count("        run: |\n"), 1)
-        self.script = textwrap.dedent(workflow.partition("        run: |\n")[2])
+        job = (ROOT / ".github/workflows/baseline.yml").read_text().partition("\n  pr-hygiene:\n")[0]
+        # The baseline job has one shell step, at its end; fail if extraction becomes ambiguous.
+        self.assertEqual(job.count("        run: |\n"), 1)
+        self.script = textwrap.dedent(job.partition("        run: |\n")[2])
 
     def run_step(self, **values: str) -> subprocess.CompletedProcess[str]:
         environment = dict(os.environ)
@@ -136,6 +137,122 @@ class BaselineTests(unittest.TestCase):
         self.assertNotIn("Traceback", result.stderr)
         for path in ("loop-one", "../outside.md", "missing"):
             self.assertIn(repr(path), result.stderr)
+
+
+
+class PullRequestHygieneTests(unittest.TestCase):
+    def setUp(self) -> None:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name) / "checkout"
+        self.root.mkdir()
+        job = (ROOT / ".github/workflows/baseline.yml").read_text().partition("\n  pr-hygiene:\n")[2]
+        self.assertEqual(job.count("        run: |\n"), 1)
+        self.script = textwrap.dedent(job.partition("        run: |\n")[2])
+        self.git("init", "-q", "-b", "main")
+        (self.root / "README.md").write_text("fixture\n")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "chore: base")
+        self.base = self.git("rev-parse", "HEAD")
+        self.commits = Path(temporary.name) / "commits.jsonl"
+        self.commits.write_text("")
+
+    def git(self, *arguments: str) -> str:
+        identity = ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.com"]
+        return subprocess.run(["git", *identity, *arguments], cwd=self.root, capture_output=True,
+                              text=True, check=True).stdout.strip()
+
+    def change(self, path: str) -> str:
+        target = self.root / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(target.read_text() + "more\n" if target.exists() else "new\n")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "feat: change")
+        return self.git("rev-parse", "HEAD")
+
+    def run_step(self, head: str | None = None, commits: list[dict[str, str]] | None = None,
+                 **values: str) -> subprocess.CompletedProcess[str]:
+        self.commits.write_text("".join(json.dumps(commit) + "\n" for commit in commits or []))
+        environment = dict(os.environ)
+        environment.update(TITLE="feat(core): add a thing", BODY="## ELI5\nA thing.", BASE=self.base,
+                           HEAD=head or self.base, AUTHOR="author", FORBIDDEN="node_modules",
+                           COMMITS_FILE=str(self.commits))
+        environment.update(values)
+        return subprocess.run(["bash", "-euo", "pipefail", "-c", self.script], cwd=self.root,
+                              env=environment, capture_output=True, text=True, timeout=15, check=False)
+
+    def test_accepts_a_clean_pull_request(self) -> None:
+        human = "fix(core): x\n\nCo-authored-by: Sam <sam@example.com>\nCo-authored-by: Claude Martin <claude@example.org>"
+        result = self.run_step(commits=[{"sha": "a" * 40, "login": "author", "message": human}])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Pull request hygiene passed", result.stdout)
+
+    def test_rejects_non_conventional_titles_and_own_commits_only(self) -> None:
+        commits = [
+            {"sha": "a" * 40, "login": "author", "message": "wip: other Sonarr instances"},
+            {"sha": "b" * 40, "login": "upstream", "message": "Add a feature upstream"},
+            {"sha": "c" * 40, "login": "author", "parents": 2, "message": "merge: main into feature"},
+        ]
+        result = self.run_step(commits=commits, TITLE="Sync published 0.4.1 source")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Title is not a conventional commit", result.stderr)
+        self.assertIn("Commit aaaaaaaa is not a conventional commit: 'wip: other Sonarr instances'", result.stderr)
+        self.assertNotIn("bbbbbbbb", result.stderr)
+        self.assertNotIn("cccccccc", result.stderr)
+
+    def test_checks_commits_beyond_the_listed_250_by_author_email(self) -> None:
+        listed = self.change("a.txt")
+        self.git("commit", "-q", "--allow-empty", "-m", "wip: unlisted own commit")
+        self.git("-c", "user.email=upstream@example.com", "commit", "-q", "--allow-empty", "-m", "Upstream change")
+        result = self.run_step(head=self.git("rev-parse", "HEAD"), TOTAL_COMMITS="3",
+                               commits=[{"sha": listed, "login": "author", "parents": 1, "message": "feat: change"}])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("'wip: unlisted own commit'", result.stderr)
+        self.assertNotIn("Upstream change", result.stderr)
+
+    def test_rejects_agent_attribution_in_body_and_commits(self) -> None:
+        commits = [{"sha": "a" * 40, "login": "author", "message": "fix(x): y\n\nCo-authored-by: Cursor <cursoragent@cursor.com>"}]
+        result = self.run_step(commits=commits, BODY="Fixes #1\n\nCreated with Kimi K3 in T3 Code.")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Pull request body carries agent attribution: 'Created with '", result.stderr)
+        self.assertIn("Commit aaaaaaaa carries agent attribution", result.stderr)
+        for trailer in ("Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>",
+                        "Co-authored-by: Copilot <198982749+Copilot@users.noreply.github.com>"):
+            with self.subTest(trailer=trailer):
+                result = self.run_step(commits=[{"sha": "b" * 40, "login": "author", "message": f"fix(x): y\n\n{trailer}"}])
+                self.assertIn("Commit bbbbbbbb carries agent attribution", result.stderr)
+
+    def test_allows_attribution_when_the_template_requires_ai_disclosure(self) -> None:
+        (self.root / ".github").mkdir()
+        (self.root / ".github/PULL_REQUEST_TEMPLATE.md").write_text("## AI disclosure\nState which AI tools assisted with this change.\n")
+        result = self.run_step(BODY="> 🤖 **Codex responding on behalf of author**")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Agent attribution allowed", result.stdout)
+
+    def test_skips_title_commit_and_attribution_checks_for_bots(self) -> None:
+        result = self.run_step(AUTHOR="dependabot[bot]", TITLE="Bump x from 1 to 2", BODY="Generated with [tool](x)")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_rejects_forbidden_paths_added_or_modified_at_any_depth(self) -> None:
+        result = self.run_step(head=self.change("web/node_modules/pkg/index.js"))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Changes forbidden path node_modules", result.stderr)
+        result = self.run_step(head=self.change("README.md"), FORBIDDEN="README.md")
+        self.assertIn("Changes forbidden path README.md: ['README.md']", result.stderr)
+        result = self.run_step(head=self.change("dist/app.html"), FORBIDDEN="node_modules, dist")
+        self.assertIn("Changes forbidden path dist", result.stderr)
+        result = self.run_step(head=self.change("node_modules/café.js"))
+        self.assertIn("'node_modules/café.js'", result.stderr)
+        (self.root / "LICENSE").write_text("text\n")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "chore: add license")
+        self.base = self.git("rev-parse", "HEAD")
+        (self.root / "LICENSE").unlink()
+        (self.root / "LICENSE").symlink_to("README.md")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "chore: link license")
+        result = self.run_step(head=self.git("rev-parse", "HEAD"), FORBIDDEN="LICENSE")
+        self.assertIn("Changes forbidden path LICENSE: ['LICENSE']", result.stderr)
 
 
 if __name__ == "__main__":
