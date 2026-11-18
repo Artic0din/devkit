@@ -33,10 +33,8 @@ GOOD
 
 > ✅ My "new worktree" default was ignored when starting new threads on existing worktrees. Super unintuitive. Now your preferences always apply.
 
-End the description with the public model name and harness that made the
-changes, for example `Created with <model> in <harness>.` Include subagent
-models that wrote part of the change. Use the model name the harness reports.
-If model identity is unavailable, name the harness without guessing a model.
+Add no agent, model or harness attribution, unless the repository's pull
+request template or contributing guide requires AI disclosure; then follow it.
 
 Before submission, check the title, description, quotes, and attachments for
 secrets and private details.

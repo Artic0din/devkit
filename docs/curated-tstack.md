@@ -41,5 +41,5 @@ Known overlaps:
 - `council` fixes known issues and outstanding PR comments before an audit.
   `AGENTS.MD` keeps reviews and audits read-only by default, so make those edits only when the request also asks for fixes or delivery.
   Problems outside the diff still go to an issue.
-- `leaving-pr-comments` asks for a model attribution note on GitHub comments, `file-pr` asks for a model and harness line at the end of PR bodies, and `council` places its section before that line.
-  `AGENTS.MD` bans agent attribution, so leave those out; PR bodies end with the ELI5 section instead.
+- Upstream `leaving-pr-comments` and `file-pr` ask for model attribution on comments and PR bodies.
+  The vendored copies drop it, because `AGENTS.MD` bans agent attribution unless a repository's template requires AI disclosure, and `scripts/validate-skills` fails if it returns.
