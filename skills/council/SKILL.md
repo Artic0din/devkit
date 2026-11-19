@@ -30,6 +30,8 @@ at once and decide what to fix while the other delegates run. Do not edit
 files while a delegate still reviews the same checkout. If the user's
 instructions mark a delegate as non-blocking, do not wait for it; treat a
 late result as feedback and do not record its score.
+Only required delegates gate round completion and final sign-off; delegates
+explicitly marked non-blocking by the user are optional.
 
 For a code review, ask each delegate for a score out of 10.
 Count each full review pass as one round.
@@ -55,7 +57,7 @@ If the PR is open, edit the description. Do not post a comment for this.
 If there is no PR, put the same results in the final reply only.
 
 If you agree with their recommendations, make the changes and request a fresh
-review after. Continue this process until all delegates are satisfied with the
+review after. Continue this process until all required delegates are satisfied with the
 outcome.
 
 Do not let repeated reviews result in scope creep. It is your job to fight to
