@@ -35,6 +35,7 @@ explicitly marked non-blocking by the user are optional.
 
 For a code review, ask each delegate for a score out of 10.
 Count each full review pass as one round.
+With no required delegates and no completed reviews, report zero rounds and no sign-off.
 A fresh review after fixes starts a new round.
 
 If the work ends in a pull request, put the results in the PR description.

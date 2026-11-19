@@ -14,7 +14,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ### Changed
 
-- Updated the vendored tstack skills to `11e37a7`: Council now checks incoming review findings while other reviewers run, avoids editing a checkout still under review, and honours explicitly non-blocking reviewers; only required reviewers gate round completion and final sign-off.
+- Updated the vendored tstack skills to `11e37a7`: Council now checks incoming review findings while other reviewers run, avoids editing a checkout still under review, and honours explicitly non-blocking reviewers; only required reviewers gate round completion and final sign-off, and runs with no required delegates and no completed reviews report zero rounds and no sign-off.
 - Removed the agent-attribution instructions from the vendored `file-pr`, `leaving-pr-comments` and `council` skills, which made agents sign PR bodies and review replies despite the `AGENTS.MD` ban; a repository whose template requires AI disclosure still gets it. `scripts/validate-skills` now fails if such an instruction returns, and CI runs it.
 - Fixed `scripts/test-agent-sweep.py` failing on Macs with Git older than 2.56: one test pushed to a file path and expected Git to create `origin/branch-deleted`, which only Git 2.56 does, so it now pushes to `origin` by name.
 - Updated `AGENTS.MD`: work tracking now uses user-level GitHub Projects, multi-phase issue breakdowns go to Council for review, UI copy must meet the Apple Human Interface Guidelines, repository rules can override the engineering constitution, and the secret-scan commands, three-failed-fixes stop rule, Graphite note, Spec Kit note and several copy rules are removed; removed `docs/awesome-copilot-import.md` and its README link.
