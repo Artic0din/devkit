@@ -6,12 +6,12 @@ read_when:
 
 # Vendored tstack skills
 
-Source: [Theo Browne's tstack](https://github.com/t3dotgg/tstack/tree/1085050f3baed1ac724caa4a8166145fb2ac88af).
-Revision: `1085050f3baed1ac724caa4a8166145fb2ac88af`.
+Source: [Theo Browne's tstack](https://github.com/t3dotgg/tstack/tree/11e37a74d0a6868c121cd0910ab2b3bd9873b92a).
+Revision: `11e37a74d0a6868c121cd0910ab2b3bd9873b92a`.
 License: [MIT, Copyright 2026 Theo Browne](licenses/tstack-MIT.txt).
 
-The skills are copied unmodified.
-When updating, review the upstream diff from the pinned revision and copy the changed folders.
+The skills are vendored with local attribution changes described below.
+When updating, review the upstream diff from the pinned revision and preserve those changes.
 
 | Skill | Invocation | Uses |
 | --- | --- | --- |
