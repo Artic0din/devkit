@@ -79,6 +79,8 @@ Run in order; STOP and report on any failure — never create the PR on a red st
 ## Merging
 
 - Native GitHub squash merge is the normal merge path after required CI passes and every review thread is resolved.
+- When GitHub refuses jobs because of Actions billing, spending limits or exhausted minutes, automatically run equivalent validation under the [quota fallback](agent-operations.md#github-actions-quota-fallback).
+  Do not ask Ryan to fix billing or approve local checks; use the recorded local evidence for already-authorized delivery where repository protections permit, without calling hosted checks green or bypassing protections.
 - Agents never invoke a direct merge or bypass protection.
   An explicit user request may authorize a specific manual merge.
 - When a current pull request conflicts with its base, the scoped repair automation merges the base into the existing branch without rebasing or force-pushing.

@@ -88,6 +88,7 @@ hard rules and links here; tool-specific items migrate into the owning skill ove
 - Explicit land of own draft PR: ignore draft; mark ready if needed; continue.
 - `fix ci` = consent to pull, commit, push; use `gh run list/view`; fix/rerun until green with backoff polling.
 - GitHub quota: use `gh`; watch one exact run or PR instead of repeatedly listing all runs or checks.
+- GitHub Actions billing or spending-limit failures: apply the [automatic local CI fallback](#github-actions-quota-fallback); never ask Ryan to fix billing or approve equivalent local validation.
 - GitHub reads: request explicit `--json <fields>` where supported; keep fields and query scope narrow.
 - Use `gh api --paginate` only when the full list is needed.
 - CI logs: fetch once per failed run; reuse printed output. One `gh search`/`list --json` over per-item view loops; narrow fields, exact refs.
@@ -100,6 +101,30 @@ hard rules and links here; tool-specific items migrate into the owning skill ove
 - Explicit land/ship authorizes needed branch changes and push. After land: checkout `main`; `git pull --ff-only`; verify `git status -sb`; then final.
 - After PR merge/ship: report in `i-have-adhd` shape. State what now works, the root cause in one line, exact PR/issue/merge state, notable CI failures or retries, and follow-ups as a numbered list.
 - Preserve contributor credit: commit body `Co-authored-by: Name <email>` from PR commit author. Changelog entries thank `@login` for user-visible work when added: at landing.
+
+## GitHub Actions quota fallback
+
+GitHub Actions billing, spending-limit, or exhausted included-minute failures are a hosted-runner capacity problem, not a request for Ryan to pay or change billing.
+Ryan will let the quota reset; do not ask him to increase spending, add payment details, approve the fallback, or choose between local checks and waiting for the reset.
+This standing authorization applies across repositories and agents.
+
+1. Confirm the current run's error identifies billing, spending limits, or exhausted Actions minutes.
+   Do not infer quota from a generic failed check, timeout, or runner error, and do not excuse a test that actually failed.
+2. Read the affected workflow and reusable workflows at the pull request's current head.
+   Run their equivalent validation commands automatically, preserving relevant dependency versions, environment, services, matrices, operating system and architecture requirements.
+3. Use the current machine or an available suitable fleet host, including an isolated temporary build or test container on the NAS when needed.
+   Ordinary setup, dependency installation and isolated test resources are authorized without another approval; preserve unrelated work and live services, keep secrets out of output, and remove task-owned temporary resources.
+   Validation does not authorize deployments, publishing, billing changes or destructive changes to live systems.
+4. Record the head SHA, affected jobs, execution host/environment, commands, results and any coverage gaps in the pull request or task response.
+   Fix real failures and rerun the affected checks before proceeding.
+   If a suitable environment is unavailable after checking accessible options, report the exact missing prerequisite and attempted alternatives; do not turn that into a billing question.
+5. Continue the already-authorized delivery work once equivalent validation passes.
+   For an already-authorized merge, local evidence satisfies the agent's validation requirement for the quota-blocked jobs where repository protections permit it.
+   Do not invent a successful GitHub status, claim hosted CI passed, disable protections or bypass required reviews.
+   If GitHub itself prevents the merge, report that specific enforcement separately from the completed local validation; do not ask Ryan to fix billing.
+
+For example, a Mac unit-test run does not prove a required Linux/AMD64 Docker image builds and starts.
+Build and smoke-test that image on an appropriate available host instead of asking whether to do so.
 
 ## Runtime Safety
 

@@ -60,7 +60,8 @@ The user-level `Development` Project is closed and must not be used.
 ## Complete work
 
 - Let the merged pull request close the issue through `Fixes #123`.
-- Confirm required checks passed, the pull request merged, and its linked issue closed.
+- Confirm required checks passed, or quota-blocked jobs passed equivalent validation under the [automatic local CI fallback](../../docs/agent-operations.md#github-actions-quota-fallback); then confirm the pull request merged and its linked issue closed.
+- Actions billing, spending-limit or exhausted-minute errors trigger that fallback without asking Ryan to fix billing or approve local checks; keep actual test failures and repository merge protections distinct.
 - If a pull request closes without merge, keep or reopen the issue and return it to the appropriate active or backlog state.
 
 ## Safety
