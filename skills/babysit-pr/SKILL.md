@@ -8,6 +8,16 @@ description: Monitor a pull request through review and CI. Use when the user ask
 Many repos have AI review bots. They're helpful, even if they are not always
 right.
 
+## Actions quota refusals
+
+Confirmed Actions billing, spending-limit or exhausted-minute refusals trigger the [automatic local CI fallback](../../docs/agent-operations.md#github-actions-quota-fallback), not a question about billing or permission to test locally.
+Run equivalent validation on an available suitable host, record the evidence and require its SHA to match the current PR head before relying on it.
+Quota-refused jobs with that passing evidence satisfy the agent's validation gate; actual test failures, other required checks, reviews and GitHub protections still apply.
+Do not wait for quota-refused jobs to turn green or restart the same failed run merely to wait for the quota reset.
+In T3, handle remaining review or check events through the existing watch.
+With `pr-wait`, use `--until any-change` for remaining events instead of its hosted-only `ready` or `green` conditions; its status output is not the merge decision and must not be relabelled as successful hosted CI.
+Apply this exception to the green-check wording below when evaluating readiness or an already-authorized merge.
+
 ## Waiting
 
 Never write your own watcher, polling loop, or `sleep` loop. Use one watcher
