@@ -112,13 +112,19 @@ This standing authorization applies across repositories and agents.
    Do not infer quota from a generic failed check, timeout, or runner error, and do not excuse a test that actually failed.
 2. Read the affected workflow and reusable workflows at the pull request's current head.
    Run their equivalent validation commands automatically, preserving relevant dependency versions, environment, services, matrices, operating system and architecture requirements.
+   Before executing untrusted pull-request code, workflow commands or dependency-install hooks, use a credential-free isolated sandbox with no access to the host's private files, credentials, container socket or live services.
+   Do not inherit host secrets or privileged mounts; use isolated test services and keep existing source-trust and permission boundaries in force.
 3. Use the current machine or an available suitable fleet host, including an isolated temporary build or test container on the NAS when needed.
    Ordinary setup, dependency installation and isolated test resources are authorized without another approval; preserve unrelated work and live services, keep secrets out of output, and remove task-owned temporary resources.
+   Give temporary resources unique task-owned names or labels and install teardown before starting them, using an exit/signal trap or equivalent finalizer.
+   After interruption, identify and remove only those owned resources before retrying; never broadly prune the host.
    Validation does not authorize deployments, publishing, billing changes or destructive changes to live systems.
 4. Record the head SHA, affected jobs, execution host/environment, commands, results and any coverage gaps in the pull request or task response.
    Fix real failures and rerun the affected checks before proceeding.
    If a suitable environment is unavailable after checking accessible options, report the exact missing prerequisite and attempted alternatives; do not turn that into a billing question.
 5. Continue the already-authorized delivery work once equivalent validation passes.
+   Immediately before relying on the results or merging, fetch the current pull request head and require it to match the recorded validation SHA.
+   If the head changed, rerun the affected validation on the new head; evidence for an older commit does not satisfy the gate.
    For an already-authorized merge, local evidence satisfies the agent's validation requirement for the quota-blocked jobs where repository protections permit it.
    Do not invent a successful GitHub status, claim hosted CI passed, disable protections or bypass required reviews.
    If GitHub itself prevents the merge, report that specific enforcement separately from the completed local validation; do not ask Ryan to fix billing.

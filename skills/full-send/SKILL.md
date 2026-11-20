@@ -70,6 +70,7 @@ reproduction, a screenshot. Use the most direct proof the change allows:
 - Reproduce the original failure, apply the fix, then watch the same
   reproduction pass.
 - Run the checks that the repo's CI runs (typecheck, lint, tests).
+- When GitHub refuses jobs for Actions billing, spending limits or exhausted minutes, use the [automatic local CI fallback](../../docs/agent-operations.md#github-actions-quota-fallback) without asking for billing changes or approval to run equivalent checks on an available suitable host.
 - Add one focused test that fails without the fix, when the behavior has none
   and the repo has a test setup.
 - For UI and runtime behavior, run the app and look at the change. Green mocked
@@ -84,7 +85,7 @@ Ask the user.
 Full confidence means all of these are true on the latest commit:
 
 - Your proof covers every change in the diff.
-- Required checks are green.
+- Required checks are green, or confirmed quota-refused jobs have recorded equivalent passing validation under the [quota fallback](../../docs/agent-operations.md#github-actions-quota-fallback); other required checks still pass and the tested SHA matches the current PR head.
 - Review bots have finished, and each finding is fixed or dismissed with a
   written reason.
 - No human review still requests changes.
