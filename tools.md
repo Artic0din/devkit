@@ -95,13 +95,12 @@ install -m 700 scripts/obscura "$HOME/.local/bin/obscura"
 ```
 
 MCP servers are not global; add Obscura only to the agent or project that needs it, for example `claude mcp add obscura -- ~/.local/bin/obscura mcp`.
+Allow only the browser tools that agent needs (in Codex, list them under `enabled_tools`), and leave Obscura out of any client that cannot restrict its tools.
 
 The profile denies access to home directories, external volumes and macOS temporary directories, denies writes to the browser installation, and prevents launching other executables.
 This is a filesystem and executable boundary, not Chrome-equivalent site isolation or a complete network sandbox.
 The native MCP browser runs in-process; subprocess-based CLI modes are outside this launcher's supported scope.
 Sessions have no imported Chrome cookies or profiles.
 Private-network navigation remains blocked by Obscura's default; use a real browser for local apps, existing logins, downloads into personal folders, extensions, visual acceptance and Chrome-specific debugging.
-Codex's `chrome-devtools` server is disabled by default but retained for an explicit fallback session.
-Launch that fallback with `codex -c 'mcp_servers.chrome-devtools.enabled=true'` when needed.
 Use the active host's browser tools when that workflow requires them; T3's browser and bundled Chrome are managed by T3 and are not replaced by this integration.
 Existing sessions keep their loaded tools until restarted after their work finishes.

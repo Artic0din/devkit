@@ -42,7 +42,7 @@ hard rules and links here; tool-specific items migrate into the owning skill ove
 
 ## Routing
 
-- Claude Code implementation/refactor/test/fix: `$codex-first` when installed. Apply its native-Claude model gate. Design/API design/tiny edit: direct. Codex session: ignore.
+- Claude Code implementation/refactor/test/fix: `$codex-first` when installed, applying its native-Claude model gate; without it, work directly in Claude Code. Design/API design/tiny edit: direct. Codex session: ignore.
 - Codex worker model, reasoning, and service tier follow the current `$codex-first` launch recipe unless the user requests an override. Use `$codex-config` for Codex settings and its direct-API preflight, and `$autoreview` for isolated reviews; preserve its reviewer isolation.
 - Claude Code parallel/background work (Codex workers, monitors, long jobs): each = own harness-tracked task (`run_in_background: true`), labeled for target, one sidebar chip each. Never `&`-detach durable work — hides it, only agent sees. Quick foreground cmds inline. Other harnesses: ignore.
 - Screenshot/live-UI bugs and computer use: use the available browser or computer-use tools and their applicable skills; verify capabilities before acting.
