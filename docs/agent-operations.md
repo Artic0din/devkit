@@ -11,7 +11,7 @@ hard rules and links here; tool-specific items migrate into the owning skill ove
 
 ## Communication
 
-- Follow [i-have-adhd](../skills/i-have-adhd/SKILL.md) for output shape, accessible technical explanations, and necessary user handoffs; it takes precedence over conflicting communication guidance in this file.
+- Follow the Communication rules in `AGENTS.MD` for output shape, accessible technical explanations, and necessary user handoffs; they take precedence over conflicting communication guidance in this file.
 - Address every requested outcome. Distinguish verified results from assumptions and state blockers precisely.
 - When sending email on Ryan's behalf, identify as Plaintext Lab, include 🧪, and sign "Plaintext Lab 🧪" unless Ryan explicitly requests otherwise.
 
@@ -42,11 +42,11 @@ hard rules and links here; tool-specific items migrate into the owning skill ove
 
 ## Routing
 
-- Claude Code implementation/refactor/test/fix: `$codex-first`, located at `skills/codex-first/SKILL.md` from the repository root. Apply its native-Claude model gate. Design/API design/tiny edit: direct. Codex session: ignore.
+- Claude Code implementation/refactor/test/fix: `$codex-first` when installed. Apply its native-Claude model gate. Design/API design/tiny edit: direct. Codex session: ignore.
 - Codex worker model, reasoning, and service tier follow the current `$codex-first` launch recipe unless the user requests an override. Use `$codex-config` for Codex settings and its direct-API preflight, and `$autoreview` for isolated reviews; preserve its reviewer isolation.
 - Claude Code parallel/background work (Codex workers, monitors, long jobs): each = own harness-tracked task (`run_in_background: true`), labeled for target, one sidebar chip each. Never `&`-detach durable work — hides it, only agent sees. Quick foreground cmds inline. Other harnesses: ignore.
 - Screenshot/live-UI bugs and computer use: use the available browser or computer-use tools and their applicable skills; verify capabilities before acting.
-- Agent page reading, extraction and DOM interaction: prefer the installed `obscura` MCP tools; see `tools.md#obscura`. Use Chrome for existing logins, local apps, visual acceptance and Chrome-specific compatibility. T3's managed browser is unchanged.
+- Agent page reading, extraction and DOM interaction: prefer `obscura` MCP tools where that agent or project has them installed; see `tools.md#obscura`. Use Chrome for existing logins, local apps, visual acceptance and Chrome-specific compatibility. T3's managed browser is unchanged.
 - Ryan's Chrome: use available browser or computer-use tools; when mcporter is available, prefer its daemon-backed `chrome-devtools` relay and reuse one long-lived connection per task. Never open raw CDP/WebSocket connections or ad-hoc Puppeteer/CDP clients.
 - Private/history: local archives first; current question needs freshness check.
 - Secrets/API keys/live creds: `$keychain`.

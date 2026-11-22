@@ -8,6 +8,4 @@ bin/*
 !bin/
 !bin/git
 !bin/rm
-skills/.system/
-skills/.external/
 output/playwright/

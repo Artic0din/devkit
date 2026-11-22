@@ -160,7 +160,7 @@ Lead with the outcome and connect technical choices to their practical effects.
 Do not assume familiarity with a language, framework, acronym, or prerequisite.
 Explain unfamiliar concepts where they matter; include a small example or diagram when it reduces reading effort.
 Keep required reasoning, risks, and requested detail even when brevity is preferred.
-Use the communication guidance in [i-have-adhd](../skills/i-have-adhd/SKILL.md).
+Use the communication guidance in `AGENTS.MD`.
 
 ## Priority rules
 

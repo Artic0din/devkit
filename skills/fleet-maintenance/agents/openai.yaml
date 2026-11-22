@@ -1,4 +1,0 @@
-interface:
-  display_name: "Fleet Maintenance"
-  short_description: "Audit and update Ryan's Macs over LAN SSH"
-  default_prompt: "Use $fleet-maintenance to audit Ryan's Macs, then report host health, disk, Homebrew, npm, and repository state before any mutation."
