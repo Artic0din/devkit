@@ -95,7 +95,6 @@ install -m 700 scripts/obscura "$HOME/.local/bin/obscura"
 ```
 
 MCP servers are not global; add Obscura only to the agent or project that needs it, for example `claude mcp add obscura -- ~/.local/bin/obscura mcp`.
-Allow only the browser tools that agent needs (in Codex, list them under `enabled_tools`), and leave Obscura out of any client that cannot restrict its tools.
 
 The profile denies access to home directories, external volumes and macOS temporary directories, denies writes to the browser installation, and prevents launching other executables.
 This is a filesystem and executable boundary, not Chrome-equivalent site isolation or a complete network sandbox.
