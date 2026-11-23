@@ -15,7 +15,6 @@ gh pr view <url> --comments --files
 gh run list / gh run view <id>
 ```
 
-Workflows: `$github-deep-review`, `$github-project-triage`, `$github-author-context`.
 
 ---
 
@@ -44,14 +43,12 @@ xcodes installed
 xcrun --find xctrace || echo "not installed; run: xcodes install --latest"
 ```
 
-Workflows: `$xcode-sync`, `$instruments-profiling`, `$native-app-performance`.
 
 ---
 
 ## yt-dlp
 Video, audio, subtitle, and transcript downloads.
 
-Workflows: `$video-transcript-downloader` for raw downloads, `$video-analysis` for a visual brief of one video.
 
 ---
 
@@ -62,7 +59,7 @@ iMessage CLI, installed from Homebrew. No skill currently routes to it.
 
 ## Sonos
 There is no `sonos` CLI installed. Sonos is reached through the Sonos connector configured in
-Claude; `$sonos` documents the workflow.
+Claude.
 
 ---
 
@@ -97,17 +94,12 @@ install -m 700 scripts/obscura "$HOME/.local/bin/obscura"
 "$HOME/.local/bin/obscura" fetch https://example.com --quiet --eval document.title
 ```
 
-Back up each client's existing MCP configuration before merging the `obscura` entry from `config/mcp.json` or `config/codex.config.template.toml`; do not replace the whole configuration.
-For Codex, retain the template's explicit routine-browser tool list and disable existing `chrome-devtools` and `playwright` entries with `enabled = false`.
-For Claude, switch off its Chrome-by-default setting if enabled.
-The fleet paths in `config/mcp.json` target the existing account; adjust those paths for other accounts.
+MCP servers are not global; add Obscura only to the agent or project that needs it, for example `claude mcp add obscura -- ~/.local/bin/obscura mcp`.
 
 The profile denies access to home directories, external volumes and macOS temporary directories, denies writes to the browser installation, and prevents launching other executables.
 This is a filesystem and executable boundary, not Chrome-equivalent site isolation or a complete network sandbox.
 The native MCP browser runs in-process; subprocess-based CLI modes are outside this launcher's supported scope.
 Sessions have no imported Chrome cookies or profiles.
 Private-network navigation remains blocked by Obscura's default; use a real browser for local apps, existing logins, downloads into personal folders, extensions, visual acceptance and Chrome-specific debugging.
-Codex's `chrome-devtools` server is disabled by default but retained for an explicit fallback session.
-Launch that fallback with `codex -c 'mcp_servers.chrome-devtools.enabled=true'` when needed.
 Use the active host's browser tools when that workflow requires them; T3's browser and bundled Chrome are managed by T3 and are not replaced by this integration.
 Existing sessions keep their loaded tools until restarted after their work finishes.

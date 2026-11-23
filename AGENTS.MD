@@ -1,7 +1,7 @@
 # AGENTS.md — Canonical Agent Instructions
 
 > **Canonical file.** path: `/Users/ryanfoyle/Metisary/Enviroment/config/AGENTS.MD`.
-> If loaded as `~/.claude/CLAUDE.md` or `~/.codex/AGENTS.md`, those are symlinks to this file.  `~/.agents/skills` and `~/.codex/skills/agent-scripts` → this repo's `skills/`.
+> If loaded as `~/.claude/CLAUDE.md` or `~/.codex/AGENTS.md`, those are symlinks to this file.
 > Edit this file, never a symlink path. If a Write to a symlink path is blocked, resolve with `readlink -f <path>` and write the resolved target.
 
 Single source of truth for Claude Code and Codex.
@@ -122,7 +122,7 @@ Full standard: [engineering-constitution.md](/Users/ryanfoyle/Metisary/Enviromen
 
 ## Communication
 
-- Use ADHD-friendly, low-cognitive-load output across Codex and Claude; follow [i-have-adhd](/Users/ryanfoyle/Metisary/Enviroment/config/skills/i-have-adhd/SKILL.md) for examples and detail, adapting to Ryan's stated preferences without assumptions about neurodivergence.
+- Use ADHD-friendly, low-cognitive-load output across Codex and Claude, adapting to Ryan's stated preferences without assumptions about neurodivergence.
 - Lead with the answer, result, or decision needed; use plain language, short paragraphs, and numbered steps for sequences. Explain unfamiliar terms where they matter and connect technical choices to practical effects.
 - Keep the visible working set small, no more than five items per group; never omit requested detail, material risks, or essential reasoning to meet a length target.
 - Restore essential context after interruptions; show verified progress and give time estimates when useful and grounded, with uncertainty stated.
@@ -180,13 +180,9 @@ When asked to modify this file or an overlay: propose the diff, wait for explici
 - Use `tool_search` before MCP resource discovery when a deferred MCP/plugin tool may apply.
 - For OpenAI product/API questions, use the `openai-docs` skill and official OpenAI sources.
 
-## Project Context
-
-- Treat `~/.agents/skills` as a link to `~/Metisary/Enviroment/config/skills`; retain validated personal skills.
-
 ## Validation
 
-- Before saying the installed agent setup is healthy, verify `~/.codex/AGENTS.md`, `~/.claude/CLAUDE.md`, `~/.codex/skills/agent-scripts`, and `~/.agents/skills` resolve inside `~/Metisary/Enviroment/config/`, and validate retained skills.
+- Before saying the installed agent setup is healthy, verify `~/.codex/AGENTS.md` and `~/.claude/CLAUDE.md` resolve to `~/Metisary/Enviroment/config/AGENTS.MD`.
 - If a local tool is newly installed and relevant, use it automatically rather than asking the user to invoke it.
 
 ## Communication

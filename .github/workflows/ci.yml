@@ -14,48 +14,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: skills/video-transcript-downloader/package-lock.json
-
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.0
-
-      - name: Check shell helper syntax
-        run: |
-          bash -n scripts/sync-skills
-          bash -n scripts/test-sync-skills
-          find skills -path '*/scripts/*' -type f -print0 |
-            while IFS= read -r -d '' script; do
-              if head -n 1 "$script" | grep -q 'bash'; then
-                bash -n "$script"
-              fi
-            done
 
       - name: Check the Cursor rule matches AGENTS.MD
         run: |
           scripts/test-cursor-rule
           scripts/cursor-rule --check
-
-      - name: Test skill link sync and audit
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ripgrep
-          /bin/bash scripts/test-sync-skills
-
-      - name: Test autoreview CLI options (offline, synthetic)
-        run: python3 skills/autoreview/scripts/test-autoreview.py
-
-      - name: Test session preview validation (offline, synthetic)
-        run: python3 skills/session-triage/scripts/test_validate_preview.py
-
-      - name: Validate skills and test the validator (offline, synthetic)
-        run: |
-          scripts/validate-skills
-          python3 scripts/test-validate-skills.py
 
       - name: Test issue triage (offline, synthetic)
         run: python3 scripts/test-issue-triage.py
@@ -78,53 +44,11 @@ jobs:
       - name: Test reusable baseline (offline, consumer fixtures)
         run: python3 scripts/test-baseline.py
 
-      - name: Test curated skill activation (offline, synthetic)
-        run: python3 scripts/test-curated-pstack-links.py
-
-      - name: Test video analysis (offline, synthetic)
-        run: python3 skills/video-analysis/scripts/test_video_analysis.py
-
       - name: Test Codex output filtering (offline, synthetic)
         run: python3 hooks/codex/test-output-scrub.py
-
-      - name: Test PR walkthrough with synthetic data
-        run: |
-          python3 -m pip install pytest playwright
-          python3 -m playwright install --with-deps chromium
-          python3 -m pytest skills/pr-walkthrough/tests -q
-
-      - name: Test isolated Playwright runtime
-        run: |
-          cd skills/playwright/scripts/runtime
-          npm ci --ignore-scripts --no-audit --no-fund
-          node node_modules/playwright/cli.js install --with-deps chromium
-          cd -
-          python3 skills/playwright/scripts/test_playwright_cli.py
-
-      - name: Test Codex preflight (offline, synthetic)
-        run: |
-          test_home="$(mktemp -d)"
-          trap 'rm -rf "$test_home"' EXIT
-          timeout 60s env -i HOME="$test_home" PATH="$PATH" ruby skills/codex-config/scripts/preflight.test.rb </dev/null
-
-      - name: Test skill list page (offline, synthetic)
-        run: |
-          test_home="$(mktemp -d)"
-          trap 'rm -rf "$test_home"' EXIT
-          timeout 60s env -i HOME="$test_home" PATH="$PATH" ruby scripts/list-skills.test.rb </dev/null
 
       - name: Build browser helper
         run: |
           bun install --frozen-lockfile
           bun build scripts/browser-tools.ts --compile --target bun --outfile /tmp/browser-tools
           /tmp/browser-tools --help
-
-      - name: Install video transcript downloader dependencies
-        working-directory: skills/video-transcript-downloader
-        run: npm ci
-
-      - name: Smoke video transcript downloader
-        working-directory: skills/video-transcript-downloader
-        run: |
-          node -e "import('youtube-transcript-plus').then(m => { if (typeof m.YoutubeTranscript?.fetchTranscript !== 'function') process.exit(1); })"
-          ./scripts/vtd.js transcript --help
