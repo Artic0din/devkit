@@ -20,7 +20,8 @@ Canonical repository: [Artic0din/devkit](https://github.com/Artic0din/devkit).
 
 ## Install
 
-On an activated machine, `~/.codex/AGENTS.md`, `~/.claude/CLAUDE.md`, `~/.claude/AGENTS.md`, `~/.gemini/GEMINI.md` and `~/.copilot/copilot-instructions.md` link to this repo's `AGENTS.MD`, and `~/.cursor/rules/metisary.mdc` links to `config/cursor.rules.mdc`.
+On an activated machine, `~/.codex/AGENTS.md`, `~/.claude/CLAUDE.md`, `~/.gemini/GEMINI.md` and `~/.copilot/copilot-instructions.md` link to this repo's `AGENTS.MD`, and `~/.cursor/rules/metisary.mdc` links to `config/cursor.rules.mdc`.
+Do not also link `~/.claude/AGENTS.md`: Claude Code would load the rules twice.
 Merge the `config/` hook and permission entries into each tool's live settings by hand (additive only), and link `agents/` into `~/.claude/agents` and `~/.codex/agents`.
 Before activating a machine, copy every file those steps touch to `~/Metisary/Enviroment/backups/activation-YYYY-MM-DD-<host>/`.
 The optional web UI paste lives in `config/ui-paste.md`.

@@ -5,7 +5,7 @@
 > Edit this file, never a symlink path. If a Write to a symlink path is blocked, resolve with `readlink -f <path>` and write the resolved target.
 
 Single source of truth for Claude Code and Codex.
-Layering: always-true-everywhere rules live here; Codex-specific rules are below; repo-specific rules live in that repo's `AGENTS.md`.
+Layering: always-true-everywhere rules live here; repo-specific rules live in that repo's `AGENTS.md`.
 Keep this file under 200 lines — context bloat is the enemy this file exists to kill.
 
 ## Who
@@ -167,24 +167,4 @@ Operational agent rules (routing, PR and CI mechanics, GitHub posting, disclosur
 
 ## This file
 
-When asked to modify this file or an overlay: propose the diff, wait for explicit confirmation, then apply.
-
-# Codex overlay
-
-> Rules that apply to Codex.
-
-## Tool Selection
-
-- Use `rg`/`rg --files` for repo search.
-- Use `apply_patch` for manual file edits.
-- Use `tool_search` before MCP resource discovery when a deferred MCP/plugin tool may apply.
-- For OpenAI product/API questions, use the `openai-docs` skill and official OpenAI sources.
-
-## Validation
-
-- Before saying the installed agent setup is healthy, verify `~/.codex/AGENTS.md` and `~/.claude/CLAUDE.md` resolve to `~/Metisary/Enviroment/config/AGENTS.MD`.
-- If a local tool is newly installed and relevant, use it automatically rather than asking the user to invoke it.
-
-## Communication
-
-- Never narrate sandbox constraints, permission gates, tool approval logic, or what you're about to do. Prompt when genuinely blocked with no alternative.
+When asked to modify this file: propose the diff, wait for explicit confirmation, then apply.
