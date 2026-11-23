@@ -85,7 +85,7 @@ hard rules and links here; tool-specific items migrate into the owning skill ove
 - `gh --attach` (repeatable, on `gh issue|pr create|edit|comment`) supersedes that curl once shipped: unmerged as of gh 2.98.0 (`cli/cli#14186`), so feature-detect, never assume. `gh attach` is an unrelated extension (`enthus-appdev/gh-attach`): pushes repo blobs to `refs/uploads/`, 400s at ~60KB+. Never use it for proof media.
 - Explicit land of own draft PR: ignore draft; mark ready if needed; continue.
 - `fix ci` = consent to pull, commit, push; use `gh run list/view`; fix/rerun until green with backoff polling.
-- T3 `pull_request_merge`: pass the full 40-character head SHA from `gh pr view <n> --json headRefOid`; a short SHA is rejected.
+- T3 `pull_request_merge`: pass `headSha` from a `pull_request_read` made after the last push as `expectedHeadSha`, in full; a SHA that doesn't match the current head is rejected.
 - GitHub quota: use `gh`; watch one exact run or PR instead of repeatedly listing all runs or checks.
 - GitHub Actions billing or spending-limit failures: apply the [automatic local CI fallback](#github-actions-quota-fallback); never ask Ryan to fix billing or approve equivalent local validation.
 - GitHub reads: request explicit `--json <fields>` where supported; keep fields and query scope narrow.
