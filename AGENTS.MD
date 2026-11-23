@@ -143,7 +143,7 @@ Full standard: [engineering-constitution.md](/Users/ryanfoyle/Metisary/Enviromen
 ## Docs
 
 - Markdown: semantic line breaks (one sentence per line). Mermaid for diagrams. Link, don't duplicate.
-- CHANGELOG.md: Keep a Changelog format, every PR adds under `[Unreleased]`.
+- CHANGELOG.md: Keep a Changelog format; every PR with a user-visible change adds under `[Unreleased]`.
 - Code comments for non-obvious WHY (constraints, invariants). Never WHAT, never task references.
 - Update docs, readme or wiki in the same change that invalidates them — stale docs mislead.
 

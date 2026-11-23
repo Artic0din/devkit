@@ -6,6 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Limited the CHANGELOG rule in `AGENTS.MD` and `docs/pr-standards.md` to pull requests with user-visible changes, matching `docs/agent-operations.md`, and dropped the reference to a `docs-check` that does not exist.
 - Removed the Codex overlay from `AGENTS.MD`, so Claude and Cursor no longer load Codex-only tool rules, and documented not linking `~/.claude/AGENTS.md`, which made Claude Code load the rules twice.
 - Removed every skill from DevKit, with the skill sync, validation, listing and lock files, their docs and CI steps, and the shared MCP templates: skills and MCP servers are now installed per agent or project through their own installers. `AGENTS.MD` drops its skill links and keeps the Council rule.
 ### Added
