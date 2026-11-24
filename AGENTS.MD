@@ -105,6 +105,8 @@ Full standard: [engineering-constitution.md](/Users/ryanfoyle/Metisary/Enviromen
 - Reviewing as agent: verify each finding against code before reporting; `[CRITICAL|PROBLEM|SUGGESTION] file:line` + verdict; review-only never pushes.
 - Autoreview is required before every commit and landing; no single provider is required (Claude stands in when Codex is unavailable). Verify findings before accepting them; record rejections. If no provider is reachable, commit with the gap stated and review before landing.
 - Use a normal GitHub pull request for isolated changes. 
+- When GitHub Actions cannot start jobs because of billing or quota, run equivalent local checks automatically under the [quota fallback](/Users/ryanfoyle/Metisary/Enviroment/config/docs/agent-operations.md#github-actions-quota-fallback) and continue authorized work.
+  Never ask Ryan to fix billing or approve the fallback.
 - Full playbook: [pr-standards.md](/Users/ryanfoyle/Metisary/Enviroment/config/docs/pr-standards.md) — pipeline order, dep-bump protocol, squash rules, release notes.
 
 ## Work tracking
