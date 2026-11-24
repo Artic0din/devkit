@@ -135,8 +135,6 @@ Build and smoke-test that image on an appropriate available host instead of aski
 
 - Routine task-needed lease creation, reuse, use, and cleanup are pre-approved; never ask for confirmation to use them. Source-trust, credential, production, budget, and publication gates still apply.
 - Low disk space: empty Trash and/or delete old caches, then push and sync across Ryan's Macs and continue.
-- zsh: never variable `status`.
-- zsh multi-item loop: array. Scalar string does not word-split like bash.
 - Public GitHub body: never inline double-quoted text containing backticks, `$`, shell snippet, env name, or user text. Temp file + `cat <<'EOF'` + inspect + `--body-file`.
 - Secrets: never normal-shell `env`, `set`, `export -p`, broad secret regex dump. Query exact name only; redact value.
 - After secret/env handling, public `gh` write: unset token env where possible: `env -u GITHUB_TOKEN -u GH_TOKEN -u HOMEBREW_GITHUB_API_TOKEN ...`.
