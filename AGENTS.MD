@@ -80,6 +80,7 @@ Full standard: [engineering-constitution.md](/Users/ryanfoyle/Metisary/Enviromen
 - After an additive diff, grep for each new symbol — green build doesn't prove additions landed.
 - When updating a value (count, version, date, name), grep the OLD value across the whole scope, not just the changed line — a fact in 2+ places updated in 1 is a silent inconsistency.
 - Copy error messages and hashes from output, never retype or paraphrase.
+- The shell is zsh: pass multi-word arguments as arrays or run them with `bash -c`; never name a variable `status`.
 
 ## Tests
 

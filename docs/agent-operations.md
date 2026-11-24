@@ -85,6 +85,7 @@ hard rules and links here; tool-specific items migrate into the owning skill ove
 - `gh --attach` (repeatable, on `gh issue|pr create|edit|comment`) supersedes that curl once shipped: unmerged as of gh 2.98.0 (`cli/cli#14186`), so feature-detect, never assume. `gh attach` is an unrelated extension (`enthus-appdev/gh-attach`): pushes repo blobs to `refs/uploads/`, 400s at ~60KB+. Never use it for proof media.
 - Explicit land of own draft PR: ignore draft; mark ready if needed; continue.
 - `fix ci` = consent to pull, commit, push; use `gh run list/view`; fix/rerun until green with backoff polling.
+- T3 `pull_request_merge`: pass `headSha` from a `pull_request_read` made after the last push as `expectedHeadSha`, in full; a SHA that doesn't match the current head is rejected.
 - GitHub quota: use `gh`; watch one exact run or PR instead of repeatedly listing all runs or checks.
 - GitHub Actions billing or spending-limit failures: apply the [automatic local CI fallback](#github-actions-quota-fallback); never ask Ryan to fix billing or approve equivalent local validation.
 - GitHub reads: request explicit `--json <fields>` where supported; keep fields and query scope narrow.
@@ -134,8 +135,6 @@ Build and smoke-test that image on an appropriate available host instead of aski
 
 - Routine task-needed lease creation, reuse, use, and cleanup are pre-approved; never ask for confirmation to use them. Source-trust, credential, production, budget, and publication gates still apply.
 - Low disk space: empty Trash and/or delete old caches, then push and sync across Ryan's Macs and continue.
-- zsh: never variable `status`.
-- zsh multi-item loop: array. Scalar string does not word-split like bash.
 - Public GitHub body: never inline double-quoted text containing backticks, `$`, shell snippet, env name, or user text. Temp file + `cat <<'EOF'` + inspect + `--body-file`.
 - Secrets: never normal-shell `env`, `set`, `export -p`, broad secret regex dump. Query exact name only; redact value.
 - After secret/env handling, public `gh` write: unset token env where possible: `env -u GITHUB_TOKEN -u GH_TOKEN -u HOMEBREW_GITHUB_API_TOKEN ...`.
