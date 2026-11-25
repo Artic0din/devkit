@@ -17,6 +17,26 @@ def run_hook(stdout: str, stderr: str = "") -> str:
     return result.stdout
 
 
+
+def test_published_filter_contract() -> None:
+    # These mixed records retain the observable contract of the published #73 hook.
+    # Freeze independent expected results so a change cannot move its own baseline.
+    formats = ("password: {value}", "api_key={value}", '"password": "{value}"')
+    public_record = "fixture_user: ordinary-neighbor"
+    for template in formats:
+        for before in (True, False):
+            marker = "synthetic-corpus-value"
+            field = template.format(value=marker)
+            lines = (public_record, field) if before else (field, public_record)
+            record = "\n".join(lines) + "\n"
+            for stdout, stderr in ((record, ""), ("", record)):
+                output = run_hook(stdout, stderr)
+                result = json.loads(output)
+                assert result["decision"] == "block", template
+                assert marker not in output, template
+                assert public_record in result["reason"], template
+
+
 def test_inline_yaml() -> None:
     for field in ("password", "api_key", "SecretAccessKey"):
         for prefix in ("", "  ", "- ", "  - "):
@@ -354,6 +374,7 @@ def test_list_item_keys_keep_siblings() -> None:
 
 
 if __name__ == "__main__":
+    test_published_filter_contract()
     test_inline_yaml()
     test_empty_quoted_segments()
     test_safe_identifiers()
