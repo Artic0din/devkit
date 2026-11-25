@@ -18,6 +18,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 ### Changed
 
 - Added preflight and pilot checks for requested provider cleanup and recovery.
+- Synced missing T3 Code ACP Registry providers and their enabled state across fleet Macs while preserving local executable overrides and sign-ins.
 
 - Made equivalent local or fleet-host CI validation automatic when GitHub Actions refuses jobs because of billing, spending limits or exhausted minutes, without asking for billing changes or repeated approval.
 - Updated the vendored tstack skills to `11e37a7`: Council now checks incoming review findings while other reviewers run, avoids editing a checkout still under review, and honours explicitly non-blocking reviewers; only required reviewers gate round completion and final sign-off, and runs with no required delegates and no completed reviews report zero rounds and no sign-off.
