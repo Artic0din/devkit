@@ -61,7 +61,7 @@ Run in order; STOP and report on any failure — never create the PR on a red st
 
 ## Confirming a published review fix
 
-Before replying that a fix landed, run `scripts/pr-head-check OWNER/REPO NUMBER FULL_FIX_SHA` or read the open PR and compare its current full head SHA using the host's PR tools.
+Before replying that a fix landed, run `"$HOME/Metisary/Enviroment/config/scripts/pr-head-check" OWNER/REPO NUMBER FULL_FIX_SHA` from the checkout containing the fix or read the open PR and compare its current full head SHA using the host's PR tools.
 For a notification, use the commit named by the event.
 Continue only when the open PR matches that commit.
 If the push failed or the head lookup failed, resolve that first.

@@ -11,7 +11,7 @@ class HeadCheck(unittest.TestCase):
         head = "a" * 40
         with tempfile.TemporaryDirectory() as temp:
             gh = Path(temp) / "gh"
-            gh.write_text('#!/bin/sh\nprintf "%s" "$RESPONSE"\nexit "$RESULT"\n')
+            gh.write_text('#!/bin/sh\n[ "$#" = 7 ] && [ "$*" = "pr view 1 --repo example/repo --json state,headRefOid" ] || exit 91\nprintf "%s" "$RESPONSE"\nexit "$RESULT"\n')
             gh.chmod(0o755)
             for state, sha, gh_exit, expected in [
                 ("OPEN", head, 0, 0), ("OPEN", "b" * 40, 0, 1),
