@@ -94,6 +94,12 @@ class FleetVerifier(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("UNVERIFIED second agent cold composer", result.stdout)
 
+    def test_composer_rejects_parent_segment_in_observed_workspace(self) -> None:
+        self.data["second"]["composer"]["agent"]["workspace"] = "/home/fixture/example/../example"
+        result = self.run_cli()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("UNVERIFIED second agent cold composer", result.stdout)
+
     def test_server_without_optional_hostname_requires_expected_environment(self) -> None:
         server = self.data["second"]["t3"]
         del server["hostname"]
