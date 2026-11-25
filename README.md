@@ -44,7 +44,7 @@ READ ~/Metisary/Enviroment/config/AGENTS.MD BEFORE ANYTHING (skip if missing).
 
 ### Fleet decisions
 
-From the installed environment, open the existing board with `open "$HOME/Metisary/Enviroment/manager/fleet/dashboard/Open dashboard.command"` and choose **Decisions**.
+On a machine with the fleet manager installed separately, open its board with `open "$HOME/Metisary/Enviroment/manager/fleet/dashboard/Open dashboard.command"` and choose **Decisions**.
 Use **Still to do** for work awaiting installation or verification.
 When a setup decision changes, mark the old decision **Changed later** and record its replacement, reason, source, and affected machines in the board.
 For a skill, include its upstream source and which provider installs it.
