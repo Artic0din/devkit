@@ -1,10 +1,10 @@
 // Invoked with Bun on the host being measured. Only catalog identifiers leave the host.
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 const policy = JSON.parse(Buffer.from(process.argv.at(-1), "base64").toString());
 const home = homedir();
-const cwd = policy.workspace.startsWith("~/") ? join(home, policy.workspace.slice(2)) : policy.workspace;
+const cwd = policy.workspace.startsWith("~/") ? resolve(home, policy.workspace.slice(2)) : resolve(policy.workspace);
 const env = { ...process.env, PATH: [join(home, ".local/bin"), "/opt/homebrew/bin", process.env.PATH].join(":") };
 const t3 = join(home, ".t3/bin/t3");
 

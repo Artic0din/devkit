@@ -23,6 +23,7 @@ Run it from a trusted machine and use trusted argument arrays. Each catalog or c
       "required": ["nested-skill"],
       "removed": ["retired-skill"],
       "composerSkill": "nested-skill",
+      "composerDisplay": "example-plugin:nested-skill",
       "composerCommand": ["/path/to/fleet-composer.cjs", "example/project", "example-provider", "nested-skill", "example-plugin:nested-skill"]
     }
   }
@@ -44,7 +45,7 @@ Install this repository's locked dependencies with `bun install --frozen-lockfil
 Supply the GitHub repository already registered with T3, the provider, the name T3 stores in the draft and the qualified display name.
 An optional `FLEET_CHROME` environment variable selects the Chrome binary.
 The adapter must observe the selected provider and workspace as well as the skill identity.
-Return one JSON object, for example `{"provider":"example-provider","workspace":"~/projects/example","cold":true,"selected":"nested-skill","inserted":"nested-skill"}`.
+Return one JSON object, for example `{"provider":"example-provider","workspace":"~/projects/example","cold":true,"selected":"nested-skill","inserted":"nested-skill","selectedLabel":"/skill:example-plugin:nested-skill","insertedLabel":"example-plugin:nested-skill"}`.
 Use a fresh client for each measurement and record separately whether the running server already cached that workspace.
 A cached screenshot, a command match or a directory listing cannot supply this evidence.
 The example workspace is home-relative; the bundled helper reports the absolute project root.

@@ -18,10 +18,11 @@ class FleetVerifier(unittest.TestCase):
         self.policy = {"hosts": {"local": "first", "second": "second"}, "workspace": "~/example",
                        "providers": {"agent": {"versionCommand": ["agent", "--version"],
                        "catalogCommand": ["agent", "list"], "version": "v1", "required": ["nested"],
-                       "removed": ["retired"], "composerSkill": "nested"}}}
+                       "removed": ["retired"], "composerSkill": "nested", "composerDisplay": "group:nested"}}}
         sample = {"cli": {"agent": "v1"}, "native": {"agent": ["nested"]},
                   "composer": {"agent": {"cold": True, "selected": "nested", "inserted": "nested",
-                                         "provider": "agent", "workspace": "~/example"}},
+                                         "provider": "agent", "workspace": "~/example",
+                                         "selectedLabel": "/skill:group:nested", "insertedLabel": "group:nested"}},
                   "t3": {"enabled": ["agent"], "catalogs": {"agent": {"status": "ready",
                         "auth": "authenticated", "version": "v1", "workspace": True,
                         "skills": ["nested"], "commands": [], "signatures": ["group/nested"]}}}}
@@ -67,6 +68,24 @@ class FleetVerifier(unittest.TestCase):
             self.assertIn(text, result.stdout)
         self.data["second"] = {}
         self.assertIn("UNVERIFIED second host identity", self.run_cli().stdout)
+
+    def test_malformed_nested_data(self) -> None:
+        self.data["second"]["t3"] = ["invalid"]
+        result = self.run_cli()
+        self.assertEqual(result.returncode, 2)
+        self.assertNotIn("Traceback", result.stderr)
+
+    def test_qualified_labels_and_equivalent_workspace(self) -> None:
+        self.policy["workspace"] += "/"
+        self.assertEqual(self.run_cli().returncode, 0)
+        agent = self.data["second"]["composer"]["agent"]
+        agent.update(selectedLabel="/skill:wrong:nested", insertedLabel="wrong:nested")
+        self.data["second"]["t3"]["catalogs"]["agent"]["labels"] = ["package:retired"]
+        self.policy["providers"]["agent"]["removed"].append("package:retired")
+        result = self.run_cli()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("cold composer", result.stdout)
+        self.assertIn("removed entry present: package:retired", result.stdout)
 
     def test_server_without_optional_hostname_requires_expected_environment(self) -> None:
         server = self.data["second"]["t3"]
