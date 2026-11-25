@@ -42,6 +42,17 @@ READ ~/Metisary/Enviroment/config/AGENTS.MD BEFORE ANYTHING (skip if missing).
 
 ## Helpers
 
+### Fleet decisions
+
+From the installed environment, open the existing board with `open "$HOME/Metisary/Enviroment/manager/fleet/dashboard/Open dashboard.command"` and choose **Decisions**.
+Use **Still to do** for work awaiting installation or verification.
+When a setup decision changes, mark the old decision **Changed later** and record its replacement, reason, source, and affected machines in the board.
+For a skill, include its upstream source and which provider installs it.
+For a removal, keep an open item for each affected host or application until its absence has been checked there.
+Keep account identifiers, credentials and private machine inventories in their existing local stores.
+
+### Scripts
+
 - `scripts/agent-sweep`: reports agent worktrees, branches, idle `node_modules` and unavailable simulators in the shared worktree folder, `~/Metisary/Projects`, `~/Development`, `/private/tmp` and older agent worktree folders (Cursor, Codex, T3, Conductor, Orca, Emdash). `--apply` removes finished worktrees at any age (clean, and their tip is a merged PR's head or their remote branch was deleted after merging) and every worktree idle for `--days` (default 5), each with its branch, uncommitted and unmerged work included, plus merged branches, scratch entries idle as long, and unavailable simulators. It keeps locked worktrees, ones a process works in, and ones holding nested repositories, submodules, or ignored files that are not rebuildable folders or junk such as `.DS_Store`, since those could be secrets. Tested by `scripts/test-agent-sweep.py`.
 - `scripts/agent-sweep-schedule`: `install` adds a LaunchAgent that runs the sweep daily at 03:30 with `--apply`, writing `~/Library/Logs/agent-sweep/YYYY-MM-DD.tsv` and `latest.tsv` and keeping 14 reports; `status`, `run` and `uninstall` do what they say. Run `agent-sweep` without `--apply` for a report that removes nothing.
 - `scripts/t3-settings-sync`: copies this Mac's T3 Code `settings.json`, `client-settings.json` and `keybindings.json` to other fleet Macs over SSH (default `ace rex`), keeping each target's per-Mac keys such as provider instances, project overrides and microphones. Reports by default; `--apply` writes, keeping one `.bak-fleet-sync` per file. `install` adds a LaunchAgent that applies on every settings change and every 15 minutes; `status` and `uninstall` do what they say. Desktop app settings show after T3 Code restarts on the target. Tested by `scripts/test-t3-settings-sync.py`.
