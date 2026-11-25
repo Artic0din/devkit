@@ -141,13 +141,19 @@ class MergeTest(unittest.TestCase):
         self.assertNotIn("defaultModelSelection", merged)
 
     def test_existing_registry_agent_under_a_different_id_keeps_local_identity(self):
-        master = {"providerInstances": {"devin": {
-            "driver": "acpRegistry", "enabled": True, "config": {"agentId": "devin"},
-        }}}
-        target = {"providerInstances": {"local-devin": {
-            "driver": "acpRegistry", "enabled": False,
-            "config": {"agentId": "devin", "commandPath": "/local/bin/devin"},
-        }}}
+        master = {
+            "providerInstances": {"devin": {
+                "driver": "acpRegistry", "enabled": True, "config": {"agentId": "devin"},
+            }},
+            "defaultModelSelection": {"instanceId": "devin", "model": "source-model"},
+        }
+        target = {
+            "providerInstances": {"local-devin": {
+                "driver": "acpRegistry", "enabled": True,
+                "config": {"agentId": "devin", "commandPath": "/local/bin/devin"},
+            }},
+            "defaultModelSelection": {"instanceId": "local-devin", "model": "local-model"},
+        }
         self.assertEqual(sync.merge("settings.json", master, target), target)
 
     def test_distinct_master_instances_of_the_same_agent_both_sync(self):
@@ -158,6 +164,30 @@ class MergeTest(unittest.TestCase):
         target = {"providerInstances": {"devin-old": master["providerInstances"]["devin-old"]}}
         self.assertEqual(sync.merge("settings.json", master, {})["providerInstances"], master["providerInstances"])
         self.assertEqual(sync.merge("settings.json", master, target)["providerInstances"], master["providerInstances"])
+
+    def test_text_generator_selection_works_alongside_disabled_registry_instance(self):
+        selection = {"instanceId": "devin", "model": "text-model"}
+        master = {"textGenerationModelSelection": selection, "defaultModelSelection": selection}
+        target = {
+            "textGenerators": {"devin": {}},
+            "defaultModelSelection": {"instanceId": "codex", "model": "gpt"},
+            "providerInstances": {"devin": {
+                "driver": "acpRegistry", "enabled": False, "config": {"agentId": "devin"},
+            }},
+        }
+        merged = sync.merge("settings.json", master, target)
+        self.assertEqual(merged["textGenerationModelSelection"], selection)
+        self.assertEqual(merged["defaultModelSelection"], target["defaultModelSelection"])
+
+    def test_malformed_fallback_instance_id_is_ignored(self):
+        master = {
+            "providerInstances": {"local": {"driver": "acpRegistry", "config": {"source": "local"}}},
+            "defaultModelSelection": {"instanceId": "local", "model": "model"},
+        }
+        for invalid_id in ([], {}):
+            with self.subTest(instance_id=invalid_id):
+                target = {"defaultModelSelection": {"instanceId": invalid_id, "model": "model"}}
+                self.assertNotIn("defaultModelSelection", sync.merge("settings.json", master, target))
 
     def test_keybindings_array_is_copied_whole(self):
         self.assertEqual(sync.merge("keybindings.json", [{"key": "mod+k"}], [{"key": "x"}]), [{"key": "mod+k"}])
