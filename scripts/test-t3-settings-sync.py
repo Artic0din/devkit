@@ -50,6 +50,74 @@ class MergeTest(unittest.TestCase):
         target = {"textGenerators": {"t": {}}, "textGenerationModelSelection": {"instanceId": "t"}}
         self.assertEqual(sync.merge("settings.json", master, target), target)
 
+    def test_registry_provider_and_its_model_selection_sync_without_local_config(self):
+        selection = {"instanceId": "acpRegistry_github_copilot", "model": "gpt"}
+        master = {
+            "providerInstances": {
+                "acpRegistry_github_copilot": {
+                    "driver": "acpRegistry",
+                    "enabled": True,
+                    "config": {
+                        "agentId": "github-copilot-cli",
+                        "distribution": "auto",
+                        "commandPath": "/max/bin/copilot",
+                        "commandArgs": ["local-only"],
+                    },
+                },
+                "local-acp": {"driver": "acpRegistry", "config": {
+                    "source": "local", "agentId": "local", "commandPath": "/max/bin/local",
+                }},
+            },
+            "defaultModelSelection": selection,
+        }
+        target = {"providerInstances": {"cursor": {"driver": "cursor"}}}
+        expected_instances = {
+            **target["providerInstances"],
+            "acpRegistry_github_copilot": {
+                "driver": "acpRegistry",
+                "enabled": True,
+                "config": {"agentId": "github-copilot-cli", "distribution": "auto"},
+            },
+        }
+        merged = sync.merge("settings.json", master, target)
+        self.assertEqual(merged["providerInstances"], expected_instances)
+        self.assertEqual(merged["defaultModelSelection"], selection)
+        self.assertEqual(sync.merge("settings.json", master, merged), merged)
+
+    def test_registry_sync_keeps_target_overrides_and_other_instances(self):
+        master = {"providerInstances": {
+            "devin": {"driver": "acpRegistry", "enabled": False, "config": {"agentId": "devin"}},
+            "collision": {"driver": "acpRegistry", "enabled": False, "config": {"agentId": "devin"}},
+        }}
+        target = {"providerInstances": {
+            "devin": {"driver": "acpRegistry", "enabled": True, "config": {
+                "agentId": "devin", "commandPath": "/ace/bin/devin", "distribution": "binary",
+            }},
+            "collision": {"driver": "acpRegistry", "config": {
+                "source": "local", "agentId": "devin", "commandPath": "/ace/bin/local",
+            }},
+            "target-only": {"driver": "codex"},
+        }}
+        expected = {**target["providerInstances"], "devin": {
+            **target["providerInstances"]["devin"], "enabled": False,
+        }}
+        self.assertEqual(sync.merge("settings.json", master, target)["providerInstances"], expected)
+
+    def test_registry_sync_uses_effective_enabled_state(self):
+        def instance(config_enabled):
+            return {"driver": "acpRegistry", "enabled": True, "config": {
+                "agentId": "devin", "enabled": config_enabled, "commandPath": "/local/bin/devin",
+            }}
+
+        disabled = {"providerInstances": {"devin": instance(False)}}
+        enabled = {"providerInstances": {"devin": instance(True)}}
+        added = sync.merge("settings.json", disabled, {})["providerInstances"]["devin"]
+        self.assertFalse(added["enabled"])
+        merged = sync.merge("settings.json", enabled, disabled)["providerInstances"]["devin"]
+        self.assertTrue(merged["enabled"])
+        self.assertIsNot(merged["config"].get("enabled"), False)
+        self.assertEqual(merged["config"]["commandPath"], "/local/bin/devin")
+
     def test_keybindings_array_is_copied_whole(self):
         self.assertEqual(sync.merge("keybindings.json", [{"key": "mod+k"}], [{"key": "x"}]), [{"key": "mod+k"}])
 

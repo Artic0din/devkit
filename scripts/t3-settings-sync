@@ -18,6 +18,7 @@ import fcntl
 import json
 import os
 import plistlib
+import re
 import subprocess
 import sys
 from datetime import datetime
@@ -70,25 +71,69 @@ def merge(name: str, master: object, target: object | None) -> object:
     target = target if isinstance(target, dict) else {}
     local = LOCAL_KEYS.get(name, frozenset())
     result = {k: v for k, v in master.items() if k not in local}
+    for key in local:
+        if key in target:
+            result[key] = target[key]
     if name == "settings.json":
+        instances = merge_registry_instances(master, target)
+        if instances:
+            result["providerInstances"] = instances
         for key, value in master.items():
-            if key.endswith("ModelSelection") and isinstance(value, dict) and not portable(value.get("instanceId"), master, target):
+            if key.endswith("ModelSelection") and isinstance(value, dict) and not portable(value.get("instanceId"), master, result):
                 if key in target:
                     result[key] = target[key]
                 else:
                     result.pop(key, None)
-    for key in local:
-        if key in target:
-            result[key] = target[key]
     return result
+
+
+def defined(settings: dict, group: str) -> dict:
+    value = settings.get(group)
+    return value if isinstance(value, dict) else {}
+
+
+def registry_agent_id(instance: object) -> str | None:
+    if not isinstance(instance, dict) or instance.get("driver") != "acpRegistry":
+        return None
+    config = defined(instance, "config")
+    agent_id = config.get("agentId")
+    if config.get("source", "registry") == "registry" and isinstance(agent_id, str):
+        if re.fullmatch(r"[a-z0-9][a-z0-9-]*", agent_id):
+            return agent_id
+    return None
+
+
+def registry_enabled(instance: dict) -> bool:
+    return instance.get("enabled") is not False and instance["config"].get("enabled") is not False
+
+
+def merge_registry_instances(master: dict, target: dict) -> dict:
+    """Copy official registry registrations without carrying over local launch settings."""
+    instances = dict(defined(target, "providerInstances"))
+    for instance_id, source in defined(master, "providerInstances").items():
+        agent_id = registry_agent_id(source)
+        if agent_id is None:
+            continue
+        enabled = registry_enabled(source)
+        if instance_id in instances:
+            existing = instances[instance_id]
+            if registry_agent_id(existing) == agent_id and registry_enabled(existing) != enabled:
+                config = dict(existing["config"])
+                if enabled and config.get("enabled") is False:
+                    config["enabled"] = True
+                instances[instance_id] = {**existing, "enabled": enabled, "config": config}
+            continue
+        config = {"agentId": agent_id}
+        distribution = source["config"].get("distribution")
+        if distribution in ("auto", "binary", "npx", "uvx"):
+            config["distribution"] = distribution
+        instances[instance_id] = {"driver": "acpRegistry", "enabled": enabled, "config": config}
+    return instances
 
 
 def portable(instance_id: object, master: dict, target: dict) -> bool:
     """A selection works on the target if the target defines its instance, or it is a
     built-in default instance (its id is its driver name), which every Mac has."""
-    def defined(settings: dict, group: str) -> dict:
-        value = settings.get(group)
-        return value if isinstance(value, dict) else {}
     if any(instance_id in defined(target, g) for g in ("providerInstances", "textGenerators")):
         return True
     if instance_id in defined(master, "textGenerators"):
