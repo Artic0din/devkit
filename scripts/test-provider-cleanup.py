@@ -44,6 +44,29 @@ class Gates(unittest.TestCase):
             self.assertEqual(self.call("preflight", "--no-backup"), 0)
             self.assertFalse(archive.exists())
 
+    def test_equivalent_paths_and_nested_payload_tree(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            archive = root / "snapshot.tar"
+            (root / "registration").write_text("synthetic")
+            payload = root / "skills"
+            nested = payload / "nested"
+            nested.mkdir(parents=True)
+            (nested / "instructions").write_text("synthetic skill")
+            args = ["preflight", "--archive", str(archive), "--root", temp,
+                    "--registration", "registration", "--payload"]
+            with tarfile.open(archive, "w") as tar:
+                tar.add(root / "registration", arcname="registration")
+                tar.add(payload, arcname="skills")
+            self.assertEqual(self.call(*args, "skills"), 0)
+            self.assertNotEqual(self.call(*args, "./registration"), 0)
+            original_mode = nested.stat().st_mode
+            nested.chmod(0o700 if nested.stat().st_mode & 0o077 else 0o755)
+            self.assertNotEqual(self.call(*args, "skills"), 0)
+            nested.chmod(original_mode)
+            (nested / "extra").write_text("missing from backup")
+            self.assertNotEqual(self.call(*args, "skills"), 0)
+
     def test_pilot_gates_the_next_host(self) -> None:
         for exit_code, rows, expected in [(1, ["sample"], False), (0, [], False),
                                           (0, [{"name": "sample", "enabled": False}], False),

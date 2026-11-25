@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -19,6 +20,8 @@ def digest(stream) -> bytes:
 def check_archive(archive: Path, root: Path, registrations: list[str], payloads: list[str]) -> None:
     if not registrations or not payloads:
         raise ValueError("both registration and payload paths are required")
+    registrations = [str(Path(name)) for name in registrations]
+    payloads = [str(Path(name)) for name in payloads]
     if set(registrations) & set(payloads):
         raise ValueError("registration and payload paths must be distinct")
     with tarfile.open(archive, "r:*") as tar:
@@ -35,15 +38,25 @@ def check_archive(archive: Path, root: Path, registrations: list[str], payloads:
             live = root / rel
             if live.is_symlink() or not live.resolve().is_relative_to(root.resolve()):
                 raise ValueError("required path resolves outside the backup scope or is a link")
-            inputs = sorted(live.rglob("*")) if live.is_dir() and name in payloads else [live]
+            def walk_error(error: OSError) -> None:
+                raise error
+
+            inputs = [live]
+            if live.is_dir() and name in payloads:
+                for directory, dirs, filenames in os.walk(live, onerror=walk_error):
+                    inputs.extend(Path(directory) / child for child in dirs + filenames)
             regular = 0
             for path in inputs:
                 if path.is_symlink():
                     raise ValueError("required payload contains a link; verify its target separately")
-                if path.is_dir():
-                    continue
                 key = str(path.relative_to(root))
                 member = files.get(key)
+                if path.is_dir():
+                    if name in registrations or not member or not member.isdir():
+                        raise ValueError(f"required directory unavailable: {key}")
+                    if (member.mode ^ path.stat().st_mode) & 0o7777:
+                        raise ValueError(f"archive permissions differ: {key}")
+                    continue
                 if not path.is_file() or not member or not member.isfile():
                     raise ValueError(f"required regular file unavailable: {key}")
                 if (member.mode ^ path.stat().st_mode) & 0o7777:
@@ -53,7 +66,8 @@ def check_archive(archive: Path, root: Path, registrations: list[str], payloads:
                 with path.open("rb") as current, tar.extractfile(member) as saved:
                     if digest(current) != digest(saved):
                         raise ValueError(f"archive content differs: {key}")
-                regular += 1
+                if name in registrations or key not in registrations:
+                    regular += 1
             if not regular:
                 raise ValueError(f"no files verified for {name}")
 
