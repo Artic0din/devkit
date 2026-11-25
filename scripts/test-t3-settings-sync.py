@@ -165,6 +165,22 @@ class MergeTest(unittest.TestCase):
         self.assertEqual(sync.merge("settings.json", master, {})["providerInstances"], master["providerInstances"])
         self.assertEqual(sync.merge("settings.json", master, target)["providerInstances"], master["providerInstances"])
 
+    def test_single_registry_alias_syncs_enabled_state_without_replacing_its_config(self):
+        for enabled in (True, False):
+            with self.subTest(enabled=enabled):
+                master = {"providerInstances": {"devin": {
+                    "driver": "acpRegistry", "enabled": enabled,
+                    "config": {"agentId": "devin"},
+                }}}
+                local_config = {"agentId": "devin", "commandPath": "/local/bin/devin"}
+                target = {"providerInstances": {"local-devin": {
+                    "driver": "acpRegistry", "enabled": not enabled, "config": local_config,
+                }}}
+                merged = sync.merge("settings.json", master, target)
+                self.assertEqual(merged["providerInstances"], {"local-devin": {
+                    "driver": "acpRegistry", "enabled": enabled, "config": local_config,
+                }})
+
     def test_text_generator_selection_works_alongside_disabled_registry_instance(self):
         selection = {"instanceId": "devin", "model": "text-model"}
         master = {"textGenerationModelSelection": selection, "defaultModelSelection": selection}
@@ -188,6 +204,29 @@ class MergeTest(unittest.TestCase):
             with self.subTest(instance_id=invalid_id):
                 target = {"defaultModelSelection": {"instanceId": invalid_id, "model": "model"}}
                 self.assertNotIn("defaultModelSelection", sync.merge("settings.json", master, target))
+
+    def test_configured_provider_selection_does_not_switch_to_a_same_id_generator(self):
+        selection = {"instanceId": "devin", "model": "provider-model"}
+        provider = {"driver": "acpRegistry", "config": {"agentId": "devin"}}
+        master = {"providerInstances": {"devin": provider}, "textGenerationModelSelection": selection}
+        working = {"instanceId": "codex", "model": "working-model"}
+        target = {"providerInstances": {"devin": provider}, "textGenerators": {"devin": {}},
+                  "textGenerationModelSelection": working}
+        merged = sync.merge("settings.json", master, target)
+        self.assertEqual(merged["textGenerationModelSelection"], working)
+
+    def test_generator_only_id_does_not_override_default_chat_model(self):
+        master = {"textGenerators": {"writer": {}},
+                  "defaultModelSelection": {"instanceId": "writer", "model": "model"}}
+        target = {"defaultModelSelection": {"instanceId": "codex", "model": "model"}}
+        self.assertEqual(sync.merge("settings.json", master, target), target)
+
+    def test_builtin_chat_id_keeps_working_when_generator_shares_the_id(self):
+        selection = {"instanceId": "codex", "model": "gpt"}
+        master = {"textGenerators": {"codex": {}}, "defaultModelSelection": selection}
+        target = {"defaultModelSelection": {"instanceId": "claudeAgent", "model": "sonnet"}}
+        merged = sync.merge("settings.json", master, target)
+        self.assertEqual(merged["defaultModelSelection"], selection)
 
     def test_keybindings_array_is_copied_whole(self):
         self.assertEqual(sync.merge("keybindings.json", [{"key": "mod+k"}], [{"key": "x"}]), [{"key": "mod+k"}])

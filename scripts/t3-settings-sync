@@ -62,6 +62,9 @@ LOCAL_KEYS: dict[str, frozenset[str]] = {
     }),
 }
 FILES = ("settings.json", "client-settings.json", "keybindings.json")
+BUILTIN_PROVIDER_IDS = frozenset({
+    "antigravity", "claudeAgent", "codex", "cursor", "grok", "kiro", "muse", "opencode", "pi",
+})
 TEXT_GENERATOR_SELECTIONS = frozenset({
     "textGenerationModelSelection",
     "sourceControlWriterModelSelection",
@@ -126,18 +129,20 @@ def merge_registry_instances(master: dict, target: dict) -> dict:
         if agent_id is None:
             continue
         enabled = registry_enabled(source)
-        if instance_id in instances:
-            existing = instances[instance_id]
+        target_id = instance_id
+        if instance_id not in instances and source_agent_counts[agent_id] == 1:
+            aliases = [key for key, value in instances.items() if registry_agent_id(value) == agent_id]
+            if len(aliases) > 1:
+                continue
+            if aliases:
+                target_id = aliases[0]
+        if target_id in instances:
+            existing = instances[target_id]
             if registry_agent_id(existing) == agent_id and registry_enabled(existing) != enabled:
                 config = dict(existing["config"])
                 if enabled and config.get("enabled") is False:
                     config["enabled"] = True
-                instances[instance_id] = {**existing, "enabled": enabled, "config": config}
-            continue
-        # Keep a target alias unless the master itself intentionally uses multiple instances.
-        if source_agent_counts[agent_id] == 1 and any(
-            registry_agent_id(existing) == agent_id for existing in instances.values()
-        ):
+                instances[target_id] = {**existing, "enabled": enabled, "config": config}
             continue
         config = {"agentId": agent_id}
         distribution = source["config"].get("distribution")
@@ -153,15 +158,20 @@ def portable(selection_key: str, instance_id: object, master: dict, target: dict
     if not isinstance(instance_id, str) or not instance_id.strip():
         return False
     text_task = selection_key in TEXT_GENERATOR_SELECTIONS
-    if text_task and instance_id in defined(target, "textGenerators"):
-        return True
+    source_instances = defined(master, "providerInstances")
+    target_has_generator = instance_id in defined(target, "textGenerators")
+    if instance_id in defined(master, "textGenerators"):
+        if text_task:
+            return target_has_generator
+        if instance_id not in source_instances and instance_id not in BUILTIN_PROVIDER_IDS:
+            return False
+    if text_task and target_has_generator:
+        return instance_id not in source_instances
     target_instances = defined(target, "providerInstances")
     if instance_id in target_instances:
         existing = target_instances[instance_id]
         return registry_agent_id(existing) is None or registry_enabled(existing)
-    if text_task and instance_id in defined(master, "textGenerators"):
-        return False
-    master_instance = defined(master, "providerInstances").get(instance_id)
+    master_instance = source_instances.get(instance_id)
     return master_instance is None or (isinstance(master_instance, dict) and master_instance.get("driver", instance_id) == instance_id)
 
 
