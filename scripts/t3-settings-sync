@@ -21,6 +21,7 @@ import plistlib
 import re
 import subprocess
 import sys
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
@@ -109,8 +110,10 @@ def registry_enabled(instance: dict) -> bool:
 
 def merge_registry_instances(master: dict, target: dict) -> dict:
     """Copy official registry registrations without carrying over local launch settings."""
+    source_instances = defined(master, "providerInstances")
+    source_agent_counts = Counter(registry_agent_id(source) for source in source_instances.values())
     instances = dict(defined(target, "providerInstances"))
-    for instance_id, source in defined(master, "providerInstances").items():
+    for instance_id, source in source_instances.items():
         agent_id = registry_agent_id(source)
         if agent_id is None:
             continue
@@ -123,6 +126,11 @@ def merge_registry_instances(master: dict, target: dict) -> dict:
                     config["enabled"] = True
                 instances[instance_id] = {**existing, "enabled": enabled, "config": config}
             continue
+        # Keep a target alias unless the master itself intentionally uses multiple instances.
+        if source_agent_counts[agent_id] == 1 and any(
+            registry_agent_id(existing) == agent_id for existing in instances.values()
+        ):
+            continue
         config = {"agentId": agent_id}
         distribution = source["config"].get("distribution")
         if distribution in ("auto", "binary", "npx", "uvx"):
@@ -134,7 +142,11 @@ def merge_registry_instances(master: dict, target: dict) -> dict:
 def portable(instance_id: object, master: dict, target: dict) -> bool:
     """A selection works on the target if the target defines its instance, or it is a
     built-in default instance (its id is its driver name), which every Mac has."""
-    if any(instance_id in defined(target, g) for g in ("providerInstances", "textGenerators")):
+    target_instances = defined(target, "providerInstances")
+    if instance_id in target_instances:
+        existing = target_instances[instance_id]
+        return registry_agent_id(existing) is None or registry_enabled(existing)
+    if instance_id in defined(target, "textGenerators"):
         return True
     if instance_id in defined(master, "textGenerators"):
         return False

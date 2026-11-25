@@ -118,6 +118,37 @@ class MergeTest(unittest.TestCase):
         self.assertIsNot(merged["config"].get("enabled"), False)
         self.assertEqual(merged["config"]["commandPath"], "/local/bin/devin")
 
+    def test_disabled_registry_selection_keeps_working_target_default(self):
+        master = {
+            "providerInstances": {"devin": {
+                "driver": "acpRegistry", "config": {"agentId": "devin", "enabled": False},
+            }},
+            "defaultModelSelection": {"instanceId": "devin", "model": "devin"},
+        }
+        target = {"defaultModelSelection": {"instanceId": "codex", "model": "gpt"}}
+        merged = sync.merge("settings.json", master, target)
+        self.assertFalse(merged["providerInstances"]["devin"]["enabled"])
+        self.assertEqual(merged["defaultModelSelection"], target["defaultModelSelection"])
+
+    def test_existing_registry_agent_under_a_different_id_keeps_local_identity(self):
+        master = {"providerInstances": {"devin": {
+            "driver": "acpRegistry", "enabled": True, "config": {"agentId": "devin"},
+        }}}
+        target = {"providerInstances": {"local-devin": {
+            "driver": "acpRegistry", "enabled": False,
+            "config": {"agentId": "devin", "commandPath": "/local/bin/devin"},
+        }}}
+        self.assertEqual(sync.merge("settings.json", master, target), target)
+
+    def test_distinct_master_instances_of_the_same_agent_both_sync(self):
+        master = {"providerInstances": {
+            "devin-old": {"driver": "acpRegistry", "enabled": False, "config": {"agentId": "devin"}},
+            "devin-current": {"driver": "acpRegistry", "enabled": True, "config": {"agentId": "devin"}},
+        }}
+        target = {"providerInstances": {"devin-old": master["providerInstances"]["devin-old"]}}
+        self.assertEqual(sync.merge("settings.json", master, {})["providerInstances"], master["providerInstances"])
+        self.assertEqual(sync.merge("settings.json", master, target)["providerInstances"], master["providerInstances"])
+
     def test_keybindings_array_is_copied_whole(self):
         self.assertEqual(sync.merge("keybindings.json", [{"key": "mod+k"}], [{"key": "x"}]), [{"key": "mod+k"}])
 
