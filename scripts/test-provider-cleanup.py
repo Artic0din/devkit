@@ -84,6 +84,8 @@ class Gates(unittest.TestCase):
             with tarfile.open(archive, "a") as tar:
                 tar.add(parent, arcname="config", recursive=False)
             self.assertEqual(self.call(*args), 0)
+            self.assertNotEqual(self.call(*args[:-1], "config"), 0,
+                                "a directory holding only the registration is not a payload")
 
     def test_pilot_gates_the_next_host(self) -> None:
         for exit_code, rows, expected in [(1, ["sample"], False), (0, [], False),
