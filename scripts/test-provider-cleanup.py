@@ -67,6 +67,24 @@ class Gates(unittest.TestCase):
             (nested / "extra").write_text("missing from backup")
             self.assertNotEqual(self.call(*args, "skills"), 0)
 
+    def test_leaf_requires_restorable_parent(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            parent = root / "config"
+            parent.mkdir()
+            (parent / "registration").write_text("synthetic")
+            (root / "skill").write_text("skill")
+            archive = root / "backup.tar"
+            with tarfile.open(archive, "w") as tar:
+                tar.add(parent / "registration", arcname="config/registration")
+                tar.add(root / "skill", arcname="skill")
+            args = ["preflight", "--root", temp, "--archive", str(archive),
+                    "--registration", "config/registration", "--payload", "skill"]
+            self.assertNotEqual(self.call(*args), 0)
+            with tarfile.open(archive, "a") as tar:
+                tar.add(parent, arcname="config", recursive=False)
+            self.assertEqual(self.call(*args), 0)
+
     def test_pilot_gates_the_next_host(self) -> None:
         for exit_code, rows, expected in [(1, ["sample"], False), (0, [], False),
                                           (0, [{"name": "sample", "enabled": False}], False),

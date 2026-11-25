@@ -17,6 +17,15 @@ def digest(stream) -> bytes:
     return result.digest()
 
 
+def check_directory(root: Path, rel: Path, files: dict[str, tarfile.TarInfo]) -> None:
+    path = root / rel
+    entry = files.get(str(rel))
+    if path.is_symlink() or not path.is_dir() or not entry or not entry.isdir():
+        raise ValueError(f"required directory unavailable: {rel}")
+    if (entry.mode ^ path.stat().st_mode) & 0o7777:
+        raise ValueError(f"archive permissions differ: {rel}")
+
+
 def check_archive(archive: Path, root: Path, registrations: list[str], payloads: list[str]) -> None:
     if not registrations or not payloads:
         raise ValueError("both registration and payload paths are required")
@@ -35,6 +44,9 @@ def check_archive(archive: Path, root: Path, registrations: list[str], payloads:
             rel = Path(name)
             if rel.is_absolute() or ".." in rel.parts or rel == Path("."):
                 raise ValueError("expected a relative path under the supplied root")
+            for parent in rel.parents:
+                if parent != Path("."):
+                    check_directory(root, parent, files)
             live = root / rel
             if live.is_symlink() or not live.resolve().is_relative_to(root.resolve()):
                 raise ValueError("required path resolves outside the backup scope or is a link")
@@ -52,10 +64,9 @@ def check_archive(archive: Path, root: Path, registrations: list[str], payloads:
                 key = str(path.relative_to(root))
                 member = files.get(key)
                 if path.is_dir():
-                    if name in registrations or not member or not member.isdir():
-                        raise ValueError(f"required directory unavailable: {key}")
-                    if (member.mode ^ path.stat().st_mode) & 0o7777:
-                        raise ValueError(f"archive permissions differ: {key}")
+                    if name in registrations:
+                        raise ValueError(f"registration must be a regular file: {name}")
+                    check_directory(root, path.relative_to(root), files)
                     continue
                 if not path.is_file() or not member or not member.isfile():
                     raise ValueError(f"required regular file unavailable: {key}")
