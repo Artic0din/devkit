@@ -17,6 +17,8 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ### Changed
 
+- Synced missing T3 Code ACP Registry providers and their enabled state across fleet Macs while preserving local executable overrides and sign-ins.
+
 - Made equivalent local or fleet-host CI validation automatic when GitHub Actions refuses jobs because of billing, spending limits or exhausted minutes, without asking for billing changes or repeated approval.
 - Updated the vendored tstack skills to `11e37a7`: Council now checks incoming review findings while other reviewers run, avoids editing a checkout still under review, and honours explicitly non-blocking reviewers; only required reviewers gate round completion and final sign-off, and runs with no required delegates and no completed reviews report zero rounds and no sign-off.
 - Removed the agent-attribution instructions from the vendored `file-pr`, `leaving-pr-comments` and `council` skills, which made agents sign PR bodies and review replies despite the `AGENTS.MD` ban; a repository whose template requires AI disclosure still gets it. `scripts/validate-skills` now fails if such an instruction returns, and CI runs it.

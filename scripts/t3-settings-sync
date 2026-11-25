@@ -18,8 +18,10 @@ import fcntl
 import json
 import os
 import plistlib
+import re
 import subprocess
 import sys
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
@@ -60,6 +62,14 @@ LOCAL_KEYS: dict[str, frozenset[str]] = {
     }),
 }
 FILES = ("settings.json", "client-settings.json", "keybindings.json")
+BUILTIN_PROVIDER_IDS = frozenset({
+    "antigravity", "claudeAgent", "codex", "cursor", "grok", "kiro", "muse", "opencode", "pi",
+})
+TEXT_GENERATOR_SELECTIONS = frozenset({
+    "textGenerationModelSelection",
+    "sourceControlWriterModelSelection",
+    "speechPostProcessingModelSelection",
+})
 
 
 def merge(name: str, master: object, target: object | None) -> object:
@@ -70,30 +80,98 @@ def merge(name: str, master: object, target: object | None) -> object:
     target = target if isinstance(target, dict) else {}
     local = LOCAL_KEYS.get(name, frozenset())
     result = {k: v for k, v in master.items() if k not in local}
-    if name == "settings.json":
-        for key, value in master.items():
-            if key.endswith("ModelSelection") and isinstance(value, dict) and not portable(value.get("instanceId"), master, target):
-                if key in target:
-                    result[key] = target[key]
-                else:
-                    result.pop(key, None)
     for key in local:
         if key in target:
             result[key] = target[key]
+    if name == "settings.json":
+        instances = merge_registry_instances(master, target)
+        if instances:
+            result["providerInstances"] = instances
+        for key, value in master.items():
+            if key.endswith("ModelSelection") and isinstance(value, dict) and not portable(key, value.get("instanceId"), master, result):
+                fallback = target.get(key)
+                if key in target and (
+                    not isinstance(fallback, dict) or portable(key, fallback.get("instanceId"), target, result)
+                ):
+                    result[key] = fallback
+                else:
+                    result.pop(key, None)
     return result
 
 
-def portable(instance_id: object, master: dict, target: dict) -> bool:
+def defined(settings: dict, group: str) -> dict:
+    value = settings.get(group)
+    return value if isinstance(value, dict) else {}
+
+
+def registry_agent_id(instance: object) -> str | None:
+    if not isinstance(instance, dict) or instance.get("driver") != "acpRegistry":
+        return None
+    config = defined(instance, "config")
+    agent_id = config.get("agentId")
+    if config.get("source", "registry") == "registry" and isinstance(agent_id, str):
+        if re.fullmatch(r"[a-z0-9][a-z0-9-]*", agent_id):
+            return agent_id
+    return None
+
+
+def registry_enabled(instance: dict) -> bool:
+    return instance.get("enabled") is not False and instance["config"].get("enabled") is not False
+
+
+def merge_registry_instances(master: dict, target: dict) -> dict:
+    """Copy official registry registrations without carrying over local launch settings."""
+    source_instances = defined(master, "providerInstances")
+    source_agent_counts = Counter(registry_agent_id(source) for source in source_instances.values())
+    instances = dict(defined(target, "providerInstances"))
+    for instance_id, source in source_instances.items():
+        agent_id = registry_agent_id(source)
+        if agent_id is None:
+            continue
+        enabled = registry_enabled(source)
+        target_id = instance_id
+        if instance_id not in instances and source_agent_counts[agent_id] == 1:
+            aliases = [key for key, value in instances.items() if registry_agent_id(value) == agent_id]
+            if len(aliases) > 1:
+                continue
+            if aliases:
+                target_id = aliases[0]
+        if target_id in instances:
+            existing = instances[target_id]
+            if registry_agent_id(existing) == agent_id and registry_enabled(existing) != enabled:
+                config = dict(existing["config"])
+                if enabled and config.get("enabled") is False:
+                    config["enabled"] = True
+                instances[target_id] = {**existing, "enabled": enabled, "config": config}
+            continue
+        config = {"agentId": agent_id}
+        distribution = source["config"].get("distribution")
+        if distribution in ("auto", "binary", "npx", "uvx"):
+            config["distribution"] = distribution
+        instances[instance_id] = {"driver": "acpRegistry", "enabled": enabled, "config": config}
+    return instances
+
+
+def portable(selection_key: str, instance_id: object, master: dict, target: dict) -> bool:
     """A selection works on the target if the target defines its instance, or it is a
     built-in default instance (its id is its driver name), which every Mac has."""
-    def defined(settings: dict, group: str) -> dict:
-        value = settings.get(group)
-        return value if isinstance(value, dict) else {}
-    if any(instance_id in defined(target, g) for g in ("providerInstances", "textGenerators")):
-        return True
-    if instance_id in defined(master, "textGenerators"):
+    if not isinstance(instance_id, str) or not instance_id.strip():
         return False
-    master_instance = defined(master, "providerInstances").get(instance_id)
+    text_task = selection_key in TEXT_GENERATOR_SELECTIONS
+    source_instances = defined(master, "providerInstances")
+    target_has_generator = instance_id in defined(target, "textGenerators")
+    if instance_id in defined(master, "textGenerators"):
+        if text_task:
+            return target_has_generator
+        if instance_id not in source_instances and instance_id not in BUILTIN_PROVIDER_IDS:
+            return False
+    if text_task and target_has_generator:
+        return instance_id not in source_instances
+    target_instances = defined(target, "providerInstances")
+    if instance_id in target_instances:
+        existing = target_instances[instance_id]
+        return registry_agent_id(existing) is None or registry_enabled(existing)
+    master_instance = source_instances.get(instance_id)
     return master_instance is None or (isinstance(master_instance, dict) and master_instance.get("driver", instance_id) == instance_id)
 
 
