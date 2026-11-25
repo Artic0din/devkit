@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Check an unsent draft in a fresh Chrome profile against the installed T3 frontend.
 const { execFileSync } = require("node:child_process");
-const { readFileSync } = require("node:fs");
+const { readFileSync, realpathSync } = require("node:fs");
 const { homedir } = require("node:os");
 const { join } = require("node:path");
 const puppeteer = require("puppeteer-core");
@@ -21,7 +21,7 @@ function projectRoot(id) {
     "if row is None: raise SystemExit(1)",
     "print(row[0])",
   ].join("\n");
-  return execFileSync("python3", ["-c", query, id], { encoding: "utf8" }).trim();
+  return realpathSync.native(execFileSync("python3", ["-c", query, id], { encoding: "utf8" }).trim());
 }
 
 async function selectSkill(page, origin) {

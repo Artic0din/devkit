@@ -1,10 +1,12 @@
 // Invoked with Bun on the host being measured. Only catalog identifiers leave the host.
+import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 
 const policy = JSON.parse(Buffer.from(process.argv.at(-1), "base64").toString());
 const home = homedir();
-const cwd = policy.workspace.startsWith("~/") ? resolve(home, policy.workspace.slice(2)) : resolve(policy.workspace);
+const requested = policy.workspace.replace(/^~(?=\/)/, () => home);
+const cwd = execFileSync("realpath", [requested], { encoding: "utf8" }).replace(/\n$/, "");
 const env = { ...process.env, PATH: [join(home, ".local/bin"), "/opt/homebrew/bin", process.env.PATH].join(":") };
 const t3 = join(home, ".t3/bin/t3");
 
