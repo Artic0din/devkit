@@ -42,6 +42,14 @@ READ ~/Metisary/Enviroment/config/AGENTS.MD BEFORE ANYTHING (skip if missing).
 
 ## Helpers
 
+Before an authorized provider cleanup, verify the requested recovery choice on that host.
+For a requested backup, pass the pre-change archive, every active registration file (including enabled plugins and marketplaces), and the installed payload paths relative to the archive root.
+For example, `scripts/provider-cleanup-check preflight --archive BACKUP.tar.gz --root SOURCE --registration plugins.json --registration marketplaces.json --payload skills` checks the live bytes against the archive without extracting it.
+Use `preflight --no-backup` only when that cleanup explicitly authorizes proceeding without a backup.
+After cleaning the first host, run `scripts/provider-cleanup-check pilot --startup '["devin","skills","list","--json"]' --catalog '["devin","skills","list","--json"]' --expect RETAINED_SKILL` with that provider's native commands and an expected usable skill.
+Run the next host's cleanup only after both checks succeed.
+When a deliberate full wipe leaves no skills, reinstall one intended skill on the pilot and demonstrate discovery before continuing.
+
 - `scripts/agent-sweep`: reports agent worktrees, branches, idle `node_modules` and unavailable simulators in the shared worktree folder, `~/Metisary/Projects`, `~/Development`, `/private/tmp` and older agent worktree folders (Cursor, Codex, T3, Conductor, Orca, Emdash). `--apply` removes finished worktrees at any age (clean, and their tip is a merged PR's head or their remote branch was deleted after merging) and every worktree idle for `--days` (default 5), each with its branch, uncommitted and unmerged work included, plus merged branches, scratch entries idle as long, and unavailable simulators. It keeps locked worktrees, ones a process works in, and ones holding nested repositories, submodules, or ignored files that are not rebuildable folders or junk such as `.DS_Store`, since those could be secrets. Tested by `scripts/test-agent-sweep.py`.
 - `scripts/agent-sweep-schedule`: `install` adds a LaunchAgent that runs the sweep daily at 03:30 with `--apply`, writing `~/Library/Logs/agent-sweep/YYYY-MM-DD.tsv` and `latest.tsv` and keeping 14 reports; `status`, `run` and `uninstall` do what they say. Run `agent-sweep` without `--apply` for a report that removes nothing.
 - `scripts/t3-settings-sync`: copies this Mac's T3 Code `settings.json`, `client-settings.json` and `keybindings.json` to other fleet Macs over SSH (default `ace rex`), keeping each target's per-Mac keys such as provider instances, project overrides and microphones. Reports by default; `--apply` writes, keeping one `.bak-fleet-sync` per file. `install` adds a LaunchAgent that applies on every settings change and every 15 minutes; `status` and `uninstall` do what they say. Desktop app settings show after T3 Code restarts on the target. Tested by `scripts/test-t3-settings-sync.py`.

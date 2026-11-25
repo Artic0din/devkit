@@ -1,0 +1,60 @@
+"""Check recovery gates through their public entry point."""
+import json
+from pathlib import Path
+import subprocess
+import sys
+import tarfile
+import tempfile
+import unittest
+
+CLI = str(Path(__file__).with_name("provider-cleanup-check"))
+
+
+class Gates(unittest.TestCase):
+    def call(self, *args: str) -> int:
+        return subprocess.run([CLI, *args], capture_output=True).returncode
+
+    def test_recovery_choice_and_registration(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            archive = root / "backup.tar"
+            for name in ["plugins.json", "skill.md"]:
+                (root / name).write_text("synthetic " + name)
+            (root / "plugins.json").chmod(0o644)
+            (root / "skill.md").chmod(0o644)
+            args = ["preflight", "--archive", str(archive), "--root", temp,
+                    "--registration", "plugins.json", "--payload", "skill.md"]
+            with tarfile.open(archive, "w") as tar:
+                tar.add(root / "skill.md", arcname="skill.md")
+            self.assertNotEqual(self.call(*args), 0)
+            with tarfile.open(archive, "a") as tar:
+                tar.add(root / "plugins.json", arcname="plugins.json")
+            self.assertEqual(self.call(*args), 0)
+            (root / "plugins.json").write_text("changed")
+            self.assertNotEqual(self.call(*args), 0)
+            (root / "plugins.json").write_text("synthetic plugins.json")
+            original = (root / "plugins.json").stat().st_mode
+            (root / "plugins.json").chmod(0o600)
+            self.assertNotEqual(self.call(*args), 0, "private registration permissions must survive restore")
+            (root / "plugins.json").chmod(original)
+            (root / "skill.md").chmod(0o755)
+            self.assertNotEqual(self.call(*args), 0, "executable bits must survive restore")
+            self.assertNotEqual(self.call("preflight"), 0)
+            archive.unlink()
+            self.assertEqual(self.call("preflight", "--no-backup"), 0)
+            self.assertFalse(archive.exists())
+
+    def test_pilot_gates_the_next_host(self) -> None:
+        for exit_code, rows, expected in [(1, ["sample"], False), (0, [], False),
+                                          (0, [{"name": "sample", "enabled": False}], False),
+                                          (0, [{"name": "sample", "errors": ["load error"]}], False),
+                                          (0, [{"name": "sample"}], True)]:
+            with self.subTest(exit_code=exit_code, rows=rows):
+                start = json.dumps([sys.executable, "-c", f"raise SystemExit({exit_code})"])
+                catalog = json.dumps([sys.executable, "-c", f"print({json.dumps(rows)!r})"])
+                self.assertEqual(self.call("pilot", "--startup", start, "--catalog", catalog,
+                                           "--expect", "sample") == 0, expected)
+
+
+if __name__ == "__main__":
+    unittest.main()
