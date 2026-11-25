@@ -1,0 +1,160 @@
+#!/usr/bin/env python3
+"""Compare fresh effective provider inventories with a private fleet policy."""
+import argparse
+import base64
+from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
+import json
+from pathlib import Path
+import re
+import shlex
+import subprocess
+import sys
+
+
+def string_list(value: object, *, empty: bool = False) -> bool:
+    return isinstance(value, list) and (empty or bool(value)) and all(isinstance(s, str) and s.strip() for s in value)
+
+
+def validate(policy: dict) -> None:
+    hosts = policy["hosts"]
+    if not isinstance(hosts, dict) or len(hosts) < 2 or not all(
+        re.fullmatch(r"[\w][\w.-]*", host) and isinstance(name, str) and name.strip() for host, name in hosts.items()
+    ) or len({s.casefold() for s in hosts.values()}) != len(hosts):
+        raise ValueError("hosts must specify distinct expected machine names")
+    ids = policy.get("environmentIds", {})
+    if not isinstance(ids, dict) or not ids.keys() <= hosts.keys() or not all(
+        isinstance(identifier, str) and identifier.strip() for identifier in ids.values()
+    ) or len(set(ids.values())) != len(ids):
+        raise ValueError("environmentIds must map hosts to distinct T3 environment IDs")
+    if not isinstance(policy["workspace"], str) or not policy["workspace"].startswith(("/", "~/")):
+        raise ValueError("workspace must be absolute or home-relative")
+    if not isinstance(policy["providers"], dict) or not policy["providers"]:
+        raise ValueError("provide expected providers")
+    if not any("composerSkill" in spec for spec in policy["providers"].values()):
+        raise ValueError("at least one required skill needs a cold composer check")
+    for spec in policy["providers"].values():
+        if not all(string_list(spec[key]) for key in ("versionCommand", "catalogCommand", "required")):
+            raise ValueError("each provider needs version and native catalog commands and expected skills")
+        if not isinstance(spec["version"], str) or not spec["version"].strip() or not string_list(spec["removed"], empty=True):
+            raise ValueError("provide the expected CLI version and explicitly list removals")
+        if set(spec["required"]) & set(spec["removed"]):
+            raise ValueError("required and removed skills overlap")
+        if "composerSkill" in spec and (not isinstance(spec["composerSkill"], str) or spec["composerSkill"] not in spec["required"]):
+            raise ValueError("composerSkill must name a required skill")
+        if "composerCommand" in spec and (not string_list(spec["composerCommand"]) or "composerSkill" not in spec):
+            raise ValueError("composerCommand requires composerSkill")
+
+
+def collect(host: str, policy: dict, probe: bytes) -> dict:
+    encoded = base64.b64encode(json.dumps({"workspace": policy["workspace"], "providers": policy["providers"]}).encode()).decode()
+    cmd = ["bun", "run", "-", encoded]
+    if host != "local":
+        cmd = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=6", host,
+               'PATH="$HOME/.bun/bin:/opt/homebrew/bin:$PATH" ' + shlex.join(cmd)]
+    try:
+        r = subprocess.run(cmd, input=probe, capture_output=True, check=True, timeout=30 + len(policy["providers"]) * 155)
+        data = json.loads(r.stdout)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return {}
+
+
+def compare(policy: dict, snapshots: dict) -> list[str]:
+    problems = []
+    previous = {}
+
+    def consistent(host: str, key: str, values: list[str]) -> None:
+        current = Counter(values)
+        other, baseline = previous.setdefault(key, (host, current))
+        if current != baseline:
+            problems.append(f"DIFFERENT {host} {key} vs {other}: extra={sorted((current-baseline).elements())} missing={sorted((baseline-current).elements())}")
+
+    for host, name in policy["hosts"].items():
+        s = snapshots.get(host, {})
+        if not isinstance(s.get("hostname"), str) or s["hostname"].casefold() != name.casefold():
+            problems.append(f"UNVERIFIED {host} host identity")
+            continue
+        t3 = s.get("t3") or {}
+        expected_id = policy.get("environmentIds", {}).get(host)
+        identity_matches = (t3.get("environmentId") == expected_id if expected_id
+                            else str(t3.get("hostname", "")).casefold() == name.casefold())
+        if not identity_matches or not string_list(t3.get("enabled")):
+            problems.append(f"UNVERIFIED {host} T3 server identity or provider inventory")
+            t3 = {}
+        else:
+            consistent(host, "enabled T3 providers", t3["enabled"])
+            for extra in sorted(set(t3["enabled"]) - policy["providers"].keys()):
+                problems.append(f"DIFFERENT {host} unexpected enabled provider {extra}")
+        for provider, spec in policy["providers"].items():
+            label = f"{host} {provider}"
+            version = s.get("cli", {}).get(provider)
+            if not version:
+                problems.append(f"UNVERIFIED {label} CLI version")
+            elif version != spec["version"]:
+                problems.append(f"DIFFERENT {label} CLI expected {spec['version']!r}, observed {version!r}")
+            entry = (t3.get("catalogs") or {}).get(provider) or {}
+            if "enabled" in t3 and provider not in t3["enabled"]:
+                problems.append(f"DIFFERENT {label} missing enabled provider")
+            if entry.get("status") != "ready" or entry.get("auth") != "authenticated":
+                problems.append(f"UNVERIFIED {label} T3 ready and authenticated")
+            runtime = entry.get("version")
+            if runtime:
+                consistent(host, provider + " T3 runtime version", [runtime])
+            elif spec.get("runtimeVersionRequired", True):
+                problems.append(f"UNVERIFIED {label} T3 runtime version")
+            for surface, values in [("native", s.get("native", {}).get(provider)), ("T3", entry.get("skills"))]:
+                if not string_list(values):
+                    problems.append(f"UNVERIFIED {label} {surface} skill catalog")
+                else:
+                    consistent(host, provider + " " + surface, values)
+                observed = set(values) if string_list(values) else set()
+                commands = set(entry.get("commands") or []) if surface == "T3" else set()
+                for required in sorted(set(spec["required"]) - observed):
+                    if required in commands or values:
+                        kind = "command only" if required in commands else "missing"
+                        problems.append(f"DIFFERENT {label} {surface} {required}: {kind}")
+                for removed in sorted(set(spec["removed"]) & (observed | commands)):
+                    problems.append(f"DIFFERENT {label} {surface} removed entry present: {removed}")
+            if not entry.get("workspace"):
+                problems.append(f"UNVERIFIED {label} exact workspace skills")
+            native = s.get("native", {}).get(provider)
+            if string_list(native) and string_list(entry.get("skills")):
+                visible = set(entry["skills"]) | set(entry.get("labels") or [])
+                missing = sorted(set(native) - visible)
+                if missing:
+                    problems.append(f"DIFFERENT {label} native skills absent from T3: {missing}")
+            if string_list(entry.get("signatures")):
+                consistent(host, provider + " T3 skill identities", entry["signatures"])
+            if isinstance(entry.get("commands"), list):
+                consistent(host, provider + " T3 commands", entry["commands"])
+            if "composerSkill" in spec:
+                result = s.get("composer", {}).get(provider)
+                expected = spec["composerSkill"]
+                if not isinstance(result, dict) or result.get("cold") is not True or result.get("selected") != expected or result.get("inserted") != expected or result.get("provider") != provider or result.get("workspace") not in (policy["workspace"], s.get("workspace") or policy["workspace"]):
+                    problems.append(f"UNVERIFIED {label} cold composer selection and insertion of {expected}")
+    return problems
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("policy", type=Path)
+    args = parser.parse_args()
+    try:
+        policy = json.loads(args.policy.read_text())
+        validate(policy)
+        probe = Path(__file__).with_name("fleet-probe.mjs").read_bytes()
+        with ThreadPoolExecutor(max_workers=min(8, len(policy["hosts"]))) as pool:
+            snapshots = dict(zip(policy["hosts"], pool.map(lambda host: collect(host, policy, probe), policy["hosts"])))
+        problems = compare(policy, snapshots)
+    except (OSError, KeyError, TypeError, ValueError) as error:
+        print(f"Invalid inventory or policy: {error}", file=sys.stderr)
+        return 2
+    for line in problems:
+        print(line)
+    print("INCOMPLETE" if problems else "MATCH")
+    return 1 if problems else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

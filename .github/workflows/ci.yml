@@ -35,6 +35,9 @@ jobs:
       - name: Test T3 settings sync (offline, synthetic)
         run: python3 scripts/test-t3-settings-sync.py
 
+      - name: Test fleet verification (offline, synthetic)
+        run: python3 scripts/test-fleet-verify.py
+
       - name: Test agent locations installer (offline, synthetic HOME)
         run: scripts/test-agent-locations
 
