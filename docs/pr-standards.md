@@ -59,6 +59,15 @@ Run in order; STOP and report on any failure — never create the PR on a red st
 - Respond to upstream review comments substantively and specifically; never paste generated boilerplate replies.
 - Small focused PRs, no repo-wide formatting, no fork-only CI in upstream PRs (existing PowerSync rule — applies to all upstreams).
 
+## Confirming a published review fix
+
+Before replying that a fix landed, run `scripts/pr-head-check OWNER/REPO NUMBER FULL_FIX_SHA` or read the open PR and compare its current full head SHA using the host's PR tools.
+For a notification, use the commit named by the event.
+Continue only when the open PR matches that commit.
+If the push failed or the head lookup failed, resolve that first.
+For a stale notification, read the current PR once and act only on outstanding work.
+The [quota fallback](agent-operations.md#github-actions-quota-fallback) covers local CI evidence for that same commit.
+
 ## Reviewing PRs (agent as reviewer)
 
 - Review dimensions: correctness/bugs, style consistency with surrounding code, performance, security, test coverage, docs updated.

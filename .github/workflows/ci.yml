@@ -23,6 +23,9 @@ jobs:
           scripts/test-cursor-rule
           scripts/cursor-rule --check
 
+      - name: Test published PR head checks
+        run: python3 scripts/test-pr-head-check.py
+
       - name: Test issue triage (offline, synthetic)
         run: python3 scripts/test-issue-triage.py
 
