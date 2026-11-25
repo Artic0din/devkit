@@ -130,6 +130,16 @@ class MergeTest(unittest.TestCase):
         self.assertFalse(merged["providerInstances"]["devin"]["enabled"])
         self.assertEqual(merged["defaultModelSelection"], target["defaultModelSelection"])
 
+        target = {
+            "providerInstances": {"devin": {
+                "driver": "acpRegistry", "enabled": True, "config": {"agentId": "devin"},
+            }},
+            "defaultModelSelection": {"instanceId": "devin", "model": "devin"},
+        }
+        merged = sync.merge("settings.json", master, target)
+        self.assertFalse(merged["providerInstances"]["devin"]["enabled"])
+        self.assertNotIn("defaultModelSelection", merged)
+
     def test_existing_registry_agent_under_a_different_id_keeps_local_identity(self):
         master = {"providerInstances": {"devin": {
             "driver": "acpRegistry", "enabled": True, "config": {"agentId": "devin"},

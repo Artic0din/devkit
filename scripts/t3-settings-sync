@@ -81,8 +81,11 @@ def merge(name: str, master: object, target: object | None) -> object:
             result["providerInstances"] = instances
         for key, value in master.items():
             if key.endswith("ModelSelection") and isinstance(value, dict) and not portable(value.get("instanceId"), master, result):
-                if key in target:
-                    result[key] = target[key]
+                fallback = target.get(key)
+                if key in target and (
+                    not isinstance(fallback, dict) or portable(fallback.get("instanceId"), target, result)
+                ):
+                    result[key] = fallback
                 else:
                     result.pop(key, None)
     return result
