@@ -45,10 +45,10 @@ Install this repository's locked dependencies with `bun install --frozen-lockfil
 Supply the GitHub repository already registered with T3, the provider, the name T3 stores in the draft and the qualified display name.
 An optional `FLEET_CHROME` environment variable selects the Chrome binary.
 The adapter must observe the selected provider and workspace as well as the skill identity.
-Return one JSON object, for example `{"provider":"example-provider","workspace":"~/projects/example","cold":true,"selected":"nested-skill","inserted":"nested-skill","selectedLabel":"/skill:example-plugin:nested-skill","insertedLabel":"example-plugin:nested-skill"}`.
+Return one JSON object, for example `{"provider":"example-provider","workspace":"/home/example/projects/example","cold":true,"selected":"nested-skill","inserted":"nested-skill","selectedLabel":"/skill:example-plugin:nested-skill","insertedLabel":"example-plugin:nested-skill"}`.
 Use a fresh client for each measurement and record separately whether the running server already cached that workspace.
 A cached screenshot, a command match or a directory listing cannot supply this evidence.
-The example workspace is home-relative; the bundled helper reports the absolute project root.
+The example workspace is home-relative; the adapter must report the physical, absolute project root the draft actually selected.
 Without a functioning adapter the command reports the missing observation.
 
 The verifier refreshes each provider in the exact workspace through its running T3 server.

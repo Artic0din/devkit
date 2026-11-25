@@ -71,7 +71,7 @@ def object_or_empty(value: object) -> dict:
     return value
 
 
-def observed_selection(result: object, spec: dict, provider: str, workspaces: list[str]) -> bool:
+def observed_selection(result: object, spec: dict, provider: str, workspace: object) -> bool:
     if not isinstance(result, dict):
         return False
     expected = {"cold": True, "selected": spec["composerSkill"], "inserted": spec["composerSkill"],
@@ -79,8 +79,9 @@ def observed_selection(result: object, spec: dict, provider: str, workspaces: li
                 "provider": provider}
     actual = result.get("workspace")
     return (result.get("cold") is True and all(result.get(k) == v for k, v in expected.items())
-            and isinstance(actual, str) and any(posixpath.normpath(actual) == posixpath.normpath(path)
-                                                for path in workspaces))
+            and isinstance(workspace, str) and posixpath.isabs(workspace)
+            and isinstance(actual, str) and ".." not in actual.split("/")
+            and posixpath.normpath(actual) == workspace)
 
 
 def compare(policy: dict, snapshots: dict) -> list[str]:
@@ -154,8 +155,7 @@ def compare(policy: dict, snapshots: dict) -> list[str]:
                 consistent(host, provider + " T3 commands", entry["commands"])
             if "composerSkill" in spec:
                 result = object_or_empty(s.get("composer")).get(provider)
-                workspaces = [policy["workspace"], s.get("workspace") or policy["workspace"]]
-                if not observed_selection(result, spec, provider, workspaces):
+                if not observed_selection(result, spec, provider, s.get("workspace")):
                     problems.append(f"UNVERIFIED {label} cold composer selection and insertion of {spec['composerDisplay']}")
     return problems
 

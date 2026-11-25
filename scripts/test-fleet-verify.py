@@ -19,9 +19,9 @@ class FleetVerifier(unittest.TestCase):
                        "providers": {"agent": {"versionCommand": ["agent", "--version"],
                        "catalogCommand": ["agent", "list"], "version": "v1", "required": ["nested"],
                        "removed": ["retired"], "composerSkill": "nested", "composerDisplay": "group:nested"}}}
-        sample = {"cli": {"agent": "v1"}, "native": {"agent": ["nested"]},
+        sample = {"workspace": "/home/fixture/example", "cli": {"agent": "v1"}, "native": {"agent": ["nested"]},
                   "composer": {"agent": {"cold": True, "selected": "nested", "inserted": "nested",
-                                         "provider": "agent", "workspace": "~/example",
+                                         "provider": "agent", "workspace": "/home/fixture/example",
                                          "selectedLabel": "/skill:group:nested", "insertedLabel": "group:nested"}},
                   "t3": {"enabled": ["agent"], "catalogs": {"agent": {"status": "ready",
                         "auth": "authenticated", "version": "v1", "workspace": True,
@@ -86,6 +86,13 @@ class FleetVerifier(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("cold composer", result.stdout)
         self.assertIn("removed entry present: package:retired", result.stdout)
+
+    def test_composer_must_match_the_resolved_host_workspace(self) -> None:
+        self.policy["workspace"] = "/home/fixture/alias/.."
+        self.data["second"]["composer"]["agent"]["workspace"] = "/home/fixture"
+        result = self.run_cli()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("UNVERIFIED second agent cold composer", result.stdout)
 
     def test_server_without_optional_hostname_requires_expected_environment(self) -> None:
         server = self.data["second"]["t3"]
