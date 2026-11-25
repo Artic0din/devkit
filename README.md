@@ -44,6 +44,8 @@ READ ~/Metisary/Enviroment/config/AGENTS.MD BEFORE ANYTHING (skip if missing).
 
 Before an authorized provider cleanup, verify the requested recovery choice on that host.
 For a requested backup, pass the pre-change archive, every active registration file (including enabled plugins and marketplaces), and the installed payload paths relative to the archive root.
+Include explicit tar entries for every parent directory beneath the supplied root and preserve their permission bits.
+The preflight checks each directory and file in a requested payload subtree, including empty directories.
 For example, `scripts/provider-cleanup-check preflight --archive BACKUP.tar.gz --root SOURCE --registration plugins.json --registration marketplaces.json --payload skills` checks the live bytes against the archive without extracting it.
 Use `preflight --no-backup` only when that cleanup explicitly authorizes proceeding without a backup.
 After cleaning the first host, run `scripts/provider-cleanup-check pilot --startup '["devin","skills","list","--json"]' --catalog '["devin","skills","list","--json"]' --expect RETAINED_SKILL` with that provider's native commands and an expected usable skill.

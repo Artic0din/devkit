@@ -84,6 +84,15 @@ class Gates(unittest.TestCase):
             with tarfile.open(archive, "a") as tar:
                 tar.add(parent, arcname="config", recursive=False)
             self.assertEqual(self.call(*args), 0)
+            original = parent.stat().st_mode
+            parent.chmod(0o700 if original & 0o077 else 0o755)
+            self.assertNotEqual(self.call(*args), 0, "a parent mode differs from the archive")
+            parent.chmod(original)
+            parent.rename(root / "original-config")
+            parent.symlink_to(root / "original-config", target_is_directory=True)
+            self.assertNotEqual(self.call(*args), 0, "a linked ancestor cannot pass recovery")
+            parent.unlink()
+            (root / "original-config").rename(parent)
             self.assertNotEqual(self.call(*args[:-1], "config"), 0,
                                 "a directory holding only the registration is not a payload")
 
