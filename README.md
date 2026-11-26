@@ -42,12 +42,35 @@ READ ~/Metisary/Enviroment/config/AGENTS.MD BEFORE ANYTHING (skip if missing).
 
 ## Helpers
 
+### Fleet decisions
+
+On a machine with the fleet manager installed separately, open its board with `open "$HOME/Metisary/Enviroment/manager/fleet/dashboard/Open dashboard.command"` and choose **Decisions**.
+Use **Still to do** for work awaiting installation or verification.
+When a setup decision changes, mark the old decision **Changed later** and record its replacement, reason, source, and affected machines in the board.
+For a skill, include its upstream source and which provider installs it.
+For a removal, keep an open item for each affected host or application until its absence has been checked there.
+Keep account identifiers, credentials and private machine inventories in their existing local stores.
+
+### Scripts
+
+Before an authorized provider cleanup, verify the requested recovery choice on that host.
+For a requested backup, pass the pre-change archive, every active registration file (including enabled plugins and marketplaces), and the installed payload paths relative to the archive root.
+Include explicit tar entries for every parent directory beneath the supplied root and preserve their permission bits.
+The preflight checks each directory and file in a requested payload subtree, including empty directories.
+For example, `scripts/provider-cleanup-check preflight --archive BACKUP.tar.gz --root SOURCE --registration plugins.json --registration marketplaces.json --payload skills` checks the live bytes against the archive without extracting it.
+Use `preflight --no-backup` only when that cleanup explicitly authorizes proceeding without a backup.
+After cleaning the first host, run `scripts/provider-cleanup-check pilot --startup '["devin","skills","list","--json"]' --catalog '["devin","skills","list","--json"]' --expect RETAINED_SKILL` with that provider's native commands and an expected usable skill.
+Run the next host's cleanup only after both checks succeed.
+When a deliberate full wipe leaves no skills, reinstall one intended skill on the pilot and demonstrate discovery before continuing.
+
 - `scripts/agent-sweep`: reports agent worktrees, branches, idle `node_modules` and unavailable simulators in the shared worktree folder, `~/Metisary/Projects`, `~/Development`, `/private/tmp` and older agent worktree folders (Cursor, Codex, T3, Conductor, Orca, Emdash). `--apply` removes finished worktrees at any age (clean, and their tip is a merged PR's head or their remote branch was deleted after merging) and every worktree idle for `--days` (default 5), each with its branch, uncommitted and unmerged work included, plus merged branches, scratch entries idle as long, and unavailable simulators. It keeps locked worktrees, ones a process works in, and ones holding nested repositories, submodules, or ignored files that are not rebuildable folders or junk such as `.DS_Store`, since those could be secrets. Tested by `scripts/test-agent-sweep.py`.
 - `scripts/agent-sweep-schedule`: `install` adds a LaunchAgent that runs the sweep daily at 03:30 with `--apply`, writing `~/Library/Logs/agent-sweep/YYYY-MM-DD.tsv` and `latest.tsv` and keeping 14 reports; `status`, `run` and `uninstall` do what they say. Run `agent-sweep` without `--apply` for a report that removes nothing.
 - `scripts/t3-settings-sync` copies this Mac's T3 Code settings and keybindings to other fleet Macs over SSH (default `ace rex`). It adds missing ACP Registry providers and syncs their enabled state. Existing provider overrides, sign-ins, project overrides and microphones stay on each Mac. Run it with `--apply` to write changes and keep one `.bak-fleet-sync` per file. `install` loads a LaunchAgent that applies on settings changes and every 15 minutes. `status` shows whether the job is loaded and where it last ran. `uninstall` removes it. Restart T3 Code to pick up desktop-only settings.
 - `scripts/agent-locations`: `install` puts every agent's worktrees in `~/Metisary/Enviroment/worktrees/<tool>/` and temp files in `~/Metisary/Enviroment/scratch/<tool>/`. Claude Code gets `CLAUDE_CODE_TMPDIR` and the `hooks/claude-worktree.py` WorktreeCreate and WorktreeRemove hooks; Cursor's and Codex's worktree folders and T3's scratch folder, which have no setting, become links into the shared folders. `status` reports drift. Scratch idle for 5 days is swept even if a long-idle Claude session still owns it. Tested by `scripts/test-agent-locations` and `hooks/test-claude-worktree.py`.
 - `scripts/docs-list.ts`: walks `docs/`, enforces `summary` and `read_when` front matter, prints onboarding summaries.
 - `scripts/browser-tools.ts`: standalone Chrome DevTools helper (`start --profile`, `nav`, `eval`, `screenshot`, `console`, `network`, `search --content`, `content`, `inspect`, `kill --all --force`); build a binary with `bun build scripts/browser-tools.ts --compile --target bun --outfile bin/browser-tools`.
+
+- [Fleet verification](docs/fleet-verification.md) compares active native and T3 catalogs, command-line versions and a fresh composer selection across hosts.
 
 ## Reusable workflows
 
