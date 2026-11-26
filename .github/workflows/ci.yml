@@ -26,6 +26,9 @@ jobs:
       - name: Test issue triage (offline, synthetic)
         run: python3 scripts/test-issue-triage.py
 
+      - name: Test provider cleanup gates
+        run: python3 scripts/test-provider-cleanup.py
+
       - name: Test agent leftover sweep (offline, synthetic)
         run: python3 scripts/test-agent-sweep.py
 
@@ -34,6 +37,9 @@ jobs:
 
       - name: Test T3 settings sync (offline, synthetic)
         run: python3 scripts/test-t3-settings-sync.py
+
+      - name: Test fleet verification (offline, synthetic)
+        run: python3 scripts/test-fleet-verify.py
 
       - name: Test agent locations installer (offline, synthetic HOME)
         run: scripts/test-agent-locations
@@ -50,5 +56,6 @@ jobs:
       - name: Build browser helper
         run: |
           bun install --frozen-lockfile
+          bun scripts/test-fleet-probe.mjs
           bun build scripts/browser-tools.ts --compile --target bun --outfile /tmp/browser-tools
           /tmp/browser-tools --help
