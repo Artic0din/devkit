@@ -20,6 +20,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ### Changed
 
+- Added preflight and pilot checks for requested provider cleanup and recovery.
 - Synced missing T3 Code ACP Registry providers and their enabled state across fleet Macs while preserving local executable overrides and sign-ins.
 
 - Made equivalent local or fleet-host CI validation automatic when GitHub Actions refuses jobs because of billing, spending limits or exhausted minutes, without asking for billing changes or repeated approval.

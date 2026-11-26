@@ -29,6 +29,9 @@ jobs:
       - name: Test issue triage (offline, synthetic)
         run: python3 scripts/test-issue-triage.py
 
+      - name: Test provider cleanup gates
+        run: python3 scripts/test-provider-cleanup.py
+
       - name: Test agent leftover sweep (offline, synthetic)
         run: python3 scripts/test-agent-sweep.py
 
