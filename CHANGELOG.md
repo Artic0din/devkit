@@ -12,6 +12,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 ### Added
 
 - Added a fleet verifier that checks effective agent and skill availability on each host.
+- Added a read-only command to verify a review fix or notification against the published pull request head.
 
 - Added a `Pull request hygiene` job to the reusable baseline: it fails a pull request whose title or own commits are not Conventional Commits, whose body or commits carry agent attribution (unless the repository's PR template asks for AI disclosure), or that changes a path in the new `forbidden-paths` input.
 - Added `scripts/t3-settings-sync`, which keeps T3 Code settings and keybindings the same on every fleet Mac by copying them from the master Mac over SSH, on change and every 15 minutes, without overwriting per-Mac paths, provider instances or microphones.
