@@ -59,6 +59,8 @@ When a deliberate full wipe leaves no skills, reinstall one intended skill on th
 - `scripts/docs-list.ts`: walks `docs/`, enforces `summary` and `read_when` front matter, prints onboarding summaries.
 - `scripts/browser-tools.ts`: standalone Chrome DevTools helper (`start --profile`, `nav`, `eval`, `screenshot`, `console`, `network`, `search --content`, `content`, `inspect`, `kill --all --force`); build a binary with `bun build scripts/browser-tools.ts --compile --target bun --outfile bin/browser-tools`.
 
+- [Fleet verification](docs/fleet-verification.md) compares active native and T3 catalogs, command-line versions and a fresh composer selection across hosts.
+
 ## Reusable workflows
 
 DevKit hosts the repository baseline check; [its contract and adoption guide](docs/reusable-workflows.md) describe inputs, permissions, validation, and rollback.
