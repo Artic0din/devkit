@@ -11,6 +11,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 - Removed every skill from DevKit, with the skill sync, validation, listing and lock files, their docs and CI steps, and the shared MCP templates: skills and MCP servers are now installed per agent or project through their own installers. `AGENTS.MD` drops its skill links and keeps the Council rule.
 ### Added
 
+- Added a fleet verifier that checks effective agent and skill availability on each host.
 - Added a read-only command to verify a review fix or notification against the published pull request head.
 
 - Added a `Pull request hygiene` job to the reusable baseline: it fails a pull request whose title or own commits are not Conventional Commits, whose body or commits carry agent attribution (unless the repository's PR template asks for AI disclosure), or that changes a path in the new `forbidden-paths` input.
