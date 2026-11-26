@@ -42,6 +42,17 @@ READ ~/Metisary/Enviroment/config/AGENTS.MD BEFORE ANYTHING (skip if missing).
 
 ## Helpers
 
+### Fleet decisions
+
+On a machine with the fleet manager installed separately, open its board with `open "$HOME/Metisary/Enviroment/manager/fleet/dashboard/Open dashboard.command"` and choose **Decisions**.
+Use **Still to do** for work awaiting installation or verification.
+When a setup decision changes, mark the old decision **Changed later** and record its replacement, reason, source, and affected machines in the board.
+For a skill, include its upstream source and which provider installs it.
+For a removal, keep an open item for each affected host or application until its absence has been checked there.
+Keep account identifiers, credentials and private machine inventories in their existing local stores.
+
+### Scripts
+
 Before an authorized provider cleanup, verify the requested recovery choice on that host.
 For a requested backup, pass the pre-change archive, every active registration file (including enabled plugins and marketplaces), and the installed payload paths relative to the archive root.
 Include explicit tar entries for every parent directory beneath the supplied root and preserve their permission bits.
