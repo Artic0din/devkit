@@ -100,7 +100,7 @@ hard rules and links here; tool-specific items migrate into the owning skill ove
 - In T3 Code, link active pull requests with `link_pull_request`.
   In top-level threads that wait on checks, reviews, or merge (including `fix ci`), handle existing comments first, then register the pull request once with `watch_pull_request` (`until` `"checks"` when handing back after CI, or `until` `"merged"` when driving review follow-up or merge) instead of shell polling loops.
   Follow its returned `next` guidance when present (such as when the pull request already ended or checks already passed), run one post-registration status check to handle any failure or comment that arrived before registration, and end the turn only while `watching` is `true` and checks, reviews, or merge remain pending.
-  If watch registration fails or leaves `watching` `false` while work remains pending, fall back to bounded `gh run view` or `gh pr view` checks and report any unresolved wait before handback.
+  If watch registration fails or leaves `watching` `false` while work remains pending, fall back to bounded `gh pr view <url>` or `gh run view <run-id>` checks verified against that pull request's current head SHA and report any unresolved wait before handback.
   Because an active watch persists across wakes and pushes, handle each wake without calling `watch_pull_request` again, and call `unwatch_pull_request` when monitoring finishes before handback.
   Delegated child threads neither watch nor poll and instead report the pull request URL, head SHA, and check or review state back to the parent.
 - GitHub quota: use `gh`; watch one exact run or PR instead of repeatedly listing all runs or checks.
