@@ -20,6 +20,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ### Changed
 
+- Restricted the `AGENTS.MD` ELI5 rule to pull request bodies only and instructed agents not to add ELI5 sections to GitHub issues or triage comments.
 - Added preflight and pilot checks for requested provider cleanup and recovery.
 - Synced missing T3 Code ACP Registry providers and their enabled state across fleet Macs while preserving local executable overrides and sign-ins.
 
