@@ -3,7 +3,8 @@
 shared folder, <worktrees root>/claude/<repo>/<name>, instead of <repo>/.claude/worktrees.
 
   claude-worktree.py create   stdin {"name", "cwd", ...}; prints the worktree path last
-  claude-worktree.py remove   stdin {"worktree_path", ...}; removes it, keeping its branch
+  claude-worktree.py remove   stdin {"worktree_path", ...}; removes it, keeping its branch,
+                              unless it holds uncommitted, untracked or unrebuildable ignored files
 
 A WorktreeCreate hook replaces Claude's own git logic, so this runs `git worktree add`
 itself. The root is $AGENT_WORKTREES_ROOT, default ~/Metisary/Enviroment/worktrees.
@@ -12,6 +13,8 @@ itself. The root is $AGENT_WORKTREES_ROOT, default ~/Metisary/Enviroment/worktre
 from __future__ import annotations
 
 import hashlib
+import importlib.machinery
+import importlib.util
 import json
 import os
 import re
@@ -20,6 +23,17 @@ import sys
 from pathlib import Path
 
 ROOT = Path(os.environ.get("AGENT_WORKTREES_ROOT", "~/Metisary/Enviroment/worktrees")).expanduser() / "claude"
+SWEEP = Path(__file__).resolve().parent.parent / "scripts" / "agent-sweep"
+
+
+def worktree_state(path: Path):
+    """agent-sweep's verdict on the files in a worktree, so the hook and the sweep keep the same things."""
+    loader = importlib.machinery.SourceFileLoader("agent_sweep", str(SWEEP))
+    spec = importlib.util.spec_from_loader("agent_sweep", loader)
+    assert spec
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module.worktree_state(path)
 
 
 def git(cwd: Path, *args: str) -> str:
@@ -67,9 +81,14 @@ def remove(event: dict) -> None:
         return
     if ROOT.resolve() not in path.resolve().parents:
         raise SystemExit(f"refusing to remove {path}: not under {ROOT}")
+    state = worktree_state(path)
+    if state is None or state[0] or state[1]:
+        why = "git status failed" if state is None else state[1] or "uncommitted or untracked changes"
+        raise SystemExit(f"keeping {path}: {why}; commit, stash or delete them first")
     # Like Claude's own removal, the branch stays; agent-sweep deletes it once merged.
     main = Path(git(path, "rev-parse", "--path-format=absolute", "--git-common-dir")).parent
-    git(main, "worktree", "remove", "--force", str(path))
+    # No --force: git still refuses if edits land between the check and the removal.
+    git(main, "worktree", "remove", str(path))
 
 
 def main() -> None:

@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+"""Put disposable Apple build output in agent scratch."""
+import hashlib
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+
+def main() -> None:
+    args = sys.argv[1:]
+    real = os.environ.get("AGENT_XCODEBUILD_REAL", "/usr/bin/xcodebuild")
+    outputs = {"-derivedDataPath": "DerivedData", "-clonedSourcePackagesDirPath": "SourcePackages"}
+    scheme_build = any(flag in args for flag in ("-scheme", "-testProductsPath", "-xctestrun"))
+    # Xcode builds the default target even with an empty argument list.
+    standalone = ("-help", "-usage", "-version", "-list", "-license", "-checkFirstLaunchStatus",
+                  "-runFirstLaunch", "-find-executable", "-find-library", "-create-xcframework",
+                  "-resolvePackageDependencies")
+    target_build = not scheme_build and not any(
+        arg in standalone or arg.startswith(("-show", "-export", "-import", "-download", "-deleteComponent"))
+        for arg in args if arg != "-showBuildSettings"
+    )
+    if scheme_build or target_build or any(flag in args for flag in outputs):
+        locations = [Path.cwd()]
+        for i, flag in enumerate(args[:-1]):
+            if flag in ("-project", "-workspace"):
+                locations.append(Path(args[i + 1]).resolve().parent)
+        worktrees = []
+        for directory in locations:
+            git = subprocess.run(["git", "-C", directory, "rev-parse", "--show-toplevel"],
+                                 capture_output=True, text=True)
+            if git.returncode == 0:
+                worktrees.append(Path(git.stdout.rstrip("\n")).resolve())
+        root = worktrees[-1] if worktrees else locations[-1]
+        scratch = Path(os.environ.get("AGENT_SCRATCH_ROOT", Path.home() / "Metisary/Enviroment/scratch"))
+        suffix = hashlib.sha1(os.fsencode(root)).hexdigest()[:8]
+        job = Path(os.environ.get("AGENT_JOB_DIR", scratch / "xcode" / f"{root.name}-{suffix}"))
+        for i, flag in enumerate(args[:-1]):
+            if flag in outputs:
+                destination = Path(args[i + 1]).resolve()
+                if any(tree == destination or tree in destination.parents for tree in worktrees):
+                    sys.exit(f"{flag} points inside the worktree. Set it to {job / outputs[flag]} "
+                             "and use that location for subsequent build steps.")
+        if scheme_build and "-derivedDataPath" not in args:
+            args = ["-derivedDataPath", str(job / "DerivedData"), *args]
+        elif target_build:
+            for key, directory in (("SYMROOT", "Build/Products"), ("OBJROOT", "Build/Intermediates")):
+                if not any(arg.startswith(key + "=") for arg in args):
+                    args.append(f"{key}={job / directory}")
+            if "-clonedSourcePackagesDirPath" not in args:
+                args.extend(["-clonedSourcePackagesDirPath", str(job / "SourcePackages")])
+    os.execv(real, [real, *args])
+
+
+if __name__ == "__main__":
+    main()

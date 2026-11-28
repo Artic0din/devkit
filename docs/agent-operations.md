@@ -138,6 +138,8 @@ This standing authorization applies across repositories and agents.
 3. Use the current machine or an available suitable fleet host, including an isolated temporary build or test container on the NAS when needed.
    Ordinary setup, dependency installation and isolated test resources are authorized without another approval; preserve unrelated work and live services, keep secrets out of output, and remove task-owned temporary resources.
    Give temporary resources unique task-owned names or labels and install teardown before starting them, using an exit/signal trap or equivalent finalizer.
+   On a fleet Mac, run the job through `scripts/agent-job run [--colima] -- <command>` from the config checkout: it records the job's scratch folder and Colima profile, removes both with the profile's disk on success, failure or signal, and leaves `colima start`, the default profile and the Docker context alone.
+   Run `xcodebuild` without `-derivedDataPath` so the `scripts/agent-bin` shim keeps DerivedData in owned scratch outside the worktree.
    After interruption, identify and remove only those owned resources before retrying; never broadly prune the host.
    Validation does not authorize deployments, publishing, billing changes or destructive changes to live systems.
 4. Record the head SHA, affected jobs, execution host/environment, commands, results and any coverage gaps in the pull request or task response.

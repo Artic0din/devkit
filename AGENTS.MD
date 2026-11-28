@@ -17,7 +17,7 @@ Home Assistant power user: Tesla solar/Powerwall/EVs, GloBird Energy, Daikin HVA
 
 ## Hard rules
 
-1. NEVER commit secrets — no .env, .pem, .key, tokens, or API keys. 
+1. NEVER commit secrets — no .env, .pem, .key, tokens, or API keys.
 2. NEVER push with failing local checks. Fix first.
 3. Always use feature branches and PRs for repository code, configuration, workflow, dependency, and documentation changes. Never commit directly to main. Local creative asset generation does not require a plan, specification document, issue, branch, worktree, commit, or PR unless the user explicitly requests integration or publication.
 4. NEVER mark tasks complete without validation — test everything, require proof.
@@ -29,7 +29,7 @@ Home Assistant power user: Tesla solar/Powerwall/EVs, GloBird Energy, Daikin HVA
 ## Review Workflow
 
 - Applies to all review requests: code review, adversarial review, spec review, PR review, audit.
-- Before using tools, classify the terminal action as `report-only`, `fix-and-push`, or `full-remediation`, and record one deliverable for every requested outcome.
+- Before using tools, classify the terminal action as `report-only`, `safe-output-delivery` (only when a separate trusted job publishes the output), `fix-and-push`, or `full-remediation`, and record one deliverable for every requested outcome.
 - Deliver findings INLINE in the response body as each one is verified. Never defer via Write, ExitPlanMode, or plan tools.
 - Emit findings incrementally as they land, not batched at the end — progress must survive interruption or session limits.
 - Review and audit tasks are read-only by default. No edits, no commits, no report files.
@@ -45,7 +45,7 @@ Home Assistant power user: Tesla solar/Powerwall/EVs, GloBird Energy, Daikin HVA
 
 - Reuse an existing simulator; create one when none fits, and delete the ones you created when the task ends.
 - When the repo uses pnpm or bun, install through its shared store so worktrees share one copy on disk.
-- Subagents that only read code install nothing and work in a temporary directory, never a new persistent worktree.
+- Subagents that only read code install nothing and work in a scratch directory under `scratch/<tool>/`, never a new persistent worktree.
 - Remove your task's worktrees and branches once merged, or once their work is pushed or abandoned.
 - Commit or report your own task's changes before finishing; never leave them uncommitted, and never discard edits you did not make.
 
@@ -105,7 +105,6 @@ Full standard: [engineering-constitution.md](/Users/ryanfoyle/Metisary/Enviromen
 - Review findings: fix inline; pre-existing problems outside the diff → GitHub issue (unless a direct consequence of this PR — then fix inline). Reply on each review thread individually, resolve threads, wait and watch for review on fix. Never push fixes silently.
 - Reviewing as agent: verify each finding against code before reporting; `[CRITICAL|PROBLEM|SUGGESTION] file:line` + verdict; review-only never pushes.
 - Autoreview is required before every commit and landing; no single provider is required (Claude stands in when Codex is unavailable). Verify findings before accepting them; record rejections. If no provider is reachable, commit with the gap stated and review before landing.
-- Use a normal GitHub pull request for isolated changes. 
 - When GitHub Actions cannot start jobs because of billing or quota, run equivalent local checks automatically under the [quota fallback](/Users/ryanfoyle/Metisary/Enviroment/config/docs/agent-operations.md#github-actions-quota-fallback) and continue authorized work.
   Never ask Ryan to fix billing or approve the fallback.
 - Full playbook: [pr-standards.md](/Users/ryanfoyle/Metisary/Enviroment/config/docs/pr-standards.md) — pipeline order, dep-bump protocol, squash rules, release notes.
@@ -130,17 +129,16 @@ Full standard: [engineering-constitution.md](/Users/ryanfoyle/Metisary/Enviromen
 - Keep the visible working set small, no more than five items per group; never omit requested detail, material risks, or essential reasoning to meet a length target.
 - Restore essential context after interruptions; show verified progress and give time estimates when useful and grounded, with uncertainty stated.
 - Perform authorised work using tools; end with one small user action when their input is needed. Do not manufacture homework or repeat approval requests.
-- Explain when asked. Safety and system rules take priority.
 - Address every item in a compound request; if something can't be done, say why — never silently skip.
 - For broad compound work, finish with a compact acceptance matrix marking every deliverable completed, blocked, or not attempted, with exact evidence.
 - When blocked: list what was tried, propose 2–3 paths forward.
-- Flag uncertainty explicitly; distinguish consensus from opinion. Validate before presenting.
-- Batch independent tool calls in parallel. Absolute paths in code; relative paths when talking to the user.
+- Flag uncertainty explicitly; distinguish consensus from opinion.
+- Absolute paths in code; relative paths when talking to the user.
 
 ## UI + copy
 
 - No emojis in UI.
-- Must meet or exceed the Apple Human Interface Guidelines 
+- Must meet or exceed the Apple Human Interface Guidelines.
 - Cut taglines, helper text and secondary labels. If a screen needs them to make sense, fix the layout.
 
 ## Docs
@@ -154,7 +152,7 @@ Full standard: [engineering-constitution.md](/Users/ryanfoyle/Metisary/Enviromen
 
 - Before ingesting a large document set or PDFs: enumerate ALL files first, including zip contents and markdown mirrors.
 - Check for an existing markdown mirror before reading source PDFs — avoids redundant reading of the same content.
-- Convert large documents to structure markdown.
+- Convert large documents to structured markdown.
 
 ## Security + data
 
