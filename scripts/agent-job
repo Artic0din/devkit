@@ -48,7 +48,7 @@ class JobError(Exception):
 
 
 def scratch_root() -> Path:
-    return Path(os.environ.get("AGENT_SCRATCH_ROOT", "~/Metisary/Enviroment/scratch")).expanduser()
+    return Path(os.environ.get("AGENT_SCRATCH_ROOT", "~/Metisary/Enviroment/scratch")).expanduser().absolute()
 
 
 def jobs_root() -> Path:

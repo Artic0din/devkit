@@ -244,7 +244,7 @@ class AgentJobTest(unittest.TestCase):
                         'import os;print(oct(os.stat(os.environ["AGENT_JOB_DIR"]).st_mode & 0o777))', umask=0)
         self.assertEqual(done.stdout.strip(), "0o700")
 
-    def test_failed_session_marker_publish_skips_command(self) -> None:
+    def test_failed_session_marker_rename_skips_command(self) -> None:
         marker = self.tmp / "ran"
         driver = """
 import runpy, sys
@@ -253,7 +253,7 @@ run = module["run"]
 new_job = module["new_job"]
 def obstruct(*args):
     directory, fd, record = new_job(*args)
-    (directory / "command.sid.tmp").mkdir()
+    (directory / "command.sid/command.sid.tmp").mkdir(parents=True)
     return directory, fd, record
 run.__globals__["new_job"] = obstruct
 sys.exit(run("publish", False, [], ["/usr/bin/touch", sys.argv[2]]))
@@ -262,7 +262,47 @@ sys.exit(run("publish", False, [], ["/usr/bin/touch", sys.argv[2]]))
                               capture_output=True)
         self.assertNotEqual(done.returncode, 0)
         self.assertFalse(marker.exists())
+        [job] = (self.scratch / "agent-job").iterdir()
+        self.assertGreater(int((job / "command.sid.tmp").read_text()), 1)
+
+    def test_session_marker_is_renamed_before_exec(self) -> None:
+        # Keep an independent link to the staging inode. A copy into the final
+        # pathname would create a different inode even when the contents match.
+        directory, fd, record = job_mod.new_job("publish", False)
+        staged = directory / "command.sid.tmp"
+        staged.touch()
+        witness = self.tmp / "witness"
+        os.link(staged, witness)
+        try:
+            self.assertFalse((directory / "command.sid").exists())
+            self.assertIn("job is running", self.sweep(apply=True))
+            check = ("import os,sys; from pathlib import Path; "
+                     "m=Path(os.environ['AGENT_JOB_DIR'])/'command.sid'; "
+                     "assert m.samefile(sys.argv[1]) and int(m.read_text()) == os.getsid(0)")
+            # Run the production runner in a child so its signal handlers and fd
+            # cleanup do not affect the test process.
+            driver = """
+import json,runpy,sys
+from pathlib import Path
+module = runpy.run_path(sys.argv[1])
+run = module["run"]
+directory = Path(sys.argv[2])
+run.__globals__["new_job"] = lambda *args: (directory, int(sys.argv[3]), json.loads((directory/"job.json").read_text()))
+sys.exit(run("publish", False, [], [sys.executable, "-c", sys.argv[4], sys.argv[5]]))
+"""
+            done = subprocess.run([sys.executable, "-c", driver, JOB, directory, str(fd), check, witness],
+                                  env=self.env, pass_fds=(fd,), capture_output=True, text=True)
+            self.assertEqual(done.returncode, 0, done.stderr)
+        finally:
+            os.close(fd)
         self.assert_clean()
+
+    def test_dash_prefixed_relative_scratch_root(self) -> None:
+        done = subprocess.run([sys.executable, JOB, "run", "--", "/bin/echo", "ran"], cwd=self.tmp,
+                              env={**self.env, "AGENT_SCRATCH_ROOT": "-scratch"}, capture_output=True, text=True)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(done.stdout.strip(), "ran")
+        self.assertEqual(list((self.tmp / "-scratch/agent-job").iterdir()), [])
 
     def test_absolute_command_with_empty_path(self) -> None:
         done = self.job("--", sys.executable, "-c", "print('ran')", env={**self.env, "PATH": ""})
