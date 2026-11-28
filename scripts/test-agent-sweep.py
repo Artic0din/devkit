@@ -34,6 +34,7 @@ class AgentSweepTest(unittest.TestCase):
         self.tmp = Path(tempfile.mkdtemp()).resolve()
         self.addCleanup(shutil.rmtree, self.tmp, True)
         os.environ["AGENT_SWEEP_SKIP_SIMULATORS"] = "1"
+        os.environ["AGENT_SWEEP_T3_DB"] = str(self.tmp / "statev2.sqlite")
         self.remote = self.tmp / "remote.git"
         sh(self.tmp, "git", "init", "-q", "--bare", "-b", "main", str(self.remote))
         self.repo = self.tmp / "projects" / "app"
@@ -209,23 +210,86 @@ class AgentSweepTest(unittest.TestCase):
         self.assertIn(str(outside), sh(self.repo, "git", "worktree", "list"))
 
     def test_scratch_idle_entries_removed(self) -> None:
+        import sqlite3
+        from datetime import datetime, timezone
+
         scratch = self.tmp / "scratch"
         old = time.time() - 30 * 86400
-        stale, fresh, nested = scratch / "t3" / "stale-job", scratch / "t3" / "fresh-job", scratch / "claude" / "claude-501" / "proj"
-        for f in (stale / "out.png", fresh / "out.png", nested / "old-session" / "x", nested / "new-session" / "y"):
+        stale, fresh, snoozed_scratch, reg_proj, nested = (
+            scratch / "t3" / "stale-job",
+            scratch / "t3" / "fresh-job",
+            scratch / "t3" / "snoozed-no-project",
+            scratch / "t3" / "registered-proj ",
+            scratch / "claude" / "claude-501" / "proj",
+        )
+        for f in (
+            stale / "out.png",
+            fresh / "out.png",
+            snoozed_scratch / "notes.md",
+            reg_proj / "unsaved.txt",
+            nested / "old-session" / "x",
+            nested / "new-session" / "y",
+        ):
             f.parent.mkdir(parents=True, exist_ok=True)
             f.write_text("x")
-        for p in (stale / "out.png", stale, nested / "old-session" / "x", nested / "old-session"):
+        for p in (
+            stale / "out.png",
+            stale,
+            snoozed_scratch / "notes.md",
+            snoozed_scratch,
+            reg_proj / "unsaved.txt",
+            reg_proj,
+            nested / "old-session" / "x",
+            nested / "old-session",
+        ):
             os.utime(p, (old, old))
+        future_iso = datetime.fromtimestamp(time.time() + 5 * 86400, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+        stale_iso = datetime.fromtimestamp(old, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+        alt_case = scratch / "T3" / "SNOOZED-NO-PROJECT"
+        db_wt_path = str(alt_case) if alt_case.exists() and os.path.samestat(alt_case.stat(), snoozed_scratch.stat()) else str(snoozed_scratch)
+        outside_target = self.tmp / "outside-scratch-target"
+        outside_target.mkdir(parents=True)
+        alias_root = self.tmp / "t3-scratch-alias"
+        alias_root.symlink_to(scratch / "t3")
+        alias_box = scratch / "t3" / "aliased-box"
+        alias_box.mkdir(parents=True)
+        mid_hop = scratch / "t3" / "mid-hop-link"
+        mid_hop.symlink_to(outside_target)
+        (alias_box / "link").symlink_to(mid_hop)
+        os.utime(alias_box, (old, old))
+        try:
+            os.utime(mid_hop, (old, old), follow_symlinks=False)
+            os.utime(alias_box / "link", (old, old), follow_symlinks=False)
+        except (NotImplementedError, OSError):
+            pass
+        con = sqlite3.connect(os.environ["AGENT_SWEEP_T3_DB"])
+        con.execute("CREATE TABLE orchestration_v2_projection_threads (updated_at TEXT NOT NULL, deleted_at TEXT, payload_json TEXT NOT NULL)")
+        con.execute("CREATE TABLE projection_projects (project_id TEXT, workspace_root TEXT, deleted_at TEXT)")
+        con.execute("INSERT INTO projection_projects VALUES ('p-scratch', ?, NULL)", (str(scratch),))
+        con.execute("INSERT INTO projection_projects VALUES ('p-reg', ?, NULL)", (str(reg_proj),))
+        con.execute(
+            "INSERT INTO orchestration_v2_projection_threads VALUES (?, NULL, ?)",
+            (stale_iso, json.dumps({"worktreePath": db_wt_path, "updatedAt": stale_iso, "snoozedUntil": future_iso})),
+        )
+        con.execute(
+            "INSERT INTO orchestration_v2_projection_threads VALUES (?, NULL, ?)",
+            (recent_iso := datetime.fromtimestamp(time.time() - 3600, tz=timezone.utc).isoformat().replace("+00:00", "Z"), json.dumps({"worktreePath": str(alias_root / "aliased-box" / "link"), "updatedAt": recent_iso})),
+        )
+        con.commit()
+        con.close()
         buf = io.StringIO()
         sweep_mod.sweep([self.wts], False, 14, False, out=buf, scratch=scratch)
         self.assertIn("\tremove\t", self.line(buf.getvalue(), str(stale)))
         self.assertIn("\tremove\t", self.line(buf.getvalue(), str(nested / "old-session")))
+        self.assertNotIn(str(snoozed_scratch), buf.getvalue())
+        self.assertNotIn(str(reg_proj), buf.getvalue())
+        self.assertNotIn(str(alias_box), buf.getvalue())
+        self.assertNotIn(str(mid_hop), buf.getvalue())
         self.assertTrue(stale.exists(), "report mode deleted scratch")
         sweep_mod.sweep([self.wts], True, 14, False, out=io.StringIO(), scratch=scratch)
         self.assertFalse(stale.exists())
         self.assertFalse((nested / "old-session").exists())
-        for kept in (fresh, nested / "new-session"):
+        for kept in (fresh, snoozed_scratch, snoozed_scratch / "notes.md", reg_proj, reg_proj / "unsaved.txt", alias_box, alias_box / "link", mid_hop, nested / "new-session"):
             self.assertTrue(kept.exists(), kept)
 
     def test_jobs_follow_their_lock_not_their_age(self) -> None:
@@ -343,6 +407,377 @@ class AgentSweepTest(unittest.TestCase):
         self.assertIn("merged-PR lookup failed", self.line(report, "github\twarning"))
         self.assertIn("not proven merged", self.line(report, "app:maybe"))
         self.assertIn("maybe", sh(self.repo, "git", "branch", "--format=%(refname:short)").split())
+
+    def test_default_idle_days_preserves_snoozed_t3_worktrees_under_ten_days(self) -> None:
+        import json, sqlite3
+        from datetime import datetime, timezone
+
+        self.assertEqual(sweep_mod.DEFAULT_IDLE_DAYS, 10)
+        snoozed = self.worktree("snoozed-six-days")
+        self.commit("wip-snoozed", snoozed)
+        self.age(snoozed, days=6)
+
+        t3_active = self.worktree("git-old-t3-recent")
+        self.commit("wip-t3-active", t3_active)
+        self.age(t3_active, days=15)  # Git commits are >10 days old, but T3 thread updated 2 days ago.
+
+        woke_unread = self.worktree("snooze-woke-marked-unread")
+        self.commit("wip-woke-unread", woke_unread)
+        (woke_unread / "uncommitted.txt").write_text("keep")
+        self.age(woke_unread, days=15)
+
+        link_host = self.worktree("symlink-carrier")
+        self.commit("wip-carrier", link_host)
+        (link_host / "jump").symlink_to(t3_active)
+        sh(link_host, "git", "add", "jump")
+        self.commit("track-jump", link_host)
+        self.age(link_host, days=15)
+
+        def land_and_delete_remote_branch(wt: Path, branch: str) -> None:
+            sh(wt, "git", "push", "-q", str(self.remote), f"{branch}:{branch}")
+            sh(self.repo, "git", "fetch", "-q", str(self.remote), "+refs/heads/*:refs/remotes/origin/*")
+            sh(wt, "git", "branch", "-q", f"--set-upstream-to=origin/{branch}")
+            sh(self.repo, "git", "merge", "-q", "--ff-only", branch)
+            sh(self.repo, "git", "push", "-q", str(self.remote), "main", f":{branch}")
+            sh(self.repo, "git", "fetch", "-q", "--prune", str(self.remote), "+refs/heads/*:refs/remotes/origin/*")
+
+        tf_primary = self.worktree("tf-primary")
+        self.commit("wip-tf-primary", tf_primary)
+        self.age(tf_primary, days=15)
+        tf_companion = self.worktree("tf-companion")
+        self.commit("wip-tf-companion", tf_companion)
+        self.age(tf_companion, days=15)
+        land_and_delete_remote_branch(tf_companion, "tf-companion")
+
+        merged_carrier = self.worktree("merged-symlink-carrier")
+        (merged_carrier / "to-active").symlink_to(t3_active)
+        sh(merged_carrier, "git", "add", "to-active")
+        self.commit("merged-carrier-link", merged_carrier)
+        self.age(merged_carrier, days=15)
+        land_and_delete_remote_branch(merged_carrier, "merged-symlink-carrier")
+
+        merged_snoozed = self.worktree("merged-but-snoozed")
+        self.commit("merged-snoozed-work", merged_snoozed)
+        land_and_delete_remote_branch(merged_snoozed, "merged-but-snoozed")
+
+        merged_running = self.worktree("merged-with-running-run")
+        self.commit("merged-running-work", merged_running)
+        land_and_delete_remote_branch(merged_running, "merged-with-running-run")
+
+        sub_child = self.worktree("subagent-isolated-child")
+        self.commit("subagent-child-work", sub_child)
+        self.age(sub_child, days=15)
+        (sub_child / "child-wip.txt").write_text("pending-delivery")
+
+        sub_from_main = self.worktree("subagent-from-main-parent")
+        self.commit("subagent-main-parent-work", sub_from_main)
+        self.age(sub_from_main, days=20)
+        (sub_from_main / "main-child-wip.txt").write_text("active-main-parent")
+
+        merged_plain = self.worktree("merged-plain-settled")
+        self.commit("merged-plain-work", merged_plain)
+        land_and_delete_remote_branch(merged_plain, "merged-plain-settled")
+
+        expired = self.worktree("expired-eleven-days")
+        self.commit("wip-expired", expired)
+        self.age(expired, days=11)
+
+        recent_iso = datetime.fromtimestamp(time.time() - 2 * 86400, tz=timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        woke_iso = datetime.fromtimestamp(time.time() - 86400, tz=timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        stale_iso = datetime.fromtimestamp(time.time() - 12 * 86400, tz=timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        tomorrow_iso = datetime.fromtimestamp(time.time() + 86400, tz=timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        con = sqlite3.connect(os.environ["AGENT_SWEEP_T3_DB"])
+        con.execute("CREATE TABLE orchestration_v2_projection_threads (thread_id TEXT, updated_at TEXT NOT NULL, deleted_at TEXT, payload_json TEXT NOT NULL)")
+        con.execute("CREATE TABLE orchestration_v2_projection_runs (run_id TEXT, thread_id TEXT, status TEXT, requested_at TEXT, completed_at TEXT, payload_json TEXT)")
+        con.execute("CREATE TABLE orchestration_v2_projection_subagents (subagent_id TEXT, thread_id TEXT, child_thread_id TEXT, status TEXT, completion_delivery_state TEXT, started_at TEXT, completed_at TEXT, updated_at TEXT, payload_json TEXT)")
+        con.execute("CREATE TABLE task_folders (root TEXT, real_root TEXT, project_id TEXT, project_root TEXT, anchor TEXT, project_path TEXT, project_is_worktree INTEGER, repositories_json TEXT, created_at TEXT)")
+        con.execute(
+            "INSERT INTO orchestration_v2_projection_threads VALUES ('t-link', ?, NULL, ?)",
+            (recent_iso, json.dumps({"id": "t-link", "worktreePath": str(link_host / "jump"), "updatedAt": recent_iso})),
+        )
+        con.execute(
+            "INSERT INTO orchestration_v2_projection_threads VALUES ('t-carrier', ?, NULL, ?)",
+            (stale_iso, json.dumps({"id": "t-carrier", "worktreePath": str(merged_carrier / "to-active"), "updatedAt": stale_iso, "snoozedUntil": tomorrow_iso})),
+        )
+        con.execute(
+            "INSERT INTO orchestration_v2_projection_threads VALUES ('t-msnooze', ?, NULL, ?)",
+            (stale_iso, json.dumps({"id": "t-msnooze", "worktreePath": str(merged_snoozed), "updatedAt": stale_iso, "snoozedUntil": tomorrow_iso})),
+        )
+        con.execute(
+            "INSERT INTO orchestration_v2_projection_threads VALUES ('t-mrun', ?, NULL, ?)",
+            (recent_iso, json.dumps({"id": "t-mrun", "worktreePath": str(merged_running), "updatedAt": recent_iso})),
+        )
+        con.execute(
+            "INSERT INTO orchestration_v2_projection_runs VALUES ('run-live', 't-mrun', 'running', ?, NULL, ?)",
+            (recent_iso, json.dumps({"id": "run-live", "threadId": "t-mrun", "status": "running", "requestedAt": recent_iso, "startedAt": recent_iso})),
+        )
+        con.execute(
+            "INSERT INTO orchestration_v2_projection_threads VALUES ('t-subchild', ?, NULL, ?)",
+            (stale_iso, json.dumps({"id": "t-subchild", "worktreePath": str(sub_child), "updatedAt": stale_iso})),
+        )
+        con.execute(
+            "INSERT INTO orchestration_v2_projection_subagents VALUES ('sa-1', 't-mrun', 't-subchild', 'completed', 'pending', ?, ?, ?, ?)",
+            (stale_iso, stale_iso, stale_iso, json.dumps({"id": "sa-1", "threadId": "t-mrun", "childThreadId": "t-subchild", "status": "completed"})),
+        )
+        con.execute(
+            "INSERT INTO orchestration_v2_projection_threads VALUES ('t-mainparent', ?, NULL, ?)",
+            (recent_iso, json.dumps({"id": "t-mainparent", "worktreePath": None, "updatedAt": recent_iso})),
+        )
+        con.execute(
+            "INSERT INTO orchestration_v2_projection_threads VALUES ('t-submain', ?, NULL, ?)",
+            (
+                stale_iso,
+                json.dumps(
+                    {
+                        "id": "t-submain",
+                        "worktreePath": str(sub_from_main),
+                        "updatedAt": stale_iso,
+                        "lineage": {"parentThreadId": "t-mainparent", "relationshipToParent": "subagent", "rootThreadId": "t-mainparent"},
+                    }
+                ),
+            ),
+        )
+        con.execute(
+            "INSERT INTO orchestration_v2_projection_subagents VALUES ('sa-2', 't-mainparent', 't-submain', 'completed', 'delivered', ?, ?, ?, ?)",
+            (stale_iso, stale_iso, stale_iso, json.dumps({"id": "sa-2", "threadId": "t-mainparent", "childThreadId": "t-submain", "status": "completed"})),
+        )
+        con.execute(
+            "INSERT INTO orchestration_v2_projection_threads VALUES ('t-mplain', ?, NULL, ?)",
+            (recent_iso, json.dumps({"id": "t-mplain", "worktreePath": str(merged_plain), "updatedAt": recent_iso})),
+        )
+        con.execute(
+            "INSERT INTO orchestration_v2_projection_runs VALUES ('run-done', 't-mplain', 'completed', ?, ?, ?)",
+            (recent_iso, recent_iso, json.dumps({"id": "run-done", "threadId": "t-mplain", "status": "completed", "requestedAt": recent_iso, "completedAt": recent_iso})),
+        )
+        con.execute(
+            "INSERT INTO orchestration_v2_projection_threads VALUES ('t-tf', ?, NULL, ?)",
+            (recent_iso, json.dumps({"id": "t-tf", "worktreePath": str(tf_primary), "updatedAt": recent_iso})),
+        )
+        con.execute(
+            "INSERT INTO task_folders VALUES (?, ?, 'p1', ?, ?, ?, 1, ?, ?)",
+            (
+                str(self.wts / "tf-root"),
+                str((self.wts / "tf-root").resolve()),
+                str(self.repo),
+                str(self.tmp),
+                str(tf_primary),
+                json.dumps([{"repositoryPath": str(self.repo), "worktreePath": str(tf_companion), "name": "companion"}]),
+                stale_iso,
+            ),
+        )
+        con.execute(
+            "INSERT INTO orchestration_v2_projection_threads VALUES ('t-woke', ?, NULL, ?)",
+            (stale_iso, json.dumps({"id": "t-woke", "worktreePath": str(woke_unread), "updatedAt": stale_iso, "snoozedUntil": None, "lastSnoozeWakeAt": woke_iso})),
+        )
+        con.execute(
+            "INSERT INTO orchestration_v2_projection_threads VALUES ('t-exp', ?, NULL, ?)",
+            (stale_iso, json.dumps({"id": "t-exp", "worktreePath": str(expired), "updatedAt": stale_iso})),
+        )
+        con.commit()
+        con.close()
+
+        rc = sweep_mod.main(["--apply", "--no-fetch", str(self.tmp / "projects"), str(self.wts)])
+        self.assertEqual(rc, 0)
+        self.assertTrue(snoozed.exists(), "6-day Git-idle worktree should survive default 10-day retention")
+        self.assertTrue(t3_active.exists(), "15-day Git-old worktree with 2-day-old T3 thread activity should survive")
+        self.assertTrue(link_host.exists(), "worktree containing a symlink traversed by an active T3 worktreePath should survive")
+        self.assertTrue(merged_carrier.exists(), "clean merged worktree containing a symlink traversed by a snoozed T3 thread should survive")
+        self.assertTrue(merged_snoozed.exists(), "clean merged worktree snoozed until tomorrow should survive")
+        self.assertTrue(merged_running.exists(), "clean merged worktree with a running row in orchestration_v2_projection_runs should survive")
+        self.assertTrue(sub_child.exists(), "isolated subagent child checkout with pending completion delivery should survive")
+        self.assertTrue((sub_child / "child-wip.txt").exists(), "uncommitted file in isolated subagent child checkout should survive")
+        self.assertTrue(sub_from_main.exists(), "isolated subagent child checkout of an active main-checkout parent (worktreePath=None) should survive")
+        self.assertTrue((sub_from_main / "main-child-wip.txt").exists(), "uncommitted file in child of active main-checkout parent should survive")
+        self.assertTrue(tf_companion.exists(), "merged companion checkout in task_folders of an active primary checkout should survive")
+        self.assertTrue(woke_unread.exists(), "worktree whose snooze woke 1 day ago (lastSnoozeWakeAt) should survive")
+        self.assertFalse(merged_plain.exists(), "clean merged worktree with only completed runs should still be removed")
+        self.assertFalse(expired.exists(), "11-day idle worktree with stale T3 thread should be removed")
+
+    def test_unreadable_t3_db_fails_closed_and_keeps_unmerged_worktree(self) -> None:
+        import sqlite3
+        risky = self.worktree("snoozed-with-corrupt-db")
+        self.commit("unpushed-commit", risky)
+        self.age(risky, days=15)
+        (risky / "dirty.txt").write_text("unsaved")
+        (risky / "node_modules" / "pkg").mkdir(parents=True)
+        db = Path(os.environ["AGENT_SWEEP_T3_DB"])
+
+        # 1. Corrupt SQLite header
+        db.write_bytes(b"corrupt sqlite header")
+        report, _ = self.run_sweep(apply=True, days=10)
+        self.assertIn("T3 thread activity could not be checked", self.line(report, "t3\twarning"))
+        self.assertIn("T3 thread activity could not be checked", self.line(report, f"{risky}\t"))
+        self.assertTrue(risky.exists())
+        self.assertTrue((risky / "node_modules").exists())
+
+        # 2. Valid SQLite table missing payload_json column (schema drift)
+        db.unlink()
+        con = sqlite3.connect(str(db))
+        con.execute("CREATE TABLE orchestration_v2_projection_threads (thread_id TEXT PRIMARY KEY, updated_at TEXT NOT NULL)")
+        con.commit()
+        con.close()
+        report, _ = self.run_sweep(apply=True, days=10)
+        self.assertIn("T3 thread activity could not be checked", self.line(report, "t3\twarning"))
+        self.assertTrue(risky.exists())
+        self.assertTrue((risky / "dirty.txt").exists())
+        self.assertTrue((risky / "node_modules").exists())
+
+        # 3. Stale valid updated_at combined with unparseable snoozedUntil must still fail closed
+        import json
+        db.unlink()
+        con = sqlite3.connect(str(db))
+        con.execute("CREATE TABLE orchestration_v2_projection_threads (updated_at TEXT NOT NULL, deleted_at TEXT, payload_json TEXT NOT NULL)")
+        con.execute(
+            "INSERT INTO orchestration_v2_projection_threads VALUES (?, NULL, ?)",
+            ("2026-01-01T00:00:00Z", json.dumps({"worktreePath": str(risky), "updatedAt": "2026-01-01T00:00:00Z", "snoozedUntil": "not-an-iso-date"})),
+        )
+        con.commit()
+        con.close()
+        report, _ = self.run_sweep(apply=True, days=10)
+        self.assertIn("T3 thread activity could not be checked", self.line(report, "t3\twarning"))
+        self.assertTrue(risky.exists())
+        self.assertTrue((risky / "dirty.txt").exists())
+        self.assertTrue((risky / "node_modules").exists())
+
+        # 4. Special URI characters (?, #, %20) in DB path open the exact file rather than truncating at '?'
+        from datetime import datetime, timezone
+        special_db = self.tmp / "state?v2#special%20.sqlite"
+        recent_iso = datetime.fromtimestamp(time.time() - 86400, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+        con = sqlite3.connect(str(special_db))
+        con.execute("CREATE TABLE orchestration_v2_projection_threads (updated_at TEXT NOT NULL, deleted_at TEXT, payload_json TEXT NOT NULL)")
+        con.execute(
+            "INSERT INTO orchestration_v2_projection_threads VALUES (?, NULL, ?)",
+            (recent_iso, json.dumps({"worktreePath": str(risky), "updatedAt": recent_iso})),
+        )
+        con.commit()
+        con.close()
+        os.environ["AGENT_SWEEP_T3_DB"] = str(special_db)
+        report, _ = self.run_sweep(apply=True, days=10)
+        self.assertIn("active in the last 10 days", self.line(report, f"{risky}\t"))
+        self.assertTrue(risky.exists())
+        self.assertTrue((risky / "node_modules").exists())
+
+        # 5. Mid-sweep T3 wakeup during disk measurement (size_kb) keeps disposable worktrees and node_modules
+        stale_iso = datetime.fromtimestamp(time.time() - 15 * 86400, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+        con = sqlite3.connect(str(special_db))
+        con.execute("DELETE FROM orchestration_v2_projection_threads")
+        con.execute(
+            "INSERT INTO orchestration_v2_projection_threads VALUES (?, NULL, ?)",
+            (stale_iso, json.dumps({"worktreePath": str(risky), "updatedAt": stale_iso})),
+        )
+        con.commit()
+        con.close()
+        orig_size_kb = sweep_mod.size_kb
+
+        def wakeup_during_wt_size(p: Path) -> int:
+            res = orig_size_kb(p)
+            if p == risky:
+                c2 = sqlite3.connect(str(special_db))
+                c2.execute(
+                    "UPDATE orchestration_v2_projection_threads SET updated_at = ?, payload_json = ?",
+                    (recent_iso, json.dumps({"worktreePath": str(risky), "updatedAt": recent_iso})),
+                )
+                c2.commit()
+                c2.close()
+            return res
+
+        sweep_mod.size_kb = wakeup_during_wt_size
+        try:
+            report, _ = self.run_sweep(apply=True, days=10)
+        finally:
+            sweep_mod.size_kb = orig_size_kb
+        self.assertIn("active in the last 10 days", self.line(report, f"{risky}\t"))
+        self.assertTrue(risky.exists())
+        self.assertTrue((risky / "dirty.txt").exists())
+        self.assertTrue((risky / "node_modules").exists())
+
+        # 5b. T3 wakeup during node_modules size_kb on an otherwise kept idle worktree preserves node_modules
+        (risky / ".env").write_text("SECRET=1\n")
+        (self.repo / ".gitignore").write_text(".env\nnode_modules/\n")
+        sh(self.repo, "git", "add", ".gitignore")
+        self.commit("ignore-env")
+        sh(risky, "git", "merge", "-q", "main")
+        self.age(risky, days=15)
+        con = sqlite3.connect(str(special_db))
+        con.execute("DELETE FROM orchestration_v2_projection_threads")
+        con.execute(
+            "INSERT INTO orchestration_v2_projection_threads VALUES (?, NULL, ?)",
+            (stale_iso, json.dumps({"worktreePath": str(risky), "updatedAt": stale_iso})),
+        )
+        con.commit()
+        con.close()
+
+        def wakeup_during_nm_size(p: Path) -> int:
+            res = orig_size_kb(p)
+            if p == risky / "node_modules":
+                c2 = sqlite3.connect(str(special_db))
+                c2.execute(
+                    "UPDATE orchestration_v2_projection_threads SET updated_at = ?, payload_json = ?",
+                    (recent_iso, json.dumps({"worktreePath": str(risky), "updatedAt": recent_iso})),
+                )
+                c2.commit()
+                c2.close()
+            return res
+
+        sweep_mod.size_kb = wakeup_during_nm_size
+        try:
+            report, _ = self.run_sweep(apply=True, days=10)
+        finally:
+            sweep_mod.size_kb = orig_size_kb
+        self.assertTrue((risky / "node_modules").exists())
+        self.assertNotIn("node_modules\tremove", report)
+
+        # 5c. Future snooze committed during final last_activity check still preserves worktree and node_modules
+        future_snooze = datetime.fromtimestamp(time.time() + 3 * 86400, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+        (risky / ".env").unlink()
+        self.age(risky, days=15)
+        con = sqlite3.connect(str(special_db))
+        con.execute("DELETE FROM orchestration_v2_projection_threads")
+        con.execute(
+            "INSERT INTO orchestration_v2_projection_threads VALUES (?, NULL, ?)",
+            (stale_iso, json.dumps({"worktreePath": str(risky), "updatedAt": stale_iso})),
+        )
+        con.commit()
+        con.close()
+        orig_last_activity = sweep_mod.last_activity
+        calls = 0
+
+        def snooze_during_recheck_git(p: Path) -> float:
+            nonlocal calls
+            res = orig_last_activity(p)
+            if p == risky:
+                calls += 1
+                if calls >= 2:
+                    c2 = sqlite3.connect(str(special_db))
+                    c2.execute(
+                        "UPDATE orchestration_v2_projection_threads SET payload_json = ?",
+                        (json.dumps({"worktreePath": str(risky), "updatedAt": stale_iso, "snoozedUntil": future_snooze}),),
+                    )
+                    c2.commit()
+                    c2.close()
+            return res
+
+        sweep_mod.last_activity = snooze_during_recheck_git
+        try:
+            report, _ = self.run_sweep(apply=True, days=10)
+        finally:
+            sweep_mod.last_activity = orig_last_activity
+        self.assertIn("active in the last 10 days", self.line(report, f"{risky}\t"))
+        self.assertTrue(risky.exists())
+        self.assertTrue((risky / "node_modules").exists())
+
+        # 6. Inaccessible DB parent directory fails closed instead of raising PermissionError or returning {}
+        if os.geteuid() != 0:
+            locked_dir = self.tmp / "locked-t3-dir"
+            locked_dir.mkdir()
+            (locked_dir / "statev2.sqlite").write_bytes(special_db.read_bytes())
+            locked_dir.chmod(0)
+            self.addCleanup(locked_dir.chmod, 0o700)
+            os.environ["AGENT_SWEEP_T3_DB"] = str(locked_dir / "statev2.sqlite")
+            report, _ = self.run_sweep(apply=True, days=10)
+            self.assertIn("T3 thread activity could not be checked", self.line(report, "t3\twarning"))
+            self.assertTrue(risky.exists())
+            self.assertTrue((risky / "node_modules").exists())
 
 
 if __name__ == "__main__":
