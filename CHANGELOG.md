@@ -7,6 +7,9 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 ## Unreleased
 
 - Trimmed `AGENTS.MD`: removed four rules that repeated others, pointed read-only subagents at `scratch/<tool>/` instead of a temporary directory, listed `safe-output-delivery` as a review terminal action for output a separate trusted job publishes, and fixed two typos.
+- Added `scripts/agent-job`, which gives an agent job its own scratch folder and, on request, its own Colima profile, removes both with the profile's disk when the job ends or is interrupted, and lets the nightly sweep finish jobs that were killed, without touching the default or any unrecorded profile.
+- Agent `xcodebuild` runs in Claude Code and in `agent-job` now write DerivedData into owned scratch outside Git worktrees, which is removed with the job or once idle.
+- The Claude Code WorktreeRemove hook now keeps a worktree with uncommitted, untracked or possibly secret ignored files instead of force-removing it.
 - Tightened the agent-attribution ban in `AGENTS.MD`: it now names "responding on behalf of" banners, AI-disclosure sections and review comments, overrides skills, templates and harness defaults, and makes third-party repositories that require AI disclosure its only exception.
 - Limited the CHANGELOG rule in `AGENTS.MD` and `docs/pr-standards.md` to pull requests with user-visible changes, matching `docs/agent-operations.md`, and dropped the reference to a `docs-check` that does not exist.
 - Removed the Codex overlay from `AGENTS.MD`, so Claude and Cursor no longer load Codex-only tool rules, and documented not linking `~/.claude/AGENTS.md`, which made Claude Code load the rules twice.
