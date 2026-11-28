@@ -145,7 +145,7 @@ def command_session_active(job_dir: Path) -> bool:
     try:
         deadline = time.monotonic() + 2
         while time.monotonic() < deadline:
-            with subprocess.Popen(["ps", "-axo", "pid=,stat="], stdout=subprocess.PIPE, text=True) as scan:
+            with subprocess.Popen(["/bin/ps", "-axo", "pid=,stat="], stdout=subprocess.PIPE, text=True) as scan:
                 try:
                     processes, _stderr = scan.communicate(timeout=10)
                 except subprocess.TimeoutExpired:
@@ -364,7 +364,8 @@ def run(label: str, colima: bool, colima_args: List[str], command: List[str]) ->
             if startup != 0:
                 raise JobError(f"colima start {profile} failed with exit {startup}")
         # Record the session leader before exec: workers can close the inherited lock.
-        launch = 'echo "$$" > "$AGENT_JOB_DIR/command.sid" && exec "$@"'
+        launch = ('marker="$AGENT_JOB_DIR/command.sid"; echo "$$" > "$marker.tmp" '
+                  '&& /bin/mv "$marker.tmp" "$marker" && exec "$@"')
         code = run_phase(["/bin/sh", "-c", launch, "agent-command", *command], env)
         code = 128 - code if code < 0 else code
     except Interrupted:

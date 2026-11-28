@@ -110,9 +110,9 @@ class AgentJobTest(unittest.TestCase):
                     os.environ[k] = v
         self.addCleanup(restore)
 
-    def job(self, *args: str, env: dict | None = None) -> subprocess.CompletedProcess:
+    def job(self, *args: str, env: dict | None = None, umask: int = -1) -> subprocess.CompletedProcess:
         return subprocess.run([sys.executable, "-I", str(JOB), "run", *args], capture_output=True, text=True,
-                              env=env or self.env, timeout=60)
+                              env=env or self.env, umask=umask, timeout=60)
 
     def spawn(self, *args: str) -> subprocess.Popen:
         return subprocess.Popen([sys.executable, "-I", str(JOB), "run", *args], env=self.env, stderr=subprocess.DEVNULL)
@@ -241,8 +241,34 @@ class AgentJobTest(unittest.TestCase):
 
     def test_job_is_private_with_a_permissive_umask(self) -> None:
         done = self.job("--", sys.executable, "-c",
-                        'import os;print(oct(os.stat(os.environ["AGENT_JOB_DIR"]).st_mode & 0o777))')
+                        'import os;print(oct(os.stat(os.environ["AGENT_JOB_DIR"]).st_mode & 0o777))', umask=0)
         self.assertEqual(done.stdout.strip(), "0o700")
+
+    def test_failed_session_marker_publish_skips_command(self) -> None:
+        marker = self.tmp / "ran"
+        driver = """
+import runpy, sys
+module = runpy.run_path(sys.argv[1])
+run = module["run"]
+new_job = module["new_job"]
+def obstruct(*args):
+    directory, fd, record = new_job(*args)
+    (directory / "command.sid.tmp").mkdir()
+    return directory, fd, record
+run.__globals__["new_job"] = obstruct
+sys.exit(run("publish", False, [], ["/usr/bin/touch", sys.argv[2]]))
+"""
+        done = subprocess.run([sys.executable, "-c", driver, str(JOB), str(marker)], env=self.env,
+                              capture_output=True)
+        self.assertNotEqual(done.returncode, 0)
+        self.assertFalse(marker.exists())
+        self.assert_clean()
+
+    def test_absolute_command_with_empty_path(self) -> None:
+        done = self.job("--", sys.executable, "-c", "print('ran')", env={**self.env, "PATH": ""})
+        self.assertEqual(done.stdout.strip(), "ran")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assert_clean()
 
     def test_indeterminate_session_scan_preserves_job(self) -> None:
         (self.tmp / "command.sid").write_text("42")
