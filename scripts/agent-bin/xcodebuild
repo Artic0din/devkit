@@ -11,8 +11,16 @@ def main() -> None:
     args = sys.argv[1:]
     real = os.environ.get("AGENT_XCODEBUILD_REAL", "/usr/bin/xcodebuild")
     outputs = {"-derivedDataPath": "DerivedData", "-clonedSourcePackagesDirPath": "SourcePackages"}
-    builds = any(flag in args for flag in ("-scheme", "-testProductsPath", "-xctestrun"))
-    if builds or any(flag in args for flag in outputs):
+    scheme_build = any(flag in args for flag in ("-scheme", "-testProductsPath", "-xctestrun"))
+    # Xcode builds the default target even with an empty argument list.
+    standalone = ("-help", "-usage", "-version", "-list", "-license", "-checkFirstLaunchStatus",
+                  "-runFirstLaunch", "-find-executable", "-find-library", "-create-xcframework",
+                  "-resolvePackageDependencies")
+    target_build = not scheme_build and not any(
+        arg in standalone or arg.startswith(("-show", "-export", "-import", "-download", "-deleteComponent"))
+        for arg in args if arg != "-showBuildSettings"
+    )
+    if scheme_build or target_build or any(flag in args for flag in outputs):
         locations = [Path.cwd()]
         for i, flag in enumerate(args[:-1]):
             if flag in ("-project", "-workspace"):
@@ -33,8 +41,14 @@ def main() -> None:
                 if any(tree == destination or tree in destination.parents for tree in worktrees):
                     sys.exit(f"{flag} points inside the worktree. Set it to {job / outputs[flag]} "
                              "and use that location for subsequent build steps.")
-        if builds and "-derivedDataPath" not in args:
+        if scheme_build and "-derivedDataPath" not in args:
             args = ["-derivedDataPath", str(job / "DerivedData"), *args]
+        elif target_build:
+            for key, directory in (("SYMROOT", "Build/Products"), ("OBJROOT", "Build/Intermediates")):
+                if not any(arg.startswith(key + "=") for arg in args):
+                    args.append(f"{key}={job / directory}")
+            if "-clonedSourcePackagesDirPath" not in args:
+                args.extend(["-clonedSourcePackagesDirPath", str(job / "SourcePackages")])
     os.execv(real, [real, *args])
 
 

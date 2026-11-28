@@ -575,7 +575,7 @@ sys.exit(module["run"]("signal", False, [], ["sleep", "5"]))
         self.assertFalse(alive(int(pidfile.read_text())))
 
     def test_colima_args_cannot_pick_another_profile(self) -> None:
-        for bad in ("-p", "--profile=default", "--activate"):
+        for bad in ("-p", "-pdefault", "-vpdefault", "--profile=default", "--activate"):
             done = self.job("--colima", f"--colima-arg={bad}", "--", "true")
             self.assertEqual(done.returncode, 2, bad)
         self.assertEqual(self.calls(), [])
@@ -602,6 +602,23 @@ class XcodebuildShimTest(unittest.TestCase):
     def test_non_build_commands_pass_through(self) -> None:
         self.assertEqual(self.shim("-version"), ["-version"])
         self.assertEqual(self.shim("-list", "-project", "A.xcodeproj"), ["-list", "-project", "A.xcodeproj"])
+
+    def test_target_and_implicit_builds_use_scratch(self) -> None:
+        for invocation in ([], ["-project", "App.xcodeproj", "-target", "App", "build"],
+                           ["-configuration", "Release"]):
+            with self.subTest(invocation=invocation):
+                args = self.shim(*invocation, AGENT_JOB_DIR="/jobs/x")
+                self.assertIn("SYMROOT=/jobs/x/Build/Products", args)
+                self.assertIn("OBJROOT=/jobs/x/Build/Intermediates", args)
+                self.assertIn("/jobs/x/SourcePackages", args)
+                self.assertNotIn("-derivedDataPath", args)
+
+    def test_target_settings_query_matches_build_paths(self) -> None:
+        for selection in ([], ["-project", "App.xcodeproj", "-target", "App"]):
+            with self.subTest(selection=selection):
+                build = self.shim(*selection, "build", AGENT_JOB_DIR="/jobs/x")
+                query = self.shim(*selection, "-showBuildSettings", AGENT_JOB_DIR="/jobs/x")
+                self.assertEqual(query, ["-showBuildSettings" if arg == "build" else arg for arg in build])
 
     def test_build_in_a_worktree_goes_to_scratch_outside_it(self) -> None:
         args = self.shim("-scheme", "App", "build", cwd=self.repo)

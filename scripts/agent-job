@@ -414,7 +414,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         p.error("give the command after --")
     if a.colima_arg and not a.colima:
         p.error("--colima-arg needs --colima")
-    bad = [x for x in a.colima_arg if x.split("=")[0] in FORBIDDEN_COLIMA_ARGS]
+    # pflag accepts -pNAME after any cluster of boolean shorthand flags.
+    bad = [x for x in a.colima_arg
+           if x.split("=")[0] in FORBIDDEN_COLIMA_ARGS or re.match(r"^-[efhkzsv]*p", x)]
     if bad:
         p.error(f"--colima-arg cannot choose the profile or Docker context: {' '.join(bad)}")
     try:
