@@ -29,7 +29,7 @@ Home Assistant power user: Tesla solar/Powerwall/EVs, GloBird Energy, Daikin HVA
 ## Review Workflow
 
 - Applies to all review requests: code review, adversarial review, spec review, PR review, audit.
-- Before using tools, classify the terminal action as `report-only`, `safe-output-delivery`, `fix-and-push`, or `full-remediation`, and record one deliverable for every requested outcome.
+- Before using tools, classify the terminal action as `report-only`, `safe-output-delivery` (only when a separate trusted job publishes the output), `fix-and-push`, or `full-remediation`, and record one deliverable for every requested outcome.
 - Deliver findings INLINE in the response body as each one is verified. Never defer via Write, ExitPlanMode, or plan tools.
 - Emit findings incrementally as they land, not batched at the end — progress must survive interruption or session limits.
 - Review and audit tasks are read-only by default. No edits, no commits, no report files.
