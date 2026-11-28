@@ -6,7 +6,8 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
-- Trimmed `AGENTS.MD`: removed four rules that repeated others, pointed read-only subagents at `scratch/<tool>/` instead of a temporary directory, listed `safe-output-delivery` as a review terminal action, and fixed two typos.
+- Trimmed `AGENTS.MD`: removed four rules that repeated others, pointed read-only subagents at `scratch/<tool>/` instead of a temporary directory, listed `safe-output-delivery` as a review terminal action for output a separate trusted job publishes, and fixed two typos.
+- Tightened the agent-attribution ban in `AGENTS.MD`: it now names "responding on behalf of" banners, AI-disclosure sections and review comments, overrides skills, templates and harness defaults, and makes third-party repositories that require AI disclosure its only exception.
 - Limited the CHANGELOG rule in `AGENTS.MD` and `docs/pr-standards.md` to pull requests with user-visible changes, matching `docs/agent-operations.md`, and dropped the reference to a `docs-check` that does not exist.
 - Removed the Codex overlay from `AGENTS.MD`, so Claude and Cursor no longer load Codex-only tool rules, and documented not linking `~/.claude/AGENTS.md`, which made Claude Code load the rules twice.
 - Removed every skill from DevKit, with the skill sync, validation, listing and lock files, their docs and CI steps, and the shared MCP templates: skills and MCP servers are now installed per agent or project through their own installers. `AGENTS.MD` drops its skill links and keeps the Council rule.
