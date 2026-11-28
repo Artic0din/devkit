@@ -1,0 +1,355 @@
+#!/usr/bin/env python3
+"""Run one agent job with its own disposable scratch folder and, with --colima, its own
+Colima profile, and remove both when the job ends (success, error or signal).
+
+  agent-job run [--label NAME] [--colima] [--colima-arg=ARG]... -- COMMAND [ARGS]...
+  agent-job run --label ci --colima --colima-arg=--arch=x86_64 -- docker build .
+
+The command gets AGENT_JOB_ID, AGENT_JOB_DIR, TMPDIR inside the job folder, the agent
+tool shims first on PATH (so xcodebuild writes DerivedData into the job folder), and
+with --colima a DOCKER_HOST for the job's profile; the user's Docker context is never
+switched. Each job records exactly what it owns in <scratch>/agent-job/<id>/job.json and
+holds job.lock while it or its command runs. A job killed before cleanup is removed by
+the nightly agent-sweep once nothing holds its lock; profiles it did not record, such as
+default, are never touched.
+"""
+
+from __future__ import annotations
+
+import argparse
+import fcntl
+import json
+import os
+import re
+import secrets
+import shutil
+import signal
+import subprocess
+import sys
+import time
+from pathlib import Path
+from typing import Callable, Dict, List, Optional, Tuple
+
+JOBS_TOOL = "agent-job"
+PROFILE_PREFIX = "agent-job-"
+RECORD = "job.json"
+LOCK = "job.lock"
+AGENT_BIN = Path(__file__).resolve().with_name("agent-bin")
+# Colima keeps Lima sockets under the profile path, and macOS caps socket paths at 104 bytes.
+LABEL_MAX = 16
+FORWARDED_SIGNALS = (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)
+POLL_S = 0.2
+# Flags that would point colima start at another profile or switch the user's Docker context.
+FORBIDDEN_COLIMA_ARGS = ("-p", "--profile", "--activate")
+
+
+class JobError(Exception):
+    pass
+
+
+def scratch_root() -> Path:
+    return Path(os.environ.get("AGENT_SCRATCH_ROOT", "~/Metisary/Enviroment/scratch")).expanduser()
+
+
+def jobs_root() -> Path:
+    return scratch_root() / JOBS_TOOL
+
+
+def colima_home() -> Path:
+    return Path(os.environ.get("COLIMA_HOME", "~/.colima")).expanduser().resolve()
+
+
+def colima_bin() -> str:
+    return os.environ.get("AGENT_JOB_COLIMA", "colima")
+
+
+def colima_paths(profile: str, home: Path) -> List[Path]:
+    """Everything Colima keeps for one profile: its config, its Lima VM and its data disk."""
+    return [home / profile, home / "_lima" / f"colima-{profile}", home / "_lima" / "_disks" / f"colima-{profile}"]
+
+
+def read_record(job_dir: Path) -> Optional[Dict[str, object]]:
+    """The job's record when it is well formed and names only resources this job owns."""
+    try:
+        rec = json.loads((job_dir / RECORD).read_text())
+    except (OSError, ValueError):
+        return None
+    if not isinstance(rec, dict) or rec.get("id") != job_dir.name:
+        return None
+    profile = rec.get("colima_profile")
+    if profile is not None and profile != PROFILE_PREFIX + job_dir.name:
+        return None  # never trust a record that points at someone else's profile
+    if profile is not None:
+        home = rec.get("colima_home")
+        if not isinstance(home, str) or not Path(home).is_absolute() or Path(home).resolve() != Path(home):
+            return None
+    return rec
+
+
+def try_lock(job_dir: Path) -> Optional[int]:
+    """A held lock on the job, or None while the job or its command still runs."""
+    try:
+        fd = os.open(job_dir / LOCK, os.O_RDWR)
+    except OSError:
+        return None
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        os.close(fd)
+        return None
+    return fd
+
+
+def delete_colima(profile: str, home: Path) -> Tuple[bool, str]:
+    paths = colima_paths(profile, home)
+    if any(p.exists() for p in paths):
+        try:
+            subprocess.run([colima_bin(), "delete", profile, "--data", "--force"], capture_output=True, text=True,
+                           env={**os.environ, "COLIMA_HOME": str(home)}, timeout=600)
+        except (OSError, subprocess.TimeoutExpired) as err:
+            return False, f"colima delete {profile} failed: {err}"
+    left = [str(p) for p in paths if p.exists()]
+    if left:
+        return False, f"colima profile {profile} still has {', '.join(left)}"
+    # Colima leaves a per-profile state file behind after deleting the profile.
+    (home / "_store" / f"colima-{profile}.json").unlink(missing_ok=True)
+    return True, ""
+
+
+def checkout_inside(job_dir: Path) -> str:
+    for root, dirs, files in os.walk(job_dir):
+        if ".git" in dirs or ".git" in files:
+            relative = Path(root).relative_to(job_dir)
+            package_roots = (Path("DerivedData/SourcePackages/checkouts"), Path("SourcePackages/checkouts"))
+            if relative.parent in package_roots and ".git" in dirs and not (Path(root) / ".git").is_symlink():
+                state = subprocess.run(["git", "-C", root, "status", "--porcelain", "--untracked-files=all"],
+                                       capture_output=True)
+                if state.returncode == 0 and not state.stdout:
+                    dirs.remove(".git")
+                    continue
+            return str(relative)
+    return ""
+
+
+def teardown(job_dir: Path, rec: Dict[str, object]) -> Tuple[bool, str]:
+    """Remove what the job recorded. The caller holds its lock. Safe to rerun after a partial run."""
+    profile = rec.get("colima_profile")
+    if isinstance(profile, str):
+        done, why = delete_colima(profile, Path(str(rec["colima_home"])))
+        if not done:
+            return False, why
+        rec = {**rec, "colima_profile": None}
+        (job_dir / RECORD).write_text(json.dumps(rec))
+    checkout = checkout_inside(job_dir)
+    if checkout:
+        return False, f"kept {job_dir}: it holds a Git checkout at {checkout}"
+    for entry in job_dir.iterdir():
+        if entry.name in (RECORD, LOCK):
+            continue
+        if entry.is_dir() and not entry.is_symlink():
+            shutil.rmtree(entry)
+        else:
+            entry.unlink()
+    # The record goes last, so a crash part-way leaves it for the sweep to finish.
+    (job_dir / RECORD).unlink()
+    (job_dir / LOCK).unlink()
+    job_dir.rmdir()
+    return not job_dir.exists(), ""
+
+
+def sweep_jobs(root: Path, apply: bool, emit: Callable[..., None]) -> int:
+    """Tear down jobs whose runner and command are gone. Returns how many were (or would be) removed."""
+    if root.is_symlink() or not root.is_dir():
+        return 0
+    removed = 0
+    for job_dir in sorted(root.iterdir()):
+        if job_dir.is_symlink() or not job_dir.is_dir():
+            emit("job", "keep", str(job_dir), "not a job folder")
+            continue
+        rec = read_record(job_dir)
+        if rec is None:
+            emit("job", "keep", str(job_dir), "no valid job record")
+            continue
+        fd = try_lock(job_dir)
+        if fd is None:
+            emit("job", "keep", str(job_dir), "job is running")
+            continue
+        try:
+            profile = rec.get("colima_profile")
+            if apply:
+                try:
+                    done, why = teardown(job_dir, rec)
+                except OSError as err:
+                    done, why = False, str(err)
+                if not done:
+                    emit("job", "error", str(job_dir), why)
+                    continue
+            else:
+                checkout = checkout_inside(job_dir)
+                if checkout:
+                    emit("job", "keep", str(job_dir), f"holds a Git checkout at {checkout}")
+                    continue
+            emit("job", "remove", str(job_dir), f"job ended without cleanup{f' (colima {profile})' if profile else ''}")
+            removed += 1
+        finally:
+            os.close(fd)
+    return removed
+
+
+def new_job(label: str, colima: bool) -> Tuple[Path, int, Dict[str, object]]:
+    slug = re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-")[:LABEL_MAX].strip("-") or "job"
+    root = jobs_root()
+    if root.is_symlink():
+        raise JobError(f"refusing symlinked jobs root {root}")
+    root.mkdir(parents=True, exist_ok=True)
+    while True:
+        job_id = f"{slug}-{secrets.token_hex(4)}"
+        job_dir = root / job_id
+        try:
+            job_dir.mkdir()
+            break
+        except FileExistsError:
+            continue
+    fd = os.open(job_dir / LOCK, os.O_RDWR | os.O_CREAT, 0o600)
+    fcntl.flock(fd, fcntl.LOCK_EX)
+    profile = PROFILE_PREFIX + job_id if colima else None
+    home = colima_home()
+    if profile and any(p.exists() for p in colima_paths(profile, home)):
+        (job_dir / LOCK).unlink()
+        job_dir.rmdir()
+        os.close(fd)
+        raise JobError(f"colima profile {profile} already exists and is not this job's")
+    rec: Dict[str, object] = {"id": job_id, "colima_profile": profile, "pid": os.getpid(), "created": time.time()}
+    if profile:
+        rec["colima_home"] = str(home)
+    tmp = job_dir / f"{RECORD}.tmp"
+    tmp.write_text(json.dumps(rec))
+    os.replace(tmp, job_dir / RECORD)  # recorded before the profile exists, so a crash mid-start is recovered
+    (job_dir / "tmp").mkdir()
+    return job_dir, fd, rec
+
+
+def command_env(job_dir: Path, rec: Dict[str, object]) -> Dict[str, str]:
+    env = {**os.environ, "AGENT_JOB_ID": str(rec["id"]), "AGENT_JOB_DIR": str(job_dir), "TMPDIR": str(job_dir / "tmp"),
+           "PATH": f"{AGENT_BIN}{os.pathsep}{os.environ.get('PATH', '')}"}
+    profile = rec.get("colima_profile")
+    if isinstance(profile, str):
+        home = Path(str(rec["colima_home"]))
+        env["COLIMA_HOME"] = str(home)
+        env["DOCKER_HOST"] = f"unix://{home / profile / 'docker.sock'}"
+        env.pop("DOCKER_CONTEXT", None)
+    return env
+
+
+def run(label: str, colima: bool, colima_args: List[str], command: List[str]) -> int:
+    got: List[int] = []
+    child: List[subprocess.Popen] = []
+
+    registering_child = False
+
+    class Interrupted(Exception):
+        pass
+
+    def on_signal(sig: int, _frame: object) -> None:
+        got.append(sig)
+        if registering_child:
+            return
+        if not child:
+            raise Interrupted()
+        try:
+            os.killpg(child[0].pid, sig)
+        except ProcessLookupError:
+            pass
+
+    job_dir, fd, rec = new_job(label, colima)
+    for sig in FORWARDED_SIGNALS:
+        signal.signal(sig, on_signal)
+    code = 1
+    try:
+        env = command_env(job_dir, rec)
+        profile = rec.get("colima_profile")
+        if isinstance(profile, str):
+            start = subprocess.run([colima_bin(), "start", profile, "--activate=false", *colima_args],
+                                   env={**os.environ, "COLIMA_HOME": env["COLIMA_HOME"]})
+            if start.returncode != 0:
+                raise JobError(f"colima start {profile} failed with exit {start.returncode}")
+        # Own session so a signal reaches the whole command tree; the lock fd keeps the job live while it runs.
+        registering_child = True
+        child.append(subprocess.Popen(command, env=env, start_new_session=True, pass_fds=(fd,)))
+        registering_child = False
+        if got:
+            try:
+                os.killpg(child[0].pid, got[0])
+            except ProcessLookupError:
+                pass
+        # Poll, so a command that ignores the forwarded signal is killed once the grace period ends.
+        grace = float(os.environ.get("AGENT_JOB_STOP_GRACE_S", "10"))
+        stop_at: Optional[float] = None
+        while True:
+            try:
+                code = child[0].wait(timeout=POLL_S)
+                break
+            except subprocess.TimeoutExpired:
+                if got and stop_at is None:
+                    stop_at = time.monotonic() + grace
+                if stop_at is not None and time.monotonic() >= stop_at:
+                    try:
+                        os.killpg(child[0].pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+        code = 128 - code if code < 0 else code
+    except Interrupted:
+        pass
+    except (JobError, OSError) as err:
+        print(f"agent-job: {err}", file=sys.stderr)
+    finally:
+        for sig in FORWARDED_SIGNALS:
+            signal.signal(sig, signal.SIG_IGN)  # a second Ctrl-C must not stop cleanup half-way
+        if child:
+            try:
+                os.killpg(child[0].pid, signal.SIGKILL)  # background leftovers of the command
+            except (ProcessLookupError, PermissionError):
+                pass
+        done, why = False, ""
+        for attempt in range(2):
+            try:
+                done, why = teardown(job_dir, rec)
+                break
+            except OSError as err:  # a just-killed process can still be writing into the folder
+                done, why = False, str(err)
+                time.sleep(1)
+        os.close(fd)
+    if got:
+        code = 128 + got[0]
+    if not done:
+        print(f"agent-job: cleanup incomplete: {why}", file=sys.stderr)
+        code = code or 1
+    return code
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    sub = p.add_subparsers(dest="verb", required=True)
+    r = sub.add_parser("run", help="run COMMAND as a job and clean up after it")
+    r.add_argument("--label", default="job", help="short name used in the job id")
+    r.add_argument("--colima", action="store_true", help="start a disposable Colima profile for the job")
+    r.add_argument("--colima-arg", action="append", default=[], help="extra colima start argument, as --colima-arg=--cpu=4 (repeatable)")
+    r.add_argument("command", nargs=argparse.REMAINDER, help="-- COMMAND [ARGS]...")
+    a = p.parse_args(argv)
+    command = a.command[1:] if a.command[:1] == ["--"] else a.command
+    if not command:
+        p.error("give the command after --")
+    if a.colima_arg and not a.colima:
+        p.error("--colima-arg needs --colima")
+    bad = [x for x in a.colima_arg if x.split("=")[0] in FORBIDDEN_COLIMA_ARGS]
+    if bad:
+        p.error(f"--colima-arg cannot choose the profile or Docker context: {' '.join(bad)}")
+    try:
+        return run(a.label, a.colima, a.colima_arg, command)
+    except JobError as err:
+        print(f"agent-job: {err}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

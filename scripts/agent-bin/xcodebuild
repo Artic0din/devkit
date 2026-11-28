@@ -1,0 +1,33 @@
+#!/usr/bin/env python3
+"""Put disposable Apple build output in agent scratch."""
+import hashlib
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+
+def main() -> None:
+    args = sys.argv[1:]
+    real = os.environ.get("AGENT_XCODEBUILD_REAL", "/usr/bin/xcodebuild")
+    outputs = {"-derivedDataPath": "DerivedData", "-clonedSourcePackagesDirPath": "SourcePackages"}
+    builds = any(flag in args for flag in ("-scheme", "-testProductsPath", "-xctestrun"))
+    if builds or any(flag in args for flag in outputs):
+        git = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True)
+        root = Path(git.stdout.rstrip("\n")).resolve() if git.returncode == 0 else Path.cwd()
+        scratch = Path(os.environ.get("AGENT_SCRATCH_ROOT", Path.home() / "Metisary/Enviroment/scratch"))
+        suffix = hashlib.sha1(os.fsencode(root)).hexdigest()[:8]
+        job = Path(os.environ.get("AGENT_JOB_DIR", scratch / "xcode" / f"{root.name}-{suffix}"))
+        for i, flag in enumerate(args[:-1]):
+            if flag in outputs and git.returncode == 0:
+                destination = Path(args[i + 1]).resolve()
+                if destination == root or root in destination.parents:
+                    sys.exit(f"{flag} points inside the worktree. Set it to {job / outputs[flag]} "
+                             "and use that location for subsequent build steps.")
+        if builds and "-derivedDataPath" not in args:
+            args = ["-derivedDataPath", str(job / "DerivedData"), *args]
+    os.execv(real, [real, *args])
+
+
+if __name__ == "__main__":
+    main()
