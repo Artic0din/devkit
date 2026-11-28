@@ -6,6 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Trimmed `AGENTS.MD`: removed four rules that repeated others, pointed read-only subagents at `scratch/<tool>/` instead of a temporary directory, listed `safe-output-delivery` as a review terminal action for output a separate trusted job publishes, and fixed two typos.
 - Added `scripts/agent-job`, which gives an agent job its own scratch folder and, on request, its own Colima profile, removes both with the profile's disk when the job ends or is interrupted, and lets the nightly sweep finish jobs that were killed, without touching the default or any unrecorded profile.
 - Agent `xcodebuild` runs in Claude Code and in `agent-job` now write DerivedData into owned scratch outside Git worktrees, which is removed with the job or once idle.
 - The Claude Code WorktreeRemove hook now keeps a worktree with uncommitted, untracked or possibly secret ignored files instead of force-removing it.
