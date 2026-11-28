@@ -4,8 +4,9 @@ simulators) and, with --apply, remove only what is provably safe.
 
 A finished worktree (clean, and its tip is a merged PR's head or its branch's
 remote was deleted after merging) is removed at any age; any worktree idle for
---days (default 5) is dead and removed with its branch, uncommitted and unmerged
-work included. Either way it must sit inside the scanned folders, is not on
+--days (default 10, aligned with T3 Code's storageCleanup.worktreeAfterDays) is
+dead and removed with its branch, uncommitted and unmerged work included. Either
+way it must sit inside the scanned folders, is not on
 the default branch, and has no ignored files beyond rebuildable folders and junk
 such as .DS_Store (any other ignored file could be a secret). Locked worktrees
 and ones a process works in are kept. A branch with no worktree is removed only
@@ -17,9 +18,11 @@ under the shared scratch folder idle for --days are removed too.
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
 import json
 import os
 import shutil
+import sqlite3
 import subprocess
 import sys
 import time
@@ -47,6 +50,7 @@ def junk_file(name: str) -> bool:
     return name in JUNK_FILES or name.endswith(JUNK_SUFFIXES)
 SCRATCH_ROOT = "~/Metisary/Enviroment/scratch"
 SCRATCH_DEPTH = 3  # e.g. claude/claude-501/<project>/<session>: descend past active parents
+DEFAULT_IDLE_DAYS = 10  # Match T3 Code storageCleanup.worktreeAfterDays so snoozed threads keep worktrees.
 FETCH_TIMEOUT_S = 60
 
 
@@ -260,6 +264,89 @@ def last_activity(wt: Path) -> float:
     return max(stamps)
 
 
+def iso_epoch(value: object) -> float:
+    if not isinstance(value, str) or not value.strip():
+        return 0.0
+    try:
+        return datetime.fromisoformat(value.strip().replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return 0.0
+
+
+def t3_worktree_activity(db_path: Optional[Path] = None) -> Optional[Dict[str, float]]:
+    """Latest T3 Code thread/snooze timestamp per worktree path, or None if an existing DB cannot be verified."""
+    db = db_path if db_path is not None else Path(os.environ.get("AGENT_SWEEP_T3_DB", Path.home() / ".t3/userdata/statev2.sqlite"))
+    if not db.exists():
+        return {}
+    if not db.is_file():
+        return None
+    activity: Dict[str, float] = {}
+
+    def record(wt_path: object, *timestamps: object) -> bool:
+        if wt_path is None or wt_path == "":
+            return True
+        if not isinstance(wt_path, str):
+            return False
+        parsed: List[float] = []
+        for ts in timestamps:
+            if ts is None or ts == "":
+                continue
+            epoch = iso_epoch(ts)
+            if epoch <= 0:
+                return False
+            parsed.append(epoch)
+        if not parsed:
+            return False
+        stamp = max(parsed)
+        p = Path(wt_path)
+        for key in {str(p), str(p.resolve()) if p.exists() else str(p)}:
+            activity[key] = max(activity.get(key, 0.0), stamp)
+        return True
+
+    try:
+        if db.stat().st_size == 0:
+            return None
+        con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        try:
+            tables = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+            if not (tables & {"projection_threads", "orchestration_v2_projection_threads"}):
+                return None
+            if "projection_threads" in tables:
+                cols = {r[1] for r in con.execute("PRAGMA table_info(projection_threads)").fetchall()}
+                if not ({"worktree_path", "updated_at"} <= cols):
+                    return None
+                extra = [c for c in ("updated_at", "latest_user_message_at", "snoozed_at", "snoozed_until") if c in cols]
+                where = "WHERE worktree_path IS NOT NULL" + (" AND deleted_at IS NULL" if "deleted_at" in cols else "")
+                for row in con.execute(f"SELECT worktree_path, {', '.join(extra)} FROM projection_threads {where}"):
+                    if not record(row[0], *row[1:]):
+                        return None
+            if "orchestration_v2_projection_threads" in tables:
+                cols = {r[1] for r in con.execute("PRAGMA table_info(orchestration_v2_projection_threads)").fetchall()}
+                if not ({"updated_at", "payload_json"} <= cols):
+                    return None
+                where = "WHERE deleted_at IS NULL" if "deleted_at" in cols else ""
+                for updated_at, payload_raw in con.execute(f"SELECT updated_at, payload_json FROM orchestration_v2_projection_threads {where}"):
+                    if not isinstance(payload_raw, str):
+                        return None
+                    payload = json.loads(payload_raw)
+                    if not isinstance(payload, dict):
+                        return None
+                    if not record(
+                        payload.get("worktreePath"),
+                        updated_at,
+                        payload.get("updatedAt"),
+                        payload.get("unsettledAt"),
+                        payload.get("snoozedAt"),
+                        payload.get("snoozedUntil"),
+                    ):
+                        return None
+        finally:
+            con.close()
+    except (OSError, sqlite3.Error, json.JSONDecodeError):
+        return None
+    return activity
+
+
 def newest_mtime(path: Path) -> float:
     newest = path.lstat().st_mtime
     if path.is_dir() and not path.is_symlink():
@@ -311,10 +398,15 @@ def sweep(roots: List[Path], apply: bool, days: int, fetch: bool, out=sys.stdout
     cwds = process_cwds()
     me = str(Path.cwd().resolve())
     cutoff = time.time() - days * 86400
+    t3_db = Path(os.environ.get("AGENT_SWEEP_T3_DB", Path.home() / ".t3/userdata/statev2.sqlite"))
+    t3_activity = t3_worktree_activity(t3_db)
     totals = {"worktrees": 0, "branches": 0, "node_modules": 0, "scratch": 0, "kept": 0, "freed_kb": 0, "reclaimable_kb": 0}
 
     def emit(kind: str, verdict: str, path: str, why: str, kb: int = 0) -> None:
         print(f"{kind}\t{verdict}\t{human(kb) if kb else '-'}\t{path}\t{why}", file=out)
+
+    if t3_activity is None:
+        emit("t3", "warning", str(t3_db), "T3 thread activity could not be checked; unmerged worktrees were kept")
 
     for found in sorted(find_repos(roots)):
         trees = worktrees(found)
@@ -337,8 +429,8 @@ def sweep(roots: List[Path], apply: bool, days: int, fetch: bool, out=sys.stdout
                 totals["worktrees"] += 1
                 continue
             sha, branch = t.get("HEAD", ""), t.get("branch", "").removeprefix("refs/heads/")
-            idle = last_activity(wt) < cutoff
-            state = worktree_state(wt)
+            done = bool(state := worktree_state(wt)) and not state[0] and repo.finished(sha, branch)
+            idle = False if t3_activity is None else max(last_activity(wt), t3_activity.get(str(wt), 0.0), t3_activity.get(real, 0.0)) < cutoff
             if not inside:
                 reason = "outside the scanned folders"
             elif "locked" in t:
@@ -349,7 +441,9 @@ def sweep(roots: List[Path], apply: bool, days: int, fetch: bool, out=sys.stdout
                 reason = "git status failed"
             elif branch == base_name:
                 reason = "default branch"
-            elif not idle and not (state and not state[0] and repo.finished(sha, branch)):
+            elif t3_activity is None and not done:
+                reason = "T3 thread activity could not be checked"
+            elif not idle and not done:
                 reason = f"active in the last {days} days"
             elif state[1]:
                 reason = state[1]
@@ -423,7 +517,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("roots", nargs="*", help=f"folders to scan (default: {' '.join(DEFAULT_ROOTS)})")
     p.add_argument("--apply", action="store_true", help="remove what the report marks 'remove'")
-    p.add_argument("--days", type=int, default=5, help="idle days before an unmerged worktree, its node_modules or scratch is removed")
+    p.add_argument("--days", type=int, default=DEFAULT_IDLE_DAYS,
+                   help="idle days before an unmerged worktree, its node_modules or scratch is removed")
     p.add_argument("--no-fetch", action="store_true", help="skip 'git fetch --prune' before judging merges")
     a = p.parse_args(argv)
     if a.days < 0:

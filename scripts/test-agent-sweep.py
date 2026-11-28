@@ -32,6 +32,7 @@ class AgentSweepTest(unittest.TestCase):
         self.tmp = Path(tempfile.mkdtemp()).resolve()
         self.addCleanup(shutil.rmtree, self.tmp, True)
         os.environ["AGENT_SWEEP_SKIP_SIMULATORS"] = "1"
+        os.environ["AGENT_SWEEP_T3_DB"] = str(self.tmp / "statev2.sqlite")
         self.remote = self.tmp / "remote.git"
         sh(self.tmp, "git", "init", "-q", "--bare", "-b", "main", str(self.remote))
         self.repo = self.tmp / "projects" / "app"
@@ -307,6 +308,90 @@ class AgentSweepTest(unittest.TestCase):
         self.assertIn("merged-PR lookup failed", self.line(report, "github\twarning"))
         self.assertIn("not proven merged", self.line(report, "app:maybe"))
         self.assertIn("maybe", sh(self.repo, "git", "branch", "--format=%(refname:short)").split())
+
+    def test_default_idle_days_preserves_snoozed_t3_worktrees_under_ten_days(self) -> None:
+        import json, sqlite3
+        from datetime import datetime, timezone
+
+        self.assertEqual(sweep_mod.DEFAULT_IDLE_DAYS, 10)
+        snoozed = self.worktree("snoozed-six-days")
+        self.commit("wip-snoozed", snoozed)
+        self.age(snoozed, days=6)
+
+        t3_active = self.worktree("git-old-t3-recent")
+        self.commit("wip-t3-active", t3_active)
+        self.age(t3_active, days=15)  # Git commits are >10 days old, but T3 thread updated 2 days ago.
+
+        expired = self.worktree("expired-eleven-days")
+        self.commit("wip-expired", expired)
+        self.age(expired, days=11)
+
+        recent_iso = datetime.fromtimestamp(time.time() - 2 * 86400, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+        stale_iso = datetime.fromtimestamp(time.time() - 12 * 86400, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+        con = sqlite3.connect(os.environ["AGENT_SWEEP_T3_DB"])
+        con.execute("CREATE TABLE orchestration_v2_projection_threads (updated_at TEXT NOT NULL, deleted_at TEXT, payload_json TEXT NOT NULL)")
+        con.execute(
+            "INSERT INTO orchestration_v2_projection_threads VALUES (?, NULL, ?)",
+            (recent_iso, json.dumps({"worktreePath": str(t3_active), "updatedAt": recent_iso})),
+        )
+        con.execute(
+            "INSERT INTO orchestration_v2_projection_threads VALUES (?, NULL, ?)",
+            (stale_iso, json.dumps({"worktreePath": str(expired), "updatedAt": stale_iso})),
+        )
+        con.commit()
+        con.close()
+
+        rc = sweep_mod.main(["--apply", "--no-fetch", str(self.tmp / "projects"), str(self.wts)])
+        self.assertEqual(rc, 0)
+        self.assertTrue(snoozed.exists(), "6-day Git-idle worktree should survive default 10-day retention")
+        self.assertTrue(t3_active.exists(), "15-day Git-old worktree with 2-day-old T3 thread activity should survive")
+        self.assertFalse(expired.exists(), "11-day idle worktree with stale T3 thread should be removed")
+
+    def test_unreadable_t3_db_fails_closed_and_keeps_unmerged_worktree(self) -> None:
+        import sqlite3
+        risky = self.worktree("snoozed-with-corrupt-db")
+        self.commit("unpushed-commit", risky)
+        self.age(risky, days=15)
+        (risky / "dirty.txt").write_text("unsaved")
+        (risky / "node_modules" / "pkg").mkdir(parents=True)
+        db = Path(os.environ["AGENT_SWEEP_T3_DB"])
+
+        # 1. Corrupt SQLite header
+        db.write_bytes(b"corrupt sqlite header")
+        report, _ = self.run_sweep(apply=True, days=10)
+        self.assertIn("T3 thread activity could not be checked", self.line(report, "t3\twarning"))
+        self.assertIn("T3 thread activity could not be checked", self.line(report, f"{risky}\t"))
+        self.assertTrue(risky.exists())
+        self.assertTrue((risky / "node_modules").exists())
+
+        # 2. Valid SQLite table missing payload_json column (schema drift)
+        db.unlink()
+        con = sqlite3.connect(str(db))
+        con.execute("CREATE TABLE orchestration_v2_projection_threads (thread_id TEXT PRIMARY KEY, updated_at TEXT NOT NULL)")
+        con.commit()
+        con.close()
+        report, _ = self.run_sweep(apply=True, days=10)
+        self.assertIn("T3 thread activity could not be checked", self.line(report, "t3\twarning"))
+        self.assertTrue(risky.exists())
+        self.assertTrue((risky / "dirty.txt").exists())
+        self.assertTrue((risky / "node_modules").exists())
+
+        # 3. Stale valid updated_at combined with unparseable snoozedUntil must still fail closed
+        import json
+        db.unlink()
+        con = sqlite3.connect(str(db))
+        con.execute("CREATE TABLE orchestration_v2_projection_threads (updated_at TEXT NOT NULL, deleted_at TEXT, payload_json TEXT NOT NULL)")
+        con.execute(
+            "INSERT INTO orchestration_v2_projection_threads VALUES (?, NULL, ?)",
+            ("2026-01-01T00:00:00Z", json.dumps({"worktreePath": str(risky), "updatedAt": "2026-01-01T00:00:00Z", "snoozedUntil": "not-an-iso-date"})),
+        )
+        con.commit()
+        con.close()
+        report, _ = self.run_sweep(apply=True, days=10)
+        self.assertIn("T3 thread activity could not be checked", self.line(report, "t3\twarning"))
+        self.assertTrue(risky.exists())
+        self.assertTrue((risky / "dirty.txt").exists())
+        self.assertTrue((risky / "node_modules").exists())
 
 
 if __name__ == "__main__":

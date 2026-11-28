@@ -6,6 +6,7 @@ summary: Timeline of guardrail helper changes mirrored from Sweetistics and rela
 
 ## Unreleased
 
+- Raised `scripts/agent-sweep` default `--days` retention from 5 to 10 days and included T3 Code `statev2.sqlite` thread and snooze timestamps in worktree activity checks so active or snoozed T3 worktrees are not deleted prematurely.
 - Tightened the agent-attribution ban in `AGENTS.MD`: it now names "responding on behalf of" banners, AI-disclosure sections and review comments, overrides skills, templates and harness defaults, and makes third-party repositories that require AI disclosure its only exception.
 - Limited the CHANGELOG rule in `AGENTS.MD` and `docs/pr-standards.md` to pull requests with user-visible changes, matching `docs/agent-operations.md`, and dropped the reference to a `docs-check` that does not exist.
 - Removed the Codex overlay from `AGENTS.MD`, so Claude and Cursor no longer load Codex-only tool rules, and documented not linking `~/.claude/AGENTS.md`, which made Claude Code load the rules twice.
