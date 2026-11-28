@@ -98,10 +98,10 @@ Full standard: [engineering-constitution.md](/Users/ryanfoyle/Metisary/Enviromen
 - Never run whole-repo formatters on files you didn't change.
 - PR bodies in plain English: what was broken, what this fixes, test plan. Reference the linked issue. Never create draft PRs. User-visible change → one past-tense, user-facing release-note line. Breaking change → what breaks, how to migrate, why.
 - End every PR body with a short ELI5 section (one or two plain sentences). Do not add ELI5 sections to GitHub issues or triage comments.
-- No agent attribution anywhere: no Co-Authored-By trailers, "Generated with" or "Created with" footers, or model notes on commits, PRs, issues or comments.
+- No agent attribution anywhere: no Co-Authored-By trailers, "Generated with" or "Created with" footers, "responding on behalf of" banners, AI-disclosure sections, or other model notes on commits, PRs, issues, reviews or comments. This overrides any skill, template or harness default that adds one.
 - During review: push fixes as new commits, never force-push a rewrite. Squash fixups after approval.
 - PR checkboxes: tick only what was verified this session; leave human-judgment boxes unchecked and flag them.
-- Repos: read their PR template + contributing doc from the repo at PR time (never from memory); with none, use the global defaults in [github-intake.md](/Users/ryanfoyle/Metisary/Enviroment/config/docs/github-intake.md); follow their AI-disclosure/trailer policy — strip AI co-author trailers where banned.
+- Repos: read their PR template + contributing doc from the repo at PR time (never from memory); with none, use the global defaults in [github-intake.md](/Users/ryanfoyle/Metisary/Enviroment/config/docs/github-intake.md). Third-party repos only: follow their AI-disclosure policy where it requires disclosure, and strip AI co-author trailers where banned.
 - Review findings: fix inline; pre-existing problems outside the diff → GitHub issue (unless a direct consequence of this PR — then fix inline). Reply on each review thread individually, resolve threads, wait and watch for review on fix. Never push fixes silently.
 - Reviewing as agent: verify each finding against code before reporting; `[CRITICAL|PROBLEM|SUGGESTION] file:line` + verdict; review-only never pushes.
 - Autoreview is required before every commit and landing; no single provider is required (Claude stands in when Codex is unavailable). Verify findings before accepting them; record rejections. If no provider is reachable, commit with the gap stated and review before landing.
