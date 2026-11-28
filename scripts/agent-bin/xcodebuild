@@ -13,15 +13,24 @@ def main() -> None:
     outputs = {"-derivedDataPath": "DerivedData", "-clonedSourcePackagesDirPath": "SourcePackages"}
     builds = any(flag in args for flag in ("-scheme", "-testProductsPath", "-xctestrun"))
     if builds or any(flag in args for flag in outputs):
-        git = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True)
-        root = Path(git.stdout.rstrip("\n")).resolve() if git.returncode == 0 else Path.cwd()
+        locations = [Path.cwd()]
+        for i, flag in enumerate(args[:-1]):
+            if flag in ("-project", "-workspace"):
+                locations.append(Path(args[i + 1]).resolve().parent)
+        worktrees = []
+        for directory in locations:
+            git = subprocess.run(["git", "-C", directory, "rev-parse", "--show-toplevel"],
+                                 capture_output=True, text=True)
+            if git.returncode == 0:
+                worktrees.append(Path(git.stdout.rstrip("\n")).resolve())
+        root = worktrees[-1] if worktrees else locations[-1]
         scratch = Path(os.environ.get("AGENT_SCRATCH_ROOT", Path.home() / "Metisary/Enviroment/scratch"))
         suffix = hashlib.sha1(os.fsencode(root)).hexdigest()[:8]
         job = Path(os.environ.get("AGENT_JOB_DIR", scratch / "xcode" / f"{root.name}-{suffix}"))
         for i, flag in enumerate(args[:-1]):
-            if flag in outputs and git.returncode == 0:
+            if flag in outputs:
                 destination = Path(args[i + 1]).resolve()
-                if destination == root or root in destination.parents:
+                if any(tree == destination or tree in destination.parents for tree in worktrees):
                     sys.exit(f"{flag} points inside the worktree. Set it to {job / outputs[flag]} "
                              "and use that location for subsequent build steps.")
         if builds and "-derivedDataPath" not in args:

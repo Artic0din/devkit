@@ -122,7 +122,7 @@ def checkout_inside(job_dir: Path) -> str:
             relative = Path(root).relative_to(job_dir)
             package_roots = (Path("DerivedData/SourcePackages/checkouts"), Path("SourcePackages/checkouts"))
             if relative.parent in package_roots and ".git" in dirs and not (Path(root) / ".git").is_symlink():
-                state = subprocess.run(["git", "-C", root, "status", "--porcelain", "--untracked-files=all"],
+                state = subprocess.run(["git", "-C", root, "status", "--porcelain", "--untracked-files=all", "--ignored"],
                                        capture_output=True)
                 if state.returncode == 0 and not state.stdout:
                     dirs.remove(".git")
@@ -264,18 +264,11 @@ def run(label: str, colima: bool, colima_args: List[str], command: List[str]) ->
     job_dir, fd, rec = new_job(label, colima)
     for sig in FORWARDED_SIGNALS:
         signal.signal(sig, on_signal)
-    code = 1
-    try:
-        env = command_env(job_dir, rec)
-        profile = rec.get("colima_profile")
-        if isinstance(profile, str):
-            start = subprocess.run([colima_bin(), "start", profile, "--activate=false", *colima_args],
-                                   env={**os.environ, "COLIMA_HOME": env["COLIMA_HOME"]})
-            if start.returncode != 0:
-                raise JobError(f"colima start {profile} failed with exit {start.returncode}")
+    def run_phase(args: List[str], env: Dict[str, str]) -> int:
+        nonlocal registering_child
         # Own session so a signal reaches the whole command tree; the lock fd keeps the job live while it runs.
         registering_child = True
-        child.append(subprocess.Popen(command, env=env, start_new_session=True, pass_fds=(fd,)))
+        child.append(subprocess.Popen(args, env=env, start_new_session=True, pass_fds=(fd,)))
         registering_child = False
         if got:
             try:
@@ -297,6 +290,25 @@ def run(label: str, colima: bool, colima_args: List[str], command: List[str]) ->
                         os.killpg(child[0].pid, signal.SIGKILL)
                     except ProcessLookupError:
                         pass
+        return code
+
+    code = 1
+    try:
+        env = command_env(job_dir, rec)
+        profile = rec.get("colima_profile")
+        if isinstance(profile, str):
+            # The shell keeps the lock while startup runs. Close it for Colima so
+            # its persistent VM cannot keep crash recovery locked indefinitely.
+            supervise = f"""trap ':' TERM INT HUP; "$@" {fd}>&-; exit $?"""
+            args = ["/bin/bash", "-c", supervise, "colima-start", colima_bin(),
+                    "start", profile, "--activate=false", *colima_args]
+            startup = run_phase(args, {**os.environ, "COLIMA_HOME": env["COLIMA_HOME"]})
+            child.clear()
+            if got:
+                raise Interrupted()
+            if startup != 0:
+                raise JobError(f"colima start {profile} failed with exit {startup}")
+        code = run_phase(command, env)
         code = 128 - code if code < 0 else code
     except Interrupted:
         pass

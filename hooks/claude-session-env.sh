@@ -4,4 +4,4 @@
 set -euo pipefail
 [[ -n ${CLAUDE_ENV_FILE:-} ]] || exit 0
 bin=$(cd "$(dirname "$0")/../scripts/agent-bin" && pwd -P)
-printf 'case ":$PATH:" in *:%q:*) ;; *) export PATH=%q:"$PATH" ;; esac\n' "$bin" "$bin" >> "$CLAUDE_ENV_FILE"
+printf 'case "$PATH:" in %q:*) ;; *) export PATH=%q:"$PATH" ;; esac\n' "$bin" "$bin" >> "$CLAUDE_ENV_FILE"

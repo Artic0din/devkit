@@ -38,6 +38,10 @@ case $verb in
   start)
     mkdir -p "$COLIMA_HOME/$p" "$COLIMA_HOME/_lima/colima-$p" "$COLIMA_HOME/_lima/_disks/colima-$p" "$COLIMA_HOME/_store"
     echo '{}' > "$COLIMA_HOME/_store/colima-$p.json"
+    if [ -n "$FAKE_COLIMA_DAEMON" ]; then
+      sleep 60 </dev/null >/dev/null 2>&1 &
+      echo $! > "$COLIMA_HOME/daemon-pid"
+    fi
     [ -n "$FAKE_COLIMA_START_SLEEP" ] && touch "$COLIMA_HOME/starting" && sleep "$FAKE_COLIMA_START_SLEEP"
     exit "${FAKE_COLIMA_START_EXIT:-0}" ;;
   delete)
@@ -194,6 +198,59 @@ class AgentJobTest(unittest.TestCase):
         runner.send_signal(signal.SIGTERM)
         self.assertEqual(runner.wait(timeout=20), 143)
         self.assertFalse(alive(int(pid_file.read_text())))
+        self.assert_clean()
+
+    def test_sweep_waits_for_orphaned_colima_start(self) -> None:
+        self.env["FAKE_COLIMA_START_SLEEP"] = "1"
+        self.env["FAKE_COLIMA_DAEMON"] = "1"
+        runner = self.spawn("--colima", "--", "true")
+        wait_for(self.colima / "starting")
+        daemon = int((self.colima / "daemon-pid").read_text())
+        self.addCleanup(os.kill, daemon, signal.SIGTERM)
+        runner.kill()
+        runner.wait(timeout=10)
+        self.assertIn("job is running", self.sweep(apply=True))
+        deadline = time.monotonic() + 10
+        while "job is running" in self.sweep(apply=False):
+            self.assertLess(time.monotonic(), deadline)
+            time.sleep(0.05)
+        self.sweep(apply=True)
+        self.assert_clean()
+
+    def test_ignored_package_file_survives_cleanup(self) -> None:
+        script = ('repo="$AGENT_JOB_DIR/SourcePackages/checkouts/Lib"; git init -q "$repo"; '
+                  'echo .env >> "$repo/.git/info/exclude"; touch "$repo/.env"')
+        done = self.job("--", "sh", "-ec", script)
+        self.assertNotEqual(done.returncode, 0)
+        [job_dir] = (self.scratch / "agent-job").iterdir()
+        self.sweep(apply=True)
+        self.assertTrue((job_dir / "SourcePackages/checkouts/Lib/.env").is_file())
+
+    def test_cancel_at_successful_startup_handoff_skips_command(self) -> None:
+        marker = self.tmp / "spawned"
+        driver = """
+import os, runpy, signal, subprocess, sys
+module = runpy.run_path(sys.argv[1])
+class StartupExit(int):
+    def __ne__(self, other):
+        os.kill(os.getpid(), signal.SIGTERM)
+        return super().__ne__(other)
+class ObservedProcess(subprocess.Popen):
+    def __init__(self, args, **kwargs):
+        if args == ["true"]:
+            open(sys.argv[2], "w").close()
+        super().__init__(args, **kwargs)
+    def wait(self, *args, **kwargs):
+        result = super().wait(*args, **kwargs)
+        if self.args[:1] == ["/bin/bash"]:
+            return StartupExit(result)
+        return result
+subprocess.Popen = ObservedProcess
+sys.exit(module["run"]("handoff", True, [], ["true"]))
+"""
+        runner = subprocess.run([sys.executable, "-c", driver, str(JOB), str(marker)], env=self.env)
+        self.assertEqual(runner.returncode, 143)
+        self.assertFalse(marker.exists(), "command spawned after cancellation")
         self.assert_clean()
 
     def test_cancel_during_colima_start_cleans_up(self) -> None:
@@ -428,6 +485,17 @@ class XcodebuildShimTest(unittest.TestCase):
                 self.assertIn(str(self.tmp / "scratch"), done.stderr)
                 self.assertFalse(done.stdout)
 
+    def test_outputs_in_explicit_project_or_workspace_are_protected(self) -> None:
+        for flag, bundle, output in (("-project", "App.xcodeproj", "-derivedDataPath"),
+                                     ("-workspace", "App.xcworkspace", "-clonedSourcePackagesDirPath")):
+            with self.subTest(flag=flag):
+                project = self.repo / bundle
+                project.mkdir()
+                done = subprocess.run([SHIM, flag, project, "-scheme", "App", output, self.repo / "out"],
+                                      cwd=self.tmp, env=self.env, text=True, capture_output=True)
+                self.assertNotEqual(done.returncode, 0)
+                self.assertIn(output, done.stderr)
+
     def test_session_hook_puts_the_shim_first_on_path_once(self) -> None:
         env_file = self.tmp / "claude-env"
         subprocess.run(["bash", str(SESSION_HOOK)], env={**self.env, "CLAUDE_ENV_FILE": str(env_file)}, check=True)
@@ -436,6 +504,9 @@ class XcodebuildShimTest(unittest.TestCase):
                              text=True, env={**self.env, "PATH": "/usr/bin:/bin"}, check=True).stdout.splitlines()
         self.assertEqual(out[0], f"{SHIM.parent}:/usr/bin:/bin")
         self.assertEqual(out[1], str(SHIM))
+        late = subprocess.check_output(["bash", "-c", '. "$1"; command -v xcodebuild', "bash", env_file],
+                                       env={**self.env, "PATH": f"/usr/bin:/bin:{SHIM.parent}"}, text=True)
+        self.assertEqual(late.strip(), str(SHIM))
         self.assertEqual(subprocess.run(["bash", str(SESSION_HOOK)], env=self.env).returncode, 0, "no env file is fine")
 
 
