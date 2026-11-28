@@ -3,9 +3,11 @@
 
 from __future__ import annotations
 
+import fcntl
 import importlib.machinery
 import importlib.util
 import io
+import json
 import os
 import subprocess
 import shutil
@@ -226,6 +228,40 @@ class AgentSweepTest(unittest.TestCase):
         self.assertFalse((nested / "old-session").exists())
         for kept in (fresh, nested / "new-session"):
             self.assertTrue(kept.exists(), kept)
+
+    def test_jobs_follow_their_lock_not_their_age(self) -> None:
+        scratch = self.tmp / "scratch"
+        jobs = scratch / "agent-job"
+        old = time.time() - 30 * 86400
+
+        def job(name: str) -> Path:
+            d = jobs / name
+            (d / "tmp").mkdir(parents=True)
+            (d / "tmp" / "out").write_text("x")
+            (d / "job.lock").write_text("")
+            (d / "job.json").write_text(json.dumps({"id": name, "colima_profile": None}))
+            return d
+        dead_fresh, dead_old, running = job("dead-fresh"), job("dead-old"), job("running")
+        for d in (dead_old, running):
+            for f in (d / "tmp" / "out", d / "tmp", d / "job.json", d / "job.lock", d):
+                os.utime(f, (old, old))
+        held = os.open(running / "job.lock", os.O_RDWR)
+        self.addCleanup(os.close, held)
+        fcntl.flock(held, fcntl.LOCK_EX)  # what a live agent-job runner holds
+        derived = scratch / "xcode" / "App-12345678" / "DerivedData" / "Build"
+        derived.mkdir(parents=True)
+        for f in (derived, derived.parent, derived.parent.parent):
+            os.utime(f, (old, old))
+        buf = io.StringIO()
+        totals = sweep_mod.sweep([self.wts], False, 14, False, out=buf, scratch=scratch)
+        self.assertEqual(totals["jobs"], 2)
+        self.assertIn("job is running", self.line(buf.getvalue(), str(running)))
+        self.assertTrue(dead_old.exists(), "report mode removed a job")
+        sweep_mod.sweep([self.wts], True, 14, False, out=io.StringIO(), scratch=scratch)
+        self.assertFalse(dead_fresh.exists())
+        self.assertFalse(dead_old.exists())
+        self.assertTrue((running / "tmp" / "out").exists(), "idle running job was removed")
+        self.assertFalse((scratch / "xcode" / "App-12345678").exists(), "idle DerivedData scratch kept")
 
     def test_worktree_reached_through_link_counts_as_inside(self) -> None:
         # What agent-locations does: the app made a worktree in its own folder, which was then
