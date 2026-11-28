@@ -31,6 +31,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from stat import S_ISREG
 from typing import Dict, List, Optional, Set, Tuple
 
 # The shared worktree folder and project checkouts, plus older places agents and apps left worktrees.
@@ -289,76 +290,545 @@ def iso_epoch(value: object) -> float:
         return 0.0
 
 
+def trace_path_inodes(raw_path: Path) -> Tuple[Set[str], Set[str]]:
+    """Return (leaf_or_link_inodes, ancestor_dir_inodes) visited while resolving raw_path step-by-step."""
+    keep_inodes: Set[str] = set()
+    anc_inodes: Set[str] = set()
+    base = raw_path if raw_path.is_absolute() else (Path.cwd() / raw_path)
+    queue = [part for part in base.parts[1:] if part and part != "."]
+    cur = Path(base.anchor or "/")
+    hops = 0
+    completed = True
+    while queue:
+        part = queue.pop(0)
+        if part == "..":
+            cur = cur.parent
+            continue
+        try:
+            pst = cur.stat()
+            anc_inodes.add(f"\0anc:{pst.st_dev}:{pst.st_ino}")
+        except OSError:
+            pass
+        nxt = cur / part
+        try:
+            lst = nxt.lstat()
+        except OSError:
+            completed = False
+            break
+        if queue:
+            anc_inodes.add(f"\0anc:{lst.st_dev}:{lst.st_ino}")
+        else:
+            keep_inodes.add(f"\0inode:{lst.st_dev}:{lst.st_ino}")
+        if os.path.islink(nxt):
+            keep_inodes.add(f"\0inode:{lst.st_dev}:{lst.st_ino}")
+            hops += 1
+            if hops > 40:
+                completed = False
+                break
+            try:
+                target = Path(os.readlink(nxt))
+            except OSError:
+                completed = False
+                break
+            if target.is_absolute():
+                cur = Path(target.anchor or "/")
+                queue = [x for x in target.parts[1:] if x and x != "."] + queue
+            else:
+                queue = [x for x in target.parts if x and x != "."] + queue
+            continue
+        cur = nxt
+    if completed:
+        try:
+            fst = cur.stat()
+            keep_inodes.add(f"\0inode:{fst.st_dev}:{fst.st_ino}")
+        except OSError:
+            pass
+    return keep_inodes, anc_inodes
+
+
 def t3_worktree_activity(db_path: Optional[Path] = None) -> Optional[Dict[str, float]]:
     """Latest T3 Code thread/snooze timestamp per worktree path, or None if an existing DB cannot be verified."""
-    db = db_path if db_path is not None else Path(os.environ.get("AGENT_SWEEP_T3_DB", Path.home() / ".t3/userdata/statev2.sqlite"))
-    if not db.exists():
+    db = (db_path if db_path is not None else Path(os.environ.get("AGENT_SWEEP_T3_DB", Path.home() / ".t3/userdata/statev2.sqlite"))).expanduser()
+    try:
+        st = db.stat()
+    except FileNotFoundError:
         return {}
-    if not db.is_file():
+    except (OSError, ValueError):
+        return None
+    if not S_ISREG(st.st_mode) or st.st_size == 0:
         return None
     activity: Dict[str, float] = {}
+    now_ts = time.time()
 
-    def record(wt_path: object, *timestamps: object) -> bool:
-        if wt_path is None or wt_path == "":
-            return True
-        if not isinstance(wt_path, str):
-            return False
+    def record_epoch(wt_path: str, stamp: float) -> None:
+        p = Path(wt_path)
+        keys = {str(p)}
+        keep_inodes, anc_inodes = trace_path_inodes(p)
+        keys.update(keep_inodes)
+        for anc_key in anc_inodes:
+            activity[anc_key] = max(activity.get(anc_key, 0.0), stamp)
+        try:
+            if p.exists():
+                resolved = p.resolve()
+                keys.add(str(resolved))
+                st = p.stat()
+                keys.add(f"\0inode:{st.st_dev}:{st.st_ino}")
+                for anc in resolved.parents:
+                    try:
+                        ast = anc.stat()
+                        anc_key = f"\0anc:{ast.st_dev}:{ast.st_ino}"
+                        activity[anc_key] = max(activity.get(anc_key, 0.0), stamp)
+                    except OSError:
+                        break
+        except OSError:
+            pass
+        for key in keys:
+            activity[key] = max(activity.get(key, 0.0), stamp)
+
+    def record_hold(wt_path: object, hold_until: float, include_children: bool = True, prefix: str = "\0hold") -> None:
+        if not isinstance(wt_path, str) or not wt_path or hold_until <= 0:
+            return
+        p = Path(wt_path)
+        hkeys: Set[str] = {f"{prefix}path:{p}"} if include_children else {f"{prefix}exact:{p}"}
+        keep_inodes, anc_inodes = trace_path_inodes(p)
+        for k in keep_inodes | anc_inodes:
+            _, dev, ino = k.split(":", 2)
+            hkeys.add(f"{prefix}:{dev}:{ino}")
+        for k in keep_inodes:
+            _, dev, ino = k.split(":", 2)
+            hkeys.add(f"{prefix}{'leaf' if include_children else 'self'}:{dev}:{ino}")
+        try:
+            if p.exists():
+                resolved = p.resolve()
+                hkeys.add(f"{prefix}path:{resolved}" if include_children else f"{prefix}exact:{resolved}")
+                st_p = p.stat()
+                hkeys.add(f"{prefix}:{st_p.st_dev}:{st_p.st_ino}")
+                hkeys.add(f"{prefix}{'leaf' if include_children else 'self'}:{st_p.st_dev}:{st_p.st_ino}")
+                for anc in resolved.parents:
+                    try:
+                        ast = anc.stat()
+                        hkeys.add(f"{prefix}:{ast.st_dev}:{ast.st_ino}")
+                    except OSError:
+                        break
+        except OSError:
+            pass
+        for hk in hkeys:
+            activity[hk] = max(activity.get(hk, 0.0), hold_until)
+
+    def parse_stamps(*timestamps: object) -> Optional[float]:
         parsed: List[float] = []
         for ts in timestamps:
             if ts is None or ts == "":
                 continue
             epoch = iso_epoch(ts)
             if epoch <= 0:
-                return False
+                return None
             parsed.append(epoch)
-        if not parsed:
+        return max(parsed) if parsed else 0.0
+
+    def record(wt_path: object, *timestamps: object) -> bool:
+        if wt_path is not None and wt_path != "" and not isinstance(wt_path, str):
             return False
-        stamp = max(parsed)
-        p = Path(wt_path)
-        for key in {str(p), str(p.resolve()) if p.exists() else str(p)}:
-            activity[key] = max(activity.get(key, 0.0), stamp)
+        best = parse_stamps(*timestamps)
+        if best is None:
+            return False
+        if isinstance(wt_path, str) and wt_path:
+            if best <= 0:
+                return False
+            record_epoch(wt_path, best)
         return True
 
     try:
-        if db.stat().st_size == 0:
-            return None
-        con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        con = sqlite3.connect(f"{db.absolute().as_uri()}?mode=ro", uri=True)
         try:
             tables = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
             if not (tables & {"projection_threads", "orchestration_v2_projection_threads"}):
                 return None
+            thread_worktrees: Dict[str, str] = {}
+            thread_stamps: Dict[str, float] = {}
+            thread_holds: Dict[str, float] = {}
+            thread_payloads: Dict[str, Dict[str, object]] = {}
+            subagent_links: List[Tuple[str, str, bool]] = []
+
+            def mark_thread(tid: object, stamp: float = 0.0, hold: float = 0.0) -> None:
+                if not isinstance(tid, str) or not tid:
+                    return
+                if stamp > 0:
+                    thread_stamps[tid] = max(thread_stamps.get(tid, 0.0), stamp)
+                if hold > 0:
+                    thread_holds[tid] = max(thread_holds.get(tid, 0.0), hold)
+                if tid in thread_worktrees:
+                    twt = thread_worktrees[tid]
+                    if stamp > 0:
+                        record_epoch(twt, stamp)
+                    if hold > 0:
+                        record_hold(twt, hold)
+
             if "projection_threads" in tables:
                 cols = {r[1] for r in con.execute("PRAGMA table_info(projection_threads)").fetchall()}
                 if not ({"worktree_path", "updated_at"} <= cols):
                     return None
-                extra = [c for c in ("updated_at", "latest_user_message_at", "snoozed_at", "snoozed_until") if c in cols]
-                where = "WHERE worktree_path IS NOT NULL" + (" AND deleted_at IS NULL" if "deleted_at" in cols else "")
-                for row in con.execute(f"SELECT worktree_path, {', '.join(extra)} FROM projection_threads {where}"):
-                    if not record(row[0], *row[1:]):
+                extra = [
+                    c for c in (
+                        "created_at",
+                        "updated_at",
+                        "latest_user_message_at",
+                        "snoozed_at",
+                        "snoozed_until",
+                        "last_snooze_wake_at",
+                        "unsettled_at",
+                        "pinned_at",
+                        "auto_settle_disabled_at",
+                    )
+                    if c in cols
+                ]
+                su_idx = extra.index("snoozed_until") + 1 if "snoozed_until" in extra else -1
+                tid_col = "thread_id, " if "thread_id" in cols else "NULL, "
+                pend_cols = [c for c in ("pending_approval_count", "pending_user_input_count") if c in cols]
+                pend_sql = (", " + ", ".join(pend_cols)) if pend_cols else ""
+                where = "WHERE deleted_at IS NULL" if "deleted_at" in cols else ""
+                for row in con.execute(f"SELECT {tid_col}worktree_path, {', '.join(extra)}{pend_sql} FROM projection_threads {where}"):
+                    v1_tid, v1_wt = row[0], row[1]
+                    ts_end = 2 + len(extra)
+                    st_val = parse_stamps(*row[2:ts_end])
+                    if st_val is None or not record(v1_wt, *row[2:ts_end]):
                         return None
+                    if isinstance(v1_tid, str) and v1_tid and isinstance(v1_wt, str) and v1_wt:
+                        thread_worktrees.setdefault(v1_tid, v1_wt)
+                    v1_hold = 0.0
+                    if su_idx > 0 and row[1 + su_idx]:
+                        su_ep = iso_epoch(row[1 + su_idx])
+                        if su_ep > now_ts:
+                            v1_hold = max(v1_hold, su_ep)
+                    if any(isinstance(v, int) and v > 0 for v in row[ts_end:]):
+                        st_val = max(st_val, now_ts)
+                        v1_hold = max(v1_hold, now_ts + 86400)
+                    if isinstance(v1_wt, str) and v1_wt and v1_hold > now_ts:
+                        if st_val >= now_ts:
+                            record_epoch(v1_wt, st_val)
+                        record_hold(v1_wt, v1_hold)
+                    mark_thread(v1_tid, stamp=st_val, hold=v1_hold)
             if "orchestration_v2_projection_threads" in tables:
                 cols = {r[1] for r in con.execute("PRAGMA table_info(orchestration_v2_projection_threads)").fetchall()}
                 if not ({"updated_at", "payload_json"} <= cols):
                     return None
+                v2_tid_sql = "thread_id, " if "thread_id" in cols else "NULL, "
                 where = "WHERE deleted_at IS NULL" if "deleted_at" in cols else ""
-                for updated_at, payload_raw in con.execute(f"SELECT updated_at, payload_json FROM orchestration_v2_projection_threads {where}"):
+                for row_tid, updated_at, payload_raw in con.execute(f"SELECT {v2_tid_sql}updated_at, payload_json FROM orchestration_v2_projection_threads {where}"):
                     if not isinstance(payload_raw, str):
                         return None
                     payload = json.loads(payload_raw)
                     if not isinstance(payload, dict):
                         return None
-                    if not record(
-                        payload.get("worktreePath"),
+                    wt_raw = payload.get("worktreePath")
+                    tid = row_tid if isinstance(row_tid, str) and row_tid else payload.get("id")
+                    if isinstance(tid, str) and tid:
+                        thread_payloads[tid] = payload
+                        if isinstance(wt_raw, str) and wt_raw:
+                            thread_worktrees[tid] = wt_raw
+                        lineage = payload.get("lineage")
+                        if isinstance(lineage, dict):
+                            ptid = lineage.get("parentThreadId")
+                            rel = lineage.get("relationshipToParent")
+                            side = lineage.get("sideChat") is True
+                            if isinstance(ptid, str) and ptid and (rel == "subagent" or side):
+                                subagent_links.append((tid, ptid, rel == "subagent"))
+                    lr = payload.get("limitRecovery")
+                    lr_reset = (
+                        lr.get("resetAt")
+                        if isinstance(lr, dict) and (lr.get("autoResume") is True or lr.get("snooze") is True)
+                        else None
+                    )
+                    ts_args = (
                         updated_at,
+                        payload.get("createdAt"),
                         payload.get("updatedAt"),
                         payload.get("unsettledAt"),
                         payload.get("snoozedAt"),
                         payload.get("snoozedUntil"),
+                        payload.get("lastSnoozeWakeAt"),
+                        payload.get("lastVisitedAt"),
+                        payload.get("pinnedAt"),
+                        payload.get("autoSettleDisabledAt"),
+                        lr_reset,
+                    )
+                    v2_stamp = parse_stamps(*ts_args)
+                    if v2_stamp is None or not record(wt_raw, *ts_args):
+                        return None
+                    hold_ep = max(iso_epoch(payload.get("snoozedUntil")), iso_epoch(lr_reset))
+                    if (
+                        payload.get("activeRunId") is not None
+                        or payload.get("status") not in (None, "idle", "completed", "interrupted", "failed", "cancelled", "rolled_back")
+                        or bool(payload.get("pendingBackgroundTasks"))
+                        or payload.get("pendingRuntimeRequest") is not None
+                        or (
+                            isinstance(lr, dict)
+                            and lr.get("autoResume") is True
+                            and payload.get("status") == "failed"
+                            and payload.get("lastErrorClass") == "usage_limit"
+                            and payload.get("archivedAt") is None
+                            and payload.get("settledOverride") != "settled"
+                        )
+                    ):
+                        v2_stamp = max(v2_stamp, now_ts)
+                        hold_ep = max(hold_ep, now_ts + 86400)
+                        if isinstance(wt_raw, str) and wt_raw:
+                            record_epoch(wt_raw, now_ts)
+                    if isinstance(wt_raw, str) and wt_raw and hold_ep > now_ts:
+                        record_hold(wt_raw, hold_ep)
+                    mark_thread(tid, stamp=v2_stamp, hold=hold_ep if hold_ep > now_ts else 0.0)
+            if "orchestration_v2_projection_runs" in tables:
+                r_cols = {r[1] for r in con.execute("PRAGMA table_info(orchestration_v2_projection_runs)").fetchall()}
+                if not ({"thread_id", "status"} <= r_cols):
+                    return None
+                r_sel = [
+                    "thread_id",
+                    "status",
+                    "requested_at" if "requested_at" in r_cols else "NULL",
+                    "completed_at" if "completed_at" in r_cols else "NULL",
+                    "payload_json" if "payload_json" in r_cols else "NULL",
+                ]
+                for r_tid, r_status, req_at, comp_at, r_payload_raw in con.execute(f"SELECT {', '.join(r_sel)} FROM orchestration_v2_projection_runs"):
+                    r_payload: Dict[str, object] = {}
+                    if r_payload_raw is not None:
+                        if not isinstance(r_payload_raw, str):
+                            return None
+                        loaded_r = json.loads(r_payload_raw)
+                        if not isinstance(loaded_r, dict):
+                            return None
+                        r_payload = loaded_r
+                    eff_tid = r_tid if isinstance(r_tid, str) and r_tid else r_payload.get("threadId")
+                    if not isinstance(eff_tid, str) or not eff_tid:
+                        continue
+                    r_stamps = [
+                        v for v in (
+                            req_at,
+                            comp_at,
+                            r_payload.get("requestedAt"),
+                            r_payload.get("startedAt"),
+                            r_payload.get("completedAt"),
+                        )
+                        if v is not None and v != ""
+                    ]
+                    r_best = parse_stamps(*r_stamps)
+                    if r_best is None:
+                        return None
+                    if r_best > 0:
+                        mark_thread(eff_tid, stamp=r_best)
+                    if not isinstance(r_status, str) or r_status not in ("completed", "interrupted", "failed", "cancelled", "rolled_back"):
+                        mark_thread(eff_tid, stamp=now_ts, hold=now_ts + 86400)
+            if "orchestration_v2_projection_runtime_requests" in tables:
+                rr_cols = {r[1] for r in con.execute("PRAGMA table_info(orchestration_v2_projection_runtime_requests)").fetchall()}
+                if {"thread_id", "status"} <= rr_cols:
+                    rr_res = "resolved_at" if "resolved_at" in rr_cols else "NULL"
+                    for rr_tid, rr_status, rr_resolved in con.execute(f"SELECT thread_id, status, {rr_res} FROM orchestration_v2_projection_runtime_requests"):
+                        if isinstance(rr_tid, str) and rr_tid and rr_resolved is None and rr_status not in ("resolved", "cancelled", "declined", "failed", "saved", "linked"):
+                            mark_thread(rr_tid, stamp=now_ts, hold=now_ts + 86400)
+            if "orchestration_v2_projection_subagents" in tables:
+                sa_cols = {r[1] for r in con.execute("PRAGMA table_info(orchestration_v2_projection_subagents)").fetchall()}
+                if not ({"thread_id", "status"} <= sa_cols):
+                    return None
+                sa_sel = [
+                    "thread_id",
+                    "child_thread_id" if "child_thread_id" in sa_cols else "NULL",
+                    "status",
+                    "completion_delivery_state" if "completion_delivery_state" in sa_cols else "'delivered'",
+                    "started_at" if "started_at" in sa_cols else "NULL",
+                    "completed_at" if "completed_at" in sa_cols else "NULL",
+                    "updated_at" if "updated_at" in sa_cols else "NULL",
+                    "payload_json" if "payload_json" in sa_cols else "NULL",
+                ]
+                for sa_tid, sa_child_col, sa_status, sa_delivery, sa_start, sa_comp, sa_upd, sa_payload_raw in con.execute(
+                    f"SELECT {', '.join(sa_sel)} FROM orchestration_v2_projection_subagents"
+                ):
+                    sa_payload: Dict[str, object] = {}
+                    if sa_payload_raw is not None:
+                        if not isinstance(sa_payload_raw, str):
+                            return None
+                        loaded_sa = json.loads(sa_payload_raw)
+                        if not isinstance(loaded_sa, dict):
+                            return None
+                        sa_payload = loaded_sa
+                    eff_parent = sa_tid if isinstance(sa_tid, str) and sa_tid else sa_payload.get("threadId")
+                    eff_child = sa_child_col if isinstance(sa_child_col, str) and sa_child_col else sa_payload.get("childThreadId")
+                    if isinstance(eff_parent, str) and eff_parent and isinstance(eff_child, str) and eff_child:
+                        subagent_links.append((eff_child, eff_parent, True))
+                    sa_stamps = [
+                        v for v in (
+                            sa_start,
+                            sa_comp,
+                            sa_upd,
+                            sa_payload.get("startedAt"),
+                            sa_payload.get("completedAt"),
+                            sa_payload.get("updatedAt"),
+                        )
+                        if v is not None and v != ""
+                    ]
+                    sa_best = parse_stamps(*sa_stamps)
+                    if sa_best is None:
+                        return None
+                    sa_unsettled = (
+                        not isinstance(sa_status, str)
+                        or sa_status not in ("completed", "failed", "cancelled", "interrupted")
+                        or not isinstance(sa_delivery, str)
+                        or sa_delivery not in ("acknowledged", "delivered", "disposed")
+                    )
+                    for linked_tid in (eff_parent, eff_child):
+                        if sa_best > 0:
+                            mark_thread(linked_tid, stamp=sa_best)
+                        if sa_unsettled:
+                            mark_thread(linked_tid, stamp=now_ts, hold=now_ts + 86400)
+            if "orchestration_v2_projection_provider_sessions" in tables:
+                pps_cols = {r[1] for r in con.execute("PRAGMA table_info(orchestration_v2_projection_provider_sessions)").fetchall()}
+                if {"thread_id", "status"} <= pps_cols:
+                    pps_pjson = "payload_json" if "payload_json" in pps_cols else "NULL"
+                    for pps_tid, pps_status, pps_raw in con.execute(f"SELECT thread_id, status, {pps_pjson} FROM orchestration_v2_projection_provider_sessions"):
+                        if pps_status in ("starting", "running"):
+                            mark_thread(pps_tid, stamp=now_ts, hold=now_ts + 86400)
+                            if isinstance(pps_raw, str):
+                                pps_obj = json.loads(pps_raw)
+                                if isinstance(pps_obj, dict) and isinstance(pps_obj.get("cwd"), str) and pps_obj["cwd"].strip():
+                                    scwd = pps_obj["cwd"]
+                                    record_epoch(scwd, now_ts)
+                                    record_hold(scwd, now_ts + 86400)
+            if "orchestration_v2_effect_outbox" in tables:
+                eo_cols = {r[1] for r in con.execute("PRAGMA table_info(orchestration_v2_effect_outbox)").fetchall()}
+                if {"thread_id", "status"} <= eo_cols:
+                    for eo_tid, eo_status in con.execute("SELECT thread_id, status FROM orchestration_v2_effect_outbox"):
+                        if isinstance(eo_tid, str) and eo_tid and eo_status not in ("succeeded", "cancelled", "failed"):
+                            mark_thread(eo_tid, stamp=now_ts, hold=now_ts + 86400)
+            if "projection_thread_sessions" in tables:
+                ps_cols = {r[1] for r in con.execute("PRAGMA table_info(projection_thread_sessions)").fetchall()}
+                if {"thread_id", "status"} <= ps_cols:
+                    ps_turn = "active_turn_id" if "active_turn_id" in ps_cols else "NULL"
+                    for ps_tid, ps_status, ps_turn_id in con.execute(f"SELECT thread_id, status, {ps_turn} FROM projection_thread_sessions"):
+                        if isinstance(ps_tid, str) and ps_tid and (ps_status in ("starting", "running") or ps_turn_id is not None):
+                            mark_thread(ps_tid, stamp=now_ts, hold=now_ts + 86400)
+            if "workflow_steps" in tables:
+                ws_cols = {r[1] for r in con.execute("PRAGMA table_info(workflow_steps)").fetchall()}
+                if {"thread_id", "status"} <= ws_cols:
+                    for ws_tid, ws_status in con.execute("SELECT thread_id, status FROM workflow_steps WHERE thread_id IS NOT NULL"):
+                        if isinstance(ws_tid, str) and ws_tid and ws_status not in ("completed", "failed", "cancelled", "succeeded", "skipped"):
+                            mark_thread(ws_tid, stamp=now_ts, hold=now_ts + 86400)
+            if "orchestration_v2_thread_launch_workflows" in tables:
+                cols = {r[1] for r in con.execute("PRAGMA table_info(orchestration_v2_thread_launch_workflows)").fetchall()}
+                if {"worktree_path", "updated_at"} <= cols:
+                    extra_wf = [c for c in ("created_at", "updated_at") if c in cols]
+                    has_wf_status = "status" in cols
+                    sel_wf = ", ".join(extra_wf + (["status"] if has_wf_status else []))
+                    for row in con.execute(f"SELECT worktree_path, {sel_wf} FROM orchestration_v2_thread_launch_workflows WHERE worktree_path IS NOT NULL"):
+                        ts_vals = row[1:-1] if has_wf_status else row[1:]
+                        if not record(row[0], *ts_vals):
+                            return None
+                        if has_wf_status and isinstance(row[0], str) and row[0] and row[-1] not in ("completed", "failed", "cancelled"):
+                            wf_ep = max((iso_epoch(v) for v in ts_vals if v), default=0.0)
+                            if wf_ep >= now_ts - 3600:
+                                record_hold(row[0], now_ts + 3600)
+            if "scheduled_tasks" in tables:
+                st_cols = {r[1] for r in con.execute("PRAGMA table_info(scheduled_tasks)").fetchall()}
+                if {"enabled", "thread_id"} <= st_cols:
+                    for (sched_tid,) in con.execute("SELECT thread_id FROM scheduled_tasks WHERE enabled = 1 AND thread_id IS NOT NULL"):
+                        mark_thread(sched_tid, stamp=now_ts, hold=now_ts + 86400)
+            if "projection_projects" in tables:
+                pp_cols = {r[1] for r in con.execute("PRAGMA table_info(projection_projects)").fetchall()}
+                if "workspace_root" in pp_cols:
+                    pp_where = "WHERE workspace_root IS NOT NULL" + (" AND deleted_at IS NULL" if "deleted_at" in pp_cols else "")
+                    for (wroot,) in con.execute(f"SELECT workspace_root FROM projection_projects {pp_where}"):
+                        if isinstance(wroot, str) and wroot.strip():
+                            record_hold(wroot, now_ts + 86400, include_children=False)
+            if subagent_links:
+                for _ in range(len(subagent_links)):
+                    progressed = False
+                    for child_tid, parent_tid, is_subagent in subagent_links:
+                        p_stamp = thread_stamps.get(parent_tid, 0.0)
+                        p_hold = thread_holds.get(parent_tid, 0.0)
+                        p_wt = thread_worktrees.get(parent_tid)
+                        if p_wt:
+                            pp = Path(p_wt)
+                            try:
+                                p_real = str(pp.resolve()) if pp.exists() else p_wt
+                            except OSError:
+                                p_real = p_wt
+                            p_stamp = max(p_stamp, t3_path_stamp(pp, p_real, activity))
+                            p_hold = max(p_hold, t3_direct_hold(pp, p_real, activity))
+                        if p_stamp > thread_stamps.get(child_tid, 0.0):
+                            mark_thread(child_tid, stamp=p_stamp)
+                            progressed = True
+                        if p_hold > now_ts and p_hold > thread_holds.get(child_tid, 0.0):
+                            mark_thread(child_tid, hold=p_hold)
+                            progressed = True
+                        if is_subagent:
+                            c_pl = thread_payloads.get(child_tid, {})
+                            p_pl = thread_payloads.get(parent_tid, {})
+                            if (
+                                "settledAt" in c_pl
+                                and c_pl.get("settledAt") is None
+                                and c_pl.get("settledOverride") != "settled"
+                                and "settledAt" in p_pl
+                                and p_pl.get("settledAt") is None
+                                and p_pl.get("settledOverride") != "settled"
+                                and thread_holds.get(child_tid, 0.0) <= now_ts
+                            ):
+                                mark_thread(child_tid, hold=now_ts + 86400)
+                                progressed = True
+                    if not progressed:
+                        break
+            if "task_folders" in tables:
+                tf_cols = {r[1] for r in con.execute("PRAGMA table_info(task_folders)").fetchall()}
+                if not ({"root", "project_path", "repositories_json"} <= tf_cols):
+                    return None
+                tf_sel = [
+                    "root",
+                    "real_root" if "real_root" in tf_cols else "NULL",
+                    "project_path",
+                    "repositories_json",
+                    "created_at" if "created_at" in tf_cols else "NULL",
+                ]
+                for tf_root, tf_real, tf_proj, repos_raw, tf_created in con.execute(f"SELECT {', '.join(tf_sel)} FROM task_folders"):
+                    if not (
+                        isinstance(tf_root, str) and tf_root.strip()
+                        and isinstance(tf_proj, str) and tf_proj.strip()
+                        and isinstance(repos_raw, str)
+                        and (tf_real is None or (isinstance(tf_real, str) and tf_real.strip()))
                     ):
                         return None
+                    repos = json.loads(repos_raw)
+                    if not isinstance(repos, list):
+                        return None
+                    members = [tf_root, tf_proj]
+                    if isinstance(tf_real, str):
+                        members.append(tf_real)
+                    for r_entry in repos:
+                        if not isinstance(r_entry, dict) or not isinstance(r_entry.get("worktreePath"), str) or not r_entry["worktreePath"].strip():
+                            return None
+                        members.append(r_entry["worktreePath"])
+                    group_stamp = 0.0
+                    group_hold = 0.0
+                    if tf_created is not None and tf_created != "":
+                        created_ep = iso_epoch(tf_created)
+                        if created_ep <= 0:
+                            return None
+                        group_stamp = created_ep
+                    for member in members:
+                        mp = Path(member)
+                        try:
+                            m_real = str(mp.resolve()) if mp.exists() else member
+                        except OSError:
+                            m_real = member
+                        group_stamp = max(group_stamp, t3_path_stamp(mp, m_real, activity))
+                        group_hold = max(group_hold, t3_direct_hold(mp, m_real, activity))
+                        if (mp / ".git").exists():
+                            group_stamp = max(group_stamp, last_activity(mp))
+                    if group_stamp > 0:
+                        for member in members:
+                            record_epoch(member, group_stamp)
+                            record_hold(member, group_stamp, prefix="\0tf")
+                    if group_hold > now_ts:
+                        for member in members:
+                            record_hold(member, group_hold)
         finally:
             con.close()
-    except (OSError, sqlite3.Error, json.JSONDecodeError):
+    except (OSError, ValueError, sqlite3.Error, json.JSONDecodeError):
         return None
     return activity
 
@@ -375,21 +845,246 @@ def newest_mtime(path: Path) -> float:
     return newest
 
 
-def sweep_scratch(scratch: Optional[Path], apply: bool, cutoff: float, days: int, cwds: Optional[List[str]],
-                  totals: Dict[str, int], emit) -> None:
+def t3_direct_hold(wt_path: Path, real_path: str, activity: Dict[str, float]) -> float:
+    paths = {str(wt_path), real_path}
+    best = max(
+        (activity.get(f"\0holdpath:{p}", 0.0) for p in paths),
+        default=0.0,
+    )
+    best = max(best, max((activity.get(f"\0holdexact:{p}", 0.0) for p in paths), default=0.0))
+    try:
+        lst = wt_path.lstat()
+        best = max(best, activity.get(f"\0hold:{lst.st_dev}:{lst.st_ino}", 0.0))
+        if wt_path.exists():
+            resolved = wt_path.resolve()
+            paths.add(str(resolved))
+            best = max(best, activity.get(f"\0holdpath:{resolved}", 0.0), activity.get(f"\0holdexact:{resolved}", 0.0))
+            st = wt_path.stat()
+            best = max(best, activity.get(f"\0hold:{st.st_dev}:{st.st_ino}", 0.0))
+            for anc in resolved.parents:
+                try:
+                    ast = anc.stat()
+                    best = max(best, activity.get(f"\0holdleaf:{ast.st_dev}:{ast.st_ino}", 0.0))
+                except OSError:
+                    break
+    except OSError:
+        pass
+    for k, stamp in activity.items():
+        if stamp <= best:
+            continue
+        if k.startswith("\0holdpath:"):
+            hp = k[len("\0holdpath:"):]
+            if any(p == hp or p.startswith(hp + "/") or hp.startswith(p + "/") for p in paths):
+                best = stamp
+        elif k.startswith("\0holdexact:"):
+            hp = k[len("\0holdexact:"):]
+            if any(p == hp or hp.startswith(p + "/") for p in paths):
+                best = stamp
+    return best
+
+
+def t3_holds_merged(wt_path: Path, real_path: str, activity: Dict[str, float], cutoff: float, now_ts: float) -> bool:
+    if t3_direct_hold(wt_path, real_path, activity) > now_ts:
+        return True
+    paths = {str(wt_path), real_path}
+    if any(activity.get(f"\0tfpath:{p}", 0.0) >= cutoff for p in paths):
+        return True
+    try:
+        lst = wt_path.lstat()
+        if (
+            activity.get(f"\0anc:{lst.st_dev}:{lst.st_ino}", 0.0) >= cutoff
+            or activity.get(f"\0tf:{lst.st_dev}:{lst.st_ino}", 0.0) >= cutoff
+        ):
+            return True
+        if wt_path.exists():
+            resolved = wt_path.resolve()
+            paths.add(str(resolved))
+            st = wt_path.stat()
+            if (
+                activity.get(f"\0anc:{st.st_dev}:{st.st_ino}", 0.0) >= cutoff
+                or activity.get(f"\0tf:{st.st_dev}:{st.st_ino}", 0.0) >= cutoff
+            ):
+                return True
+            for anc in resolved.parents:
+                try:
+                    ast = anc.stat()
+                    if activity.get(f"\0tfleaf:{ast.st_dev}:{ast.st_ino}", 0.0) >= cutoff:
+                        return True
+                except OSError:
+                    break
+    except OSError:
+        pass
+    for k, stamp in activity.items():
+        if stamp < cutoff:
+            continue
+        if not k.startswith("\0"):
+            if any(k.startswith(p + "/") for p in paths):
+                return True
+        elif k.startswith("\0tfpath:"):
+            tp = k[len("\0tfpath:"):]
+            if any(p == tp or p.startswith(tp + "/") or tp.startswith(p + "/") for p in paths):
+                return True
+    return False
+
+
+def t3_path_stamp(wt_path: Path, real_path: str, activity: Dict[str, float]) -> float:
+    paths = {str(wt_path), real_path}
+    best = max((activity.get(p, 0.0) for p in paths), default=0.0)
+    try:
+        lst = wt_path.lstat()
+        best = max(
+            best,
+            activity.get(f"\0inode:{lst.st_dev}:{lst.st_ino}", 0.0),
+            activity.get(f"\0anc:{lst.st_dev}:{lst.st_ino}", 0.0),
+        )
+        if wt_path.exists():
+            resolved = wt_path.resolve()
+            paths.add(str(resolved))
+            st = wt_path.stat()
+            best = max(
+                best,
+                activity.get(f"\0inode:{st.st_dev}:{st.st_ino}", 0.0),
+                activity.get(f"\0anc:{st.st_dev}:{st.st_ino}", 0.0),
+            )
+            for anc in resolved.parents:
+                try:
+                    ast = anc.stat()
+                    best = max(best, activity.get(f"\0inode:{ast.st_dev}:{ast.st_ino}", 0.0))
+                except OSError:
+                    break
+    except OSError:
+        pass
+    for k, stamp in activity.items():
+        if k.startswith("\0") or stamp <= best:
+            continue
+        if any(p == k or p.startswith(k + "/") or k.startswith(p + "/") for p in paths):
+            best = stamp
+    return best
+
+
+def t3_scratch_status(
+    entry: Path,
+    scratch_root: Path,
+    activity: Dict[str, float],
+    min_stamp: float,
+    now_ts: Optional[float] = None,
+) -> str:
+    now_check = time.time() if now_ts is None else now_ts
+    try:
+        paths = {str(entry), str(entry.resolve())} if not entry.is_symlink() else {str(entry)}
+    except OSError:
+        paths = {str(entry)}
+    try:
+        scratch_paths = {str(scratch_root), str(scratch_root.resolve())}
+    except OSError:
+        scratch_paths = {str(scratch_root)}
+    try:
+        lst = entry.lstat()
+        if (
+            activity.get(f"\0inode:{lst.st_dev}:{lst.st_ino}", 0.0) >= min_stamp
+            or activity.get(f"\0holdleaf:{lst.st_dev}:{lst.st_ino}", 0.0) > now_check
+            or activity.get(f"\0holdself:{lst.st_dev}:{lst.st_ino}", 0.0) > now_check
+            or (entry.is_symlink() and activity.get(f"\0hold:{lst.st_dev}:{lst.st_ino}", 0.0) > now_check)
+        ):
+            return "keep"
+        if not entry.is_symlink():
+            root_st = scratch_root.stat()
+            cur = entry.resolve()
+            while True:
+                cst = cur.stat()
+                if (cst.st_dev, cst.st_ino) == (root_st.st_dev, root_st.st_ino):
+                    break
+                if (
+                    activity.get(f"\0inode:{cst.st_dev}:{cst.st_ino}", 0.0) >= min_stamp
+                    or activity.get(f"\0holdleaf:{cst.st_dev}:{cst.st_ino}", 0.0) > now_check
+                    or activity.get(f"\0holdself:{cst.st_dev}:{cst.st_ino}", 0.0) > now_check
+                ):
+                    return "keep"
+                if cur.parent == cur:
+                    break
+                cur = cur.parent
+            est = entry.stat()
+            if (
+                activity.get(f"\0anc:{est.st_dev}:{est.st_ino}", 0.0) >= min_stamp
+                or activity.get(f"\0hold:{est.st_dev}:{est.st_ino}", 0.0) > now_check
+            ):
+                return "descend"
+    except OSError:
+        pass
+    has_active_child = False
+    for k, stamp in activity.items():
+        if not k.startswith("\0"):
+            if stamp < min_stamp:
+                continue
+            for p in paths:
+                if p == k or p.startswith(k + "/"):
+                    return "keep"
+                if k.startswith(p + "/"):
+                    has_active_child = True
+        elif k.startswith("\0holdpath:") and stamp > now_check:
+            hp = k[len("\0holdpath:"):]
+            for p in paths:
+                if p == hp or p.startswith(hp + "/"):
+                    return "keep"
+                if hp.startswith(p + "/"):
+                    has_active_child = True
+        elif k.startswith("\0holdexact:") and stamp > now_check:
+            hp = k[len("\0holdexact:"):]
+            if any(sr == hp or sr.startswith(hp + "/") for sr in scratch_paths):
+                continue
+            for p in paths:
+                if p == hp or p.startswith(hp + "/"):
+                    return "keep"
+                if hp.startswith(p + "/"):
+                    has_active_child = True
+    return "descend" if has_active_child else "idle"
+
+
+def sweep_scratch(
+    scratch: Optional[Path],
+    apply: bool,
+    cutoff: float,
+    days: int,
+    cwds: Optional[List[str]],
+    totals: Dict[str, int],
+    emit,
+    t3_activity: Optional[Dict[str, float]] = None,
+    t3_db: Optional[Path] = None,
+    t3_checked: bool = False,
+) -> None:
     """Remove scratch entries untouched for --days, descending into active folders to find idle ones."""
-    if scratch is None or not scratch.is_dir() or cwds is None:
+    if scratch is None or not scratch.is_dir() or cwds is None or (t3_checked and t3_activity is None):
         return
+    cur_t3 = t3_activity
 
     def visit(d: Path, depth: int) -> None:
+        nonlocal cur_t3
         for entry in sorted(d.iterdir()):
+            if t3_checked and cur_t3 is None:
+                return
             if any(c == str(entry) or c.startswith(str(entry) + "/") for c in cwds):
                 continue
-            if newest_mtime(entry) >= cutoff:
+            t3_state = t3_scratch_status(entry, scratch, cur_t3, cutoff) if cur_t3 else "idle"
+            if t3_state == "keep":
+                continue
+            if t3_state == "descend" or newest_mtime(entry) >= cutoff:
                 if depth < SCRATCH_DEPTH and entry.is_dir() and not entry.is_symlink():
                     visit(entry, depth + 1)
                 continue
             kb = 0 if entry.is_symlink() else size_kb(entry)
+            if apply and t3_db is not None:
+                fresh_t3 = t3_worktree_activity(t3_db)
+                if fresh_t3 is None:
+                    if cur_t3 is not None:
+                        emit("t3", "warning", str(t3_db), "T3 thread activity could not be checked; unmerged worktrees were kept")
+                    cur_t3 = None
+                    return
+                cur_t3 = fresh_t3
+                rechecked = t3_scratch_status(entry, scratch, cur_t3, time.time() - days * 86400)
+                if rechecked != "idle":
+                    if rechecked == "descend" and depth < SCRATCH_DEPTH and entry.is_dir() and not entry.is_symlink():
+                        visit(entry, depth + 1)
+                    continue
             emit("scratch", "remove", str(entry), f"idle {days}+ days", kb)
             totals["scratch"] += 1
             if not apply:
@@ -414,14 +1109,32 @@ def sweep(roots: List[Path], apply: bool, days: int, fetch: bool, out=sys.stdout
           scratch: Optional[Path] = None) -> Dict[str, int]:
     cwds = process_cwds()
     me = str(Path.cwd().resolve())
-    cutoff = time.time() - days * 86400
-    t3_db = Path(os.environ.get("AGENT_SWEEP_T3_DB", Path.home() / ".t3/userdata/statev2.sqlite"))
+    now_start = time.time()
+    cutoff = now_start - days * 86400
+    t3_db = Path(os.environ.get("AGENT_SWEEP_T3_DB", Path.home() / ".t3/userdata/statev2.sqlite")).expanduser()
     t3_activity = t3_worktree_activity(t3_db)
     totals = {"worktrees": 0, "branches": 0, "node_modules": 0, "scratch": 0, "jobs": 0, "kept": 0, "freed_kb": 0,
               "reclaimable_kb": 0}
 
     def emit(kind: str, verdict: str, path: str, why: str, kb: int = 0) -> None:
         print(f"{kind}\t{verdict}\t{human(kb) if kb else '-'}\t{path}\t{why}", file=out)
+
+    def refresh_state(wt_path: Path, real_path: str) -> Tuple[bool, bool]:
+        """Return (fresh_idle, fresh_held) after rereading Git and T3 SQLite immediately before removal."""
+        nonlocal t3_activity
+        git_stamp = last_activity(wt_path)
+        fresh_t3 = t3_worktree_activity(t3_db)
+        if fresh_t3 is None:
+            if t3_activity is not None:
+                emit("t3", "warning", str(t3_db), "T3 thread activity could not be checked; unmerged worktrees were kept")
+            t3_activity = None
+            return False, True
+        t3_activity = fresh_t3
+        now_recheck = time.time()
+        cut_recheck = now_recheck - days * 86400
+        fresh_idle = max(git_stamp, t3_path_stamp(wt_path, real_path, t3_activity)) < cut_recheck
+        fresh_held = t3_holds_merged(wt_path, real_path, t3_activity, cut_recheck, now_recheck)
+        return fresh_idle, fresh_held
 
     if t3_activity is None:
         emit("t3", "warning", str(t3_db), "T3 thread activity could not be checked; unmerged worktrees were kept")
@@ -448,7 +1161,8 @@ def sweep(roots: List[Path], apply: bool, days: int, fetch: bool, out=sys.stdout
                 continue
             sha, branch = t.get("HEAD", ""), t.get("branch", "").removeprefix("refs/heads/")
             done = bool(state := worktree_state(wt)) and not state[0] and repo.finished(sha, branch)
-            idle = False if t3_activity is None else max(last_activity(wt), t3_activity.get(str(wt), 0.0), t3_activity.get(real, 0.0)) < cutoff
+            idle = False if t3_activity is None else max(last_activity(wt), t3_path_stamp(wt, real, t3_activity)) < cutoff
+            t3_held = True if t3_activity is None else t3_holds_merged(wt, real, t3_activity, cutoff, now_start)
             if not inside:
                 reason = "outside the scanned folders"
             elif "locked" in t:
@@ -459,38 +1173,46 @@ def sweep(roots: List[Path], apply: bool, days: int, fetch: bool, out=sys.stdout
                 reason = "git status failed"
             elif branch == base_name:
                 reason = "default branch"
-            elif t3_activity is None and not done:
+            elif t3_activity is None:
                 reason = "T3 thread activity could not be checked"
-            elif not idle and not done:
+            elif t3_held or (not idle and not done):
                 reason = f"active in the last {days} days"
             elif state[1]:
                 reason = state[1]
             else:
                 reason = ""
             kb = size_kb(wt)
+            lost: List[str] = []
+            if not reason:
+                lost = ["uncommitted changes"] if state and state[0] else []
+                if repo.fetch_failed or not repo.base:
+                    lost.append("commits of unknown merge state")
+                elif not repo.merged(sha):
+                    n = repo.unpushed(sha)
+                    lost.append(f"{n} unpushed commit(s)" if n else "unmerged commits")
+                if apply:
+                    fresh_idle, fresh_held = refresh_state(wt, real)
+                    idle, t3_held = fresh_idle, fresh_held
+                    if fresh_held or (not fresh_idle and not done):
+                        reason = "T3 thread activity could not be checked" if t3_activity is None else f"active in the last {days} days"
             if reason:
                 totals["kept"] += 1
                 emit("worktree", "keep", str(wt), reason, kb)
                 stale = wt / "node_modules"
-                if inside and idle and not busy and state is not None and "locked" not in t and stale.is_dir() and not stale.is_symlink():
+                if inside and idle and not t3_held and not busy and state is not None and "locked" not in t and stale.is_dir() and not stale.is_symlink():
                     nkb = size_kb(stale)
-                    totals["node_modules"] += 1
-                    emit("node_modules", "remove", str(stale), f"idle {days}+ days, reinstallable", nkb)
-                    if apply:
-                        try:
-                            shutil.rmtree(stale)
-                            totals["freed_kb"] += nkb
-                        except OSError as err:
-                            emit("node_modules", "error", str(stale), str(err))
-                    else:
-                        totals["reclaimable_kb"] += nkb
+                    if not apply or (lambda fi, fh: fi and not fh)(*refresh_state(wt, real)):
+                        totals["node_modules"] += 1
+                        emit("node_modules", "remove", str(stale), f"idle {days}+ days, reinstallable", nkb)
+                        if apply:
+                            try:
+                                shutil.rmtree(stale)
+                                totals["freed_kb"] += nkb
+                            except OSError as err:
+                                emit("node_modules", "error", str(stale), str(err))
+                        else:
+                            totals["reclaimable_kb"] += nkb
                 continue
-            lost = ["uncommitted changes"] if state and state[0] else []
-            if repo.fetch_failed or not repo.base:
-                lost.append("commits of unknown merge state")
-            elif not repo.merged(sha):
-                n = repo.unpushed(sha)
-                lost.append(f"{n} unpushed commit(s)" if n else "unmerged commits")
             emit("worktree", "remove", str(wt), f"{f'idle {days}+ days' if idle else 'merged'} ({branch or 'detached'}; "
                  f"{'discards ' + ', '.join(lost) if lost else 'merged'})", kb)
             totals["worktrees"] += 1
@@ -520,7 +1242,7 @@ def sweep(roots: List[Path], apply: bool, days: int, fetch: bool, out=sys.stdout
         if repo.pr_lookup_failed:
             emit("github", "warning", label, "merged-PR lookup failed; squash merges were not recognised")
 
-    sweep_scratch(scratch, apply, cutoff, days, cwds, totals, emit)
+    sweep_scratch(scratch, apply, cutoff, days, cwds, totals, emit, t3_activity=t3_activity, t3_db=t3_db, t3_checked=True)
     if scratch is not None:
         totals["jobs"] = agent_job.sweep_jobs(scratch / agent_job.JOBS_TOOL, apply, emit)
 
