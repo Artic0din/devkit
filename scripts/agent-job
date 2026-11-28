@@ -116,15 +116,69 @@ def delete_colima(profile: str, home: Path) -> Tuple[bool, str]:
     return True, ""
 
 
+def clean_package_checkout(root: str) -> bool:
+    checks = (["status", "--porcelain", "--untracked-files=all", "--ignored"],
+              ["rev-list", "-1", "--all", "--reflog", "--not", "--remotes"])
+    for args in checks:
+        try:
+            result = subprocess.run(["git", "-C", root, *args], capture_output=True, timeout=30)
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+        if result.returncode or result.stdout:
+            return False
+    return True
+
+
+def write_record(job_dir: Path, rec: Dict[str, object]) -> None:
+    tmp = job_dir / f"{RECORD}.tmp"
+    tmp.write_text(json.dumps(rec))
+    os.replace(tmp, job_dir / RECORD)
+
+
+def command_session_active(job_dir: Path) -> bool:
+    try:
+        session = int((job_dir / "command.sid").read_text())
+    except FileNotFoundError:
+        return False
+    except (OSError, ValueError):
+        return True
+    try:
+        deadline = time.monotonic() + 2
+        while time.monotonic() < deadline:
+            with subprocess.Popen(["ps", "-axo", "pid=,stat="], stdout=subprocess.PIPE, text=True) as scan:
+                try:
+                    processes, _stderr = scan.communicate(timeout=10)
+                except subprocess.TimeoutExpired:
+                    scan.kill()
+                    return True
+                if scan.returncode or not processes.strip():
+                    return True
+            uncertain = False
+            for row in processes.splitlines():
+                pid_text, state = row.split()
+                pid = int(pid_text)
+                if pid == scan.pid or state.startswith("Z"):
+                    continue
+                try:
+                    if os.getsid(pid) == session:
+                        return True
+                except ProcessLookupError:
+                    # It may have forked a successor since ps enumerated it.
+                    uncertain = True
+            if not uncertain:
+                return False
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return True
+    return True
+
+
 def checkout_inside(job_dir: Path) -> str:
     for root, dirs, files in os.walk(job_dir):
         if ".git" in dirs or ".git" in files:
             relative = Path(root).relative_to(job_dir)
             package_roots = (Path("DerivedData/SourcePackages/checkouts"), Path("SourcePackages/checkouts"))
             if relative.parent in package_roots and ".git" in dirs and not (Path(root) / ".git").is_symlink():
-                state = subprocess.run(["git", "-C", root, "status", "--porcelain", "--untracked-files=all", "--ignored"],
-                                       capture_output=True)
-                if state.returncode == 0 and not state.stdout:
+                if clean_package_checkout(root):
                     dirs.remove(".git")
                     continue
             return str(relative)
@@ -139,7 +193,7 @@ def teardown(job_dir: Path, rec: Dict[str, object]) -> Tuple[bool, str]:
         if not done:
             return False, why
         rec = {**rec, "colima_profile": None}
-        (job_dir / RECORD).write_text(json.dumps(rec))
+        write_record(job_dir, rec)
     checkout = checkout_inside(job_dir)
     if checkout:
         return False, f"kept {job_dir}: it holds a Git checkout at {checkout}"
@@ -175,6 +229,9 @@ def sweep_jobs(root: Path, apply: bool, emit: Callable[..., None]) -> int:
             emit("job", "keep", str(job_dir), "job is running")
             continue
         try:
+            if command_session_active(job_dir):
+                emit("job", "keep", str(job_dir), "job is running")
+                continue
             profile = rec.get("colima_profile")
             if apply:
                 try:
@@ -206,7 +263,7 @@ def new_job(label: str, colima: bool) -> Tuple[Path, int, Dict[str, object]]:
         job_id = f"{slug}-{secrets.token_hex(4)}"
         job_dir = root / job_id
         try:
-            job_dir.mkdir()
+            job_dir.mkdir(mode=0o700)
             break
         except FileExistsError:
             continue
@@ -222,9 +279,7 @@ def new_job(label: str, colima: bool) -> Tuple[Path, int, Dict[str, object]]:
     rec: Dict[str, object] = {"id": job_id, "colima_profile": profile, "pid": os.getpid(), "created": time.time()}
     if profile:
         rec["colima_home"] = str(home)
-    tmp = job_dir / f"{RECORD}.tmp"
-    tmp.write_text(json.dumps(rec))
-    os.replace(tmp, job_dir / RECORD)  # recorded before the profile exists, so a crash mid-start is recovered
+    write_record(job_dir, rec)
     (job_dir / "tmp").mkdir()
     return job_dir, fd, rec
 
@@ -308,7 +363,9 @@ def run(label: str, colima: bool, colima_args: List[str], command: List[str]) ->
                 raise Interrupted()
             if startup != 0:
                 raise JobError(f"colima start {profile} failed with exit {startup}")
-        code = run_phase(command, env)
+        # Record the session leader before exec: workers can close the inherited lock.
+        launch = 'echo "$$" > "$AGENT_JOB_DIR/command.sid" && exec "$@"'
+        code = run_phase(["/bin/sh", "-c", launch, "agent-command", *command], env)
         code = 128 - code if code < 0 else code
     except Interrupted:
         pass
@@ -325,6 +382,9 @@ def run(label: str, colima: bool, colima_args: List[str], command: List[str]) ->
         done, why = False, ""
         for attempt in range(2):
             try:
+                if command_session_active(job_dir):
+                    done, why = False, "job workers are still running"
+                    break
                 done, why = teardown(job_dir, rec)
                 break
             except OSError as err:  # a just-killed process can still be writing into the folder

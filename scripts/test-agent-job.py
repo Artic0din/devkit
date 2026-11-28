@@ -16,6 +16,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from typing import List
 
@@ -217,6 +218,82 @@ class AgentJobTest(unittest.TestCase):
         self.sweep(apply=True)
         self.assert_clean()
 
+    def test_stalled_git_check_preserves_package_checkout(self) -> None:
+        repo = self.tmp / "SourcePackages/checkouts/Lib"
+        repo.mkdir(parents=True)
+        sh(repo, "git", "init", "-q")
+        def stall(*args, timeout, **kwargs):
+            self.assertGreater(timeout, 0)
+            raise subprocess.TimeoutExpired(args, timeout)
+        with patch.object(subprocess, "run", side_effect=stall):
+            self.assertEqual(job_mod.checkout_inside(self.tmp), "SourcePackages/checkouts/Lib")
+
+    def test_interrupted_record_update_preserves_previous_record(self) -> None:
+        path, fd, record = job_mod.new_job("record", True)
+        try:
+            with patch.object(os, "replace", side_effect=OSError("interrupted")):
+                with self.assertRaises(OSError):
+                    job_mod.teardown(path, record)
+            self.assertEqual(job_mod.read_record(path), record)
+            self.assertTrue(job_mod.teardown(path, record)[0])
+        finally:
+            os.close(fd)
+
+    def test_job_is_private_with_a_permissive_umask(self) -> None:
+        done = self.job("--", sys.executable, "-c",
+                        'import os;print(oct(os.stat(os.environ["AGENT_JOB_DIR"]).st_mode & 0o777))')
+        self.assertEqual(done.stdout.strip(), "0o700")
+
+    def test_indeterminate_session_scan_preserves_job(self) -> None:
+        (self.tmp / "command.sid").write_text("42")
+        with patch.object(os, "getsid", side_effect=ProcessLookupError):
+            self.assertTrue(job_mod.command_session_active(self.tmp))
+
+    def test_worker_without_lock_keeps_job_active(self) -> None:
+        worker_file = self.tmp / "worker"
+        script = ("import os,subprocess,sys,time; "
+                  "p=subprocess.Popen(['sleep','30'],close_fds=True,preexec_fn=os.setpgrp); "
+                  "open(sys.argv[1],'w').write(str(p.pid)+' '+str(os.getpid())); time.sleep(30)")
+        runner = self.spawn("--", sys.executable, "-c", script, str(worker_file))
+        wait_for(worker_file)
+        worker, leader = map(int, worker_file.read_text().split())
+        try:
+            runner.kill()
+            runner.wait(timeout=10)
+            os.kill(leader, signal.SIGKILL)
+            deadline = time.monotonic() + 5
+            while alive(leader) and time.monotonic() < deadline:
+                time.sleep(0.05)
+            self.assertIn("job is running", self.sweep(apply=True))
+        finally:
+            os.kill(worker, signal.SIGKILL)
+        deadline = time.monotonic() + 5
+        while "job is running" in self.sweep(apply=False):
+            self.assertLess(time.monotonic(), deadline)
+            time.sleep(0.05)
+        self.sweep(apply=True)
+        self.assert_clean()
+
+    def test_package_edits_and_local_commits_survive_sweep(self) -> None:
+        source = self.tmp / "remote"
+        source.mkdir()
+        sh(source, "git", "init", "-q")
+        (source / "code").write_text("upstream")
+        sh(source, "git", "add", "code")
+        sh(source, "git", "commit", "-qm", "upstream")
+        for commit in (False, True):
+            with self.subTest(commit=commit):
+                script = ('repo="$AGENT_JOB_DIR/SourcePackages/checkouts/Lib"; git clone -q "$1" "$repo"; '
+                          'echo local > "$repo/code"')
+                if commit:
+                    script += '; git -C "$repo" -c user.name=t -c user.email=t@t commit -qam local'
+                done = self.job("--", "sh", "-ec", script, "sh", str(source))
+                self.assertNotEqual(done.returncode, 0)
+                self.sweep(apply=True)
+                files = list((self.scratch / "agent-job").glob("*/SourcePackages/checkouts/Lib/code"))
+                self.assertEqual(len(files), 1 + int(commit))
+                self.assertTrue(all(file.read_text() == "local\n" for file in files))
+
     def test_ignored_package_file_survives_cleanup(self) -> None:
         script = ('repo="$AGENT_JOB_DIR/SourcePackages/checkouts/Lib"; git init -q "$repo"; '
                   'echo .env >> "$repo/.git/info/exclude"; touch "$repo/.env"')
@@ -237,21 +314,26 @@ class StartupExit(int):
         return super().__ne__(other)
 class ObservedProcess(subprocess.Popen):
     def __init__(self, args, **kwargs):
-        if args == ["true"]:
+        if args[-1:] == ["true"]:
             open(sys.argv[2], "w").close()
         super().__init__(args, **kwargs)
     def wait(self, *args, **kwargs):
         result = super().wait(*args, **kwargs)
         if self.args[:1] == ["/bin/bash"]:
+            if sys.argv[3] == "pending":
+                os.kill(os.getpid(), signal.SIGTERM)
+                return result
             return StartupExit(result)
         return result
 subprocess.Popen = ObservedProcess
 sys.exit(module["run"]("handoff", True, [], ["true"]))
 """
-        runner = subprocess.run([sys.executable, "-c", driver, str(JOB), str(marker)], env=self.env)
-        self.assertEqual(runner.returncode, 143)
-        self.assertFalse(marker.exists(), "command spawned after cancellation")
-        self.assert_clean()
+        for timing in ("pending", "handoff"):
+            with self.subTest(timing=timing):
+                runner = subprocess.run([sys.executable, "-c", driver, str(JOB), str(marker), timing], env=self.env)
+                self.assertEqual(runner.returncode, 143)
+                self.assertFalse(marker.exists(), "command spawned after cancellation")
+                self.assert_clean()
 
     def test_cancel_during_colima_start_cleans_up(self) -> None:
         marker = self.tmp / "ran"
@@ -414,8 +496,9 @@ module = runpy.run_path(sys.argv[1])
 original = subprocess.Popen
 def interrupt(*args, **kwargs):
     proc = original(*args, **kwargs)
-    open(sys.argv[2], "w").write(str(proc.pid))
-    os.kill(os.getpid(), signal.SIGTERM)
+    if kwargs.get("start_new_session"):
+        open(sys.argv[2], "w").write(str(proc.pid))
+        os.kill(os.getpid(), signal.SIGTERM)
     return proc
 subprocess.Popen = interrupt
 sys.exit(module["run"]("signal", False, [], ["sleep", "5"]))
