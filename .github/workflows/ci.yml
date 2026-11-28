@@ -35,6 +35,9 @@ jobs:
       - name: Test agent leftover sweep (offline, synthetic)
         run: python3 scripts/test-agent-sweep.py
 
+      - name: Test agent jobs, xcodebuild shim and session hook (offline, synthetic)
+        run: python3 scripts/test-agent-job.py
+
       - name: Test agent sweep schedule (offline, synthetic)
         run: scripts/test-agent-sweep-schedule
 

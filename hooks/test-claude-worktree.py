@@ -61,6 +61,34 @@ class ClaudeWorktreeHookTest(unittest.TestCase):
         self.assertNotEqual(first, second)
         self.assertEqual(sh(second, "git", "rev-parse", "--path-format=absolute", "--git-common-dir"), str(twin / ".git"))
 
+    def test_remove_keeps_worktrees_holding_unsaved_work(self) -> None:
+        (self.repo / ".gitignore").write_text(".env\nnode_modules/\n")
+        sh(self.repo, "git", "add", ".gitignore")
+        sh(self.repo, "git", "commit", "-q", "-m", "ignore")
+        cases = {"modified": ("f", "edited"), "untracked": ("new.txt", "draft"), "staged": ("staged.txt", "s"),
+                 "ignored secret": (".env", "TOKEN=x")}
+        for label, (name, text) in cases.items():
+            with self.subTest(label):
+                path = Path(self.hook("create", {"name": label, "cwd": str(self.repo)}).stdout.strip())
+                (path / name).write_text(text)
+                if label == "staged":
+                    sh(path, "git", "add", name)
+                done = self.hook("remove", {"worktree_path": str(path)})
+                self.assertNotEqual(done.returncode, 0, label)
+                self.assertIn("keeping", done.stderr)
+                self.assertEqual((path / name).read_text(), text, f"{label} work was deleted")
+
+    def test_remove_drops_rebuildable_ignored_folders(self) -> None:
+        (self.repo / ".gitignore").write_text("node_modules/\n")
+        sh(self.repo, "git", "add", ".gitignore")
+        sh(self.repo, "git", "commit", "-q", "-m", "ignore")
+        path = Path(self.hook("create", {"name": "deps", "cwd": str(self.repo)}).stdout.strip())
+        (path / "node_modules" / "dep").mkdir(parents=True)
+        (path / "node_modules" / "dep" / "index.js").write_text("x")
+        done = self.hook("remove", {"worktree_path": str(path)})
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertFalse(path.exists())
+
     def test_remove_refuses_outside_root(self) -> None:
         other = self.tmp / "other"
         sh(self.repo, "git", "worktree", "add", "-q", "-b", "other", str(other))

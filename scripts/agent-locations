@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # agent-locations: keep every agent's worktrees and temp files in one place on this Mac.
 #
-#   agent-locations install   create the folders, point Claude Code at them, and
-#                             link the folders Cursor, Codex and T3 can't be told to move
+#   agent-locations install   create the folders, point Claude Code at them, put the
+#                             agent tool shims on its PATH, and link the folders
+#                             Cursor, Codex and T3 can't be told to move
 #   agent-locations status    show what is in place
 #
 # Worktrees: <worktrees>/<tool>/...  Scratch: <scratch>/<tool>/...  (scripts/canonical-paths.sh)
@@ -12,6 +13,7 @@ wt=$CANONICAL_WORKTREES_ROOT
 scratch=$CANONICAL_SCRATCH_ROOT
 settings="$HOME/.claude/settings.json"
 hook="$CANONICAL_CONFIG_ROOT/hooks/claude-worktree.py"
+session_hook="$CANONICAL_CONFIG_ROOT/hooks/claude-session-env.sh"
 # Folders these apps hardcode (no setting exists), each replaced by a link into the shared root.
 # shortcut: a symlink can break if an app update recreates its folder; status reports that.
 links=("$HOME/.cursor/worktrees=$wt/cursor" "$HOME/.codex/worktrees=$wt/codex" "$HOME/.t3/scratch=$scratch/t3")
@@ -33,13 +35,15 @@ link_into() {  # move an app folder's contents into the shared root and leave a 
 
 case "${1:-}" in
   install)
-    [[ -f "$hook" ]] || { echo "missing $hook: pull the main config checkout first" >&2; exit 2; }
+    for need in "$hook" "$session_hook"; do
+      [[ -f "$need" ]] || { echo "missing $need: pull the main config checkout first" >&2; exit 2; }
+    done
     mkdir -p "$wt"/{claude,codex,cursor,t3} "$scratch"/{claude,codex,cursor,t3}
     for pair in "${links[@]}"; do link_into "${pair%%=*}" "${pair#*=}"; done
     mkdir -p "$(dirname "$settings")"
-    python3 -I - "$settings" "$hook" "$wt" "$scratch/claude" <<'PY'
+    python3 -I - "$settings" "$hook" "$wt" "$scratch/claude" "$session_hook" <<'PY'
 import json, os, shlex, sys
-path, hook, wt, tmp = sys.argv[1:]
+path, hook, wt, tmp, session_hook = sys.argv[1:]
 data = json.load(open(path)) if os.path.exists(path) else {}
 data.setdefault("env", {})["CLAUDE_CODE_TMPDIR"] = tmp
 cmd = f"AGENT_WORKTREES_ROOT={shlex.quote(wt)} python3 {shlex.quote(hook)}"
@@ -49,6 +53,10 @@ for event, verb in (("WorktreeCreate", "create"), ("WorktreeRemove", "remove")):
     if hooks.get(event) not in (None, want):
         print(f"replacing existing {event} hook: {json.dumps(hooks[event])}", file=sys.stderr)
     hooks[event] = want
+# SessionStart keeps the user's other entries; ours is added once.
+starts = hooks.setdefault("SessionStart", [])
+if "claude-session-env.sh" not in json.dumps(starts):
+    starts.append({"hooks": [{"type": "command", "command": f"bash {shlex.quote(session_hook)}"}]})
 tmp_path = path + ".tmp"
 with open(tmp_path, "w") as f:
     json.dump(data, f, indent=2)
@@ -73,14 +81,15 @@ except (OSError, ValueError):
     data = {}
 good = data.get("env", {}).get("CLAUDE_CODE_TMPDIR") == tmp
 hooks = all("claude-worktree.py" in json.dumps(data.get("hooks", {}).get(e, [])) for e in ("WorktreeCreate", "WorktreeRemove"))
+hooks = hooks and "claude-session-env.sh" in json.dumps(data.get("hooks", {}).get("SessionStart", []))
 print(("ok   " if good else "DRIFT") + f" Claude Code CLAUDE_CODE_TMPDIR={tmp}")
-print(("ok   " if hooks else "DRIFT") + " Claude Code worktree hooks")
+print(("ok   " if hooks else "DRIFT") + " Claude Code worktree and session hooks")
 sys.exit(0 if good and hooks else 1)
 PY
     exit $ok
     ;;
   *)
-    sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'
     exit 2
     ;;
 esac

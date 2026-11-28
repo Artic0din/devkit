@@ -11,12 +11,16 @@ such as .DS_Store (any other ignored file could be a secret). Locked worktrees
 and ones a process works in are kept. A branch with no worktree is removed only
 when it is merged: its tip is an ancestor of origin's default branch, or a merged
 PR on GitHub has exactly that tip as its head (squash merges). Scratch entries
-under the shared scratch folder idle for --days are removed too.
+under the shared scratch folder idle for --days are removed too, except agent-job
+folders: a job whose runner and command are gone (none holds its lock) has exactly
+what it recorded removed, its Colima profile and disk included, at any age.
 """
 
 from __future__ import annotations
 
 import argparse
+import importlib.machinery
+import importlib.util
 import json
 import os
 import shutil
@@ -48,6 +52,18 @@ def junk_file(name: str) -> bool:
 SCRATCH_ROOT = "~/Metisary/Enviroment/scratch"
 SCRATCH_DEPTH = 3  # e.g. claude/claude-501/<project>/<session>: descend past active parents
 FETCH_TIMEOUT_S = 60
+
+
+def load_agent_job():
+    loader = importlib.machinery.SourceFileLoader("agent_job", str(Path(__file__).resolve().with_name("agent-job")))
+    spec = importlib.util.spec_from_loader("agent_job", loader)
+    assert spec
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module
+
+
+agent_job = load_agent_job()
 
 
 def run(args: List[str], cwd: Optional[Path] = None, timeout: int = 60) -> subprocess.CompletedProcess:
@@ -302,7 +318,8 @@ def sweep_scratch(scratch: Optional[Path], apply: bool, cutoff: float, days: int
                 emit("scratch", "error", str(entry), str(err))
 
     for tool in sorted(scratch.iterdir()):
-        if tool.is_dir() and not tool.is_symlink():
+        # A job's lock, not its age, says whether it is finished; sweep_jobs handles those.
+        if tool.is_dir() and not tool.is_symlink() and tool.name != agent_job.JOBS_TOOL:
             visit(tool, 1)
 
 
@@ -311,7 +328,8 @@ def sweep(roots: List[Path], apply: bool, days: int, fetch: bool, out=sys.stdout
     cwds = process_cwds()
     me = str(Path.cwd().resolve())
     cutoff = time.time() - days * 86400
-    totals = {"worktrees": 0, "branches": 0, "node_modules": 0, "scratch": 0, "kept": 0, "freed_kb": 0, "reclaimable_kb": 0}
+    totals = {"worktrees": 0, "branches": 0, "node_modules": 0, "scratch": 0, "jobs": 0, "kept": 0, "freed_kb": 0,
+              "reclaimable_kb": 0}
 
     def emit(kind: str, verdict: str, path: str, why: str, kb: int = 0) -> None:
         print(f"{kind}\t{verdict}\t{human(kb) if kb else '-'}\t{path}\t{why}", file=out)
@@ -409,6 +427,8 @@ def sweep(roots: List[Path], apply: bool, days: int, fetch: bool, out=sys.stdout
             emit("github", "warning", label, "merged-PR lookup failed; squash merges were not recognised")
 
     sweep_scratch(scratch, apply, cutoff, days, cwds, totals, emit)
+    if scratch is not None:
+        totals["jobs"] = agent_job.sweep_jobs(scratch / agent_job.JOBS_TOOL, apply, emit)
 
     if shutil.which("xcrun") and not os.environ.get("AGENT_SWEEP_SKIP_SIMULATORS"):
         sims = run(["xcrun", "simctl", "list", "devices", "unavailable"], timeout=120).stdout
@@ -433,7 +453,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     t = sweep(roots, a.apply, a.days, not a.no_fetch, scratch=scratch)
     done = f"freed {human(t['freed_kb'])}" if a.apply else f"reclaimable {human(t['reclaimable_kb'])}"
     print(f"summary\tworktrees={t['worktrees']} branches={t['branches']} node_modules={t['node_modules']} scratch={t['scratch']} "
-          f"kept={t['kept']} {done}{'' if a.apply else ' (report only; rerun with --apply)'}")
+          f"jobs={t['jobs']} kept={t['kept']} {done}{'' if a.apply else ' (report only; rerun with --apply)'}")
     return 0
 
 
